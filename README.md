@@ -1,6 +1,6 @@
-# Meghkawach
+# BurstWatch
 
-Meghkawach is a React and Vite dashboard for cloudburst-risk monitoring and
+BurstWatch is a React and Vite dashboard for cloudburst-risk monitoring and
 weather visualization.
 
 ## Requirements
