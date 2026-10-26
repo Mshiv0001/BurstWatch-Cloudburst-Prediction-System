@@ -615,7 +615,6 @@ export default function App() {
           is3D={is3D}
           onToggle3D={handleToggle3D}
           mapView={mapView}
-          onToggleMapView={(view) => setMapView(typeof view === 'string' ? view : (mapView === 'satellite' ? 'liberty' : 'satellite'))}
           isHomeView={isHomeView}
           isAnalyticsOpen={isAnalyticsOpen}
           showParticles={!showIntro && showParticles && windParticleMode !== 'off'}

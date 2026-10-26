@@ -30,11 +30,23 @@ import {
 } from '../utils/radarEchoesData';
 import { generateHazardRadiusGeoJSON } from '../services/cloudburstEventModel';
 
-// OpenFreeMap Official Vector Style Endpoints (Free, no API key required)
-export const OPENFREEMAP_STYLES = {
-  liberty: "https://tiles.openfreemap.org/styles/liberty",
-  positron: "https://tiles.openfreemap.org/styles/positron",
-  bright: "https://tiles.openfreemap.org/styles/bright"
+const BASEMAP_STYLE = {
+  version: 8,
+  sources: {
+    basemap: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap contributors'
+    }
+  },
+  layers: [
+    {
+      id: 'basemap',
+      type: 'raster',
+      source: 'basemap'
+    }
+  ]
 };
 
 // MapLibre GL JS Built-in Heatmap Layer Identifiers
@@ -806,7 +818,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   applyMapLabelsTheme(map, isSatellite);
 }
 
-// Clean, high-performance MapLibre GL JS Map Component paired with OpenFreeMap & Built-in Heatmap
+// Clean, high-performance MapLibre GL JS map component with a built-in heatmap
 export default function CloudburstMap({
   stations = STATIONS_NETWORK,
   selectedStation,
@@ -819,8 +831,7 @@ export default function CloudburstMap({
   onChangeActiveLayer,
   is3D = false,
   onToggle3D,
-  mapView = 'liberty', // 'liberty' | 'positron' | 'bright' | 'satellite'
-  onToggleMapView,
+  mapView = 'liberty',
   isHomeView = false,
   isAnalyticsOpen = false,
   showParticles = true,
@@ -878,12 +889,6 @@ export default function CloudburstMap({
   const [scaleInfo, setScaleInfo] = useState({ widthPx: 64, label: '200 km' });
   const scaleUnitRef = useRef(scaleUnit);
   scaleUnitRef.current = scaleUnit;
-
-  // Selected OpenFreeMap base style ('positron' | 'liberty' | 'bright')
-  const [selectedOpenFreeMapStyle, setSelectedOpenFreeMapStyle] = useState(
-    ['positron', 'bright', 'liberty'].includes(mapView) ? mapView : 'positron'
-  );
-
 
   // Interactive coordinate inspector probe
   const [probe, setProbe] = useState(null);
@@ -1092,15 +1097,13 @@ export default function CloudburstMap({
     }
   }, [userLocation, cloudburstEvent, updateProbeAtCoords, onFocusEpicenter]);
 
-  // Initialize MapLibre GL JS with OpenFreeMap vector basemap
+  // Initialize MapLibre GL JS with a raster basemap
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const initialStyleUrl = OPENFREEMAP_STYLES[selectedOpenFreeMapStyle] || OPENFREEMAP_STYLES.positron;
-
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: initialStyleUrl,
+      style: BASEMAP_STYLE,
       center: [78.96, 22.50],
       zoom: 4.2,
       minZoom: 2.8,
@@ -1109,7 +1112,7 @@ export default function CloudburstMap({
       pitch: 0,
       antialias: true,
       renderWorldCopies: true,
-      attributionControl: false,
+      attributionControl: true,
       preserveDrawingBuffer: false,
       fadeDuration: 0
     });
@@ -1222,20 +1225,6 @@ export default function CloudburstMap({
 
     applyMapLayersAndHeatmap(map, isSat, selectedWeatherLayer, isHeatmapVis, heatmapGeoJSON, radarTimestampPath, cloudburstEvent);
   }, [heatmapGeoJSON, showTemperature, mapView, selectedWeatherLayer, radarTimestampPath, cloudburstEvent]);
-
-  // Handle switching OpenFreeMap Vector Styles (Liberty, Positron, Bright)
-  const handleSwitchOpenFreeMapStyle = useCallback((styleKey) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const targetUrl = OPENFREEMAP_STYLES[styleKey];
-    if (!targetUrl) return;
-
-    setSelectedOpenFreeMapStyle(styleKey);
-    if (onToggleMapView) onToggleMapView(styleKey);
-
-    map.setStyle(targetUrl);
-  }, [onToggleMapView]);
 
   // Reactively recompute scale when scaleUnit toggles
   useEffect(() => {
@@ -1782,7 +1771,7 @@ export default function CloudburstMap({
     >
 
 
-      {/* 1. MapLibre GL JS WebGL Canvas Container (Paired with OpenFreeMap vector styles & built-in heatmap) */}
+      {/* 1. MapLibre GL JS WebGL Canvas Container */}
       <div 
         ref={mapContainerRef} 
         onMouseMove={handleMouseMove}
