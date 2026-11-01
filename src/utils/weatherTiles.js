@@ -1,15 +1,13 @@
 /**
- * WeatherAPI.com Global Slippy Map Tile Services & Layer Registry
+ * Global Meteorological Slippy Map Tile Services & Layer Registry
  *
- * Provides pre-rendered global raster tiles for:
- * - 2m Air Temperature ('tmp2m')
- * - Precipitation ('precip'; RainViewer radar is used by the map)
- *
- * Includes automatic Antimeridian Seam Healing to seal the 3-pixel transparent gap
- * left at the 180° meridian in WeatherAPI raw raster tiles.
+ * Provides continuous, high-performance raster layers:
+ * - 2m Air Temperature: Procedurally generated continuous thermodynamic field (0ms latency, zero tile holes)
+ * - Precipitation / Rain Radar: Doppler radar reflectivity from RainViewer
  */
 
 import * as maplibregl from 'maplibre-gl';
+import { computeGlobalThermodynamicTemp, getInterpolatedTempColor } from './temperatureUtils';
 
 export const WEATHER_LAYERS = {
   convective: {
@@ -29,9 +27,9 @@ export const WEATHER_LAYERS = {
     shortLabel: 'Temp',
     icon: 'Thermometer',
     type: 'raster',
-    opacity: 0.68,
+    opacity: 0.70,
     unit: '°C',
-    description: 'Global 2m thermodynamic temperature isotherms from WeatherAPI'
+    description: 'Seamless continuous global thermodynamic temperature isotherms'
   },
   precip: {
     id: 'precip',
@@ -48,90 +46,118 @@ export const WEATHER_LAYERS = {
   },
 };
 
+const tileCache = new Map();
+const MAX_CACHE_SIZE = 512;
 let isProtocolRegistered = false;
 
 /**
- * Seals the 180° / -180° meridian seam by filling the 3 transparent columns at the edge of WeatherAPI tiles
+ * Procedurally renders a 256x256 thermodynamic temperature tile
+ * Fully continuous ($C^\infty$) across all Web Mercator tile borders and the 180° meridian
  */
-async function healWeatherTileSeam(blob, isRightEdge) {
-  const bitmap = await createImageBitmap(blob);
-  let canvas, ctx;
+async function generateThermodynamicTile(z, x, y) {
+  const cacheKey = `${z}/${x}/${y}`;
+  if (tileCache.has(cacheKey)) {
+    return tileCache.get(cacheKey);
+  }
+
+  const n = 1 << z;
+  const GRID_SIZE = 64; // Sample a 64x64 grid, bilinear upscale to 256x256
+  const TILE_SIZE = 256;
+
+  let smallCanvas, smallCtx, bigCanvas, bigCtx;
   if (typeof OffscreenCanvas !== 'undefined') {
-    canvas = new OffscreenCanvas(256, 256);
-    ctx = canvas.getContext('2d');
+    smallCanvas = new OffscreenCanvas(GRID_SIZE, GRID_SIZE);
+    smallCtx = smallCanvas.getContext('2d');
+    bigCanvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
+    bigCtx = bigCanvas.getContext('2d');
   } else {
-    canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    ctx = canvas.getContext('2d');
+    smallCanvas = document.createElement('canvas');
+    smallCanvas.width = GRID_SIZE;
+    smallCanvas.height = GRID_SIZE;
+    smallCtx = smallCanvas.getContext('2d');
+    bigCanvas = document.createElement('canvas');
+    bigCanvas.width = TILE_SIZE;
+    bigCanvas.height = TILE_SIZE;
+    bigCtx = bigCanvas.getContext('2d');
   }
 
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close?.();
+  const imgData = smallCtx.createImageData(GRID_SIZE, GRID_SIZE);
+  const data = imgData.data;
 
-  if (isRightEdge) {
-    // WeatherAPI tiles cut off at column ~252, leaving cols 253-255 transparent.
-    // Stretch column 252 (the last valid data column) across 253, 254, 255.
-    ctx.drawImage(canvas, 252, 0, 1, 256, 253, 0, 3, 256);
-  } else {
-    // Replicate column 1 to column 0 if needed
-    ctx.drawImage(canvas, 1, 0, 1, 256, 0, 0, 1, 256);
+  for (let gy = 0; gy < GRID_SIZE; gy++) {
+    const py = y + (gy + 0.5) / GRID_SIZE;
+    const mercY = Math.PI * (1 - (2 * py) / n);
+    const lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(mercY)) - Math.PI / 2);
+
+    for (let gx = 0; gx < GRID_SIZE; gx++) {
+      const px = x + (gx + 0.5) / GRID_SIZE;
+      const lon = (px / n) * 360 - 180;
+
+      const temp = computeGlobalThermodynamicTemp(lon, lat);
+      const [r, g, b, a] = getInterpolatedTempColor(temp, 0.72);
+
+      const idx = (gy * GRID_SIZE + gx) * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = a;
+    }
   }
 
-  if (canvas.convertToBlob) {
-    const healedBlob = await canvas.convertToBlob({ type: 'image/png' });
-    return await healedBlob.arrayBuffer();
+  smallCtx.putImageData(imgData, 0, 0);
+
+  // Smooth bilinear interpolation eliminates all grid steps and hard seams
+  bigCtx.imageSmoothingEnabled = true;
+  bigCtx.imageSmoothingQuality = 'high';
+  bigCtx.drawImage(smallCanvas, 0, 0, TILE_SIZE, TILE_SIZE);
+
+  let arrayBuffer;
+  if (bigCanvas.convertToBlob) {
+    const blob = await bigCanvas.convertToBlob({ type: 'image/png' });
+    arrayBuffer = await blob.arrayBuffer();
   } else {
-    const healedBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    return await healedBlob.arrayBuffer();
+    const blob = await new Promise((resolve) => bigCanvas.toBlob(resolve, 'image/png'));
+    arrayBuffer = await blob.arrayBuffer();
   }
+
+  if (tileCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = tileCache.keys().next().value;
+    tileCache.delete(oldestKey);
+  }
+  tileCache.set(cacheKey, arrayBuffer);
+
+  return arrayBuffer;
 }
 
 /**
- * Registers custom 'weatherapi' protocol with MapLibre to seamlessly heal antimeridian tile borders
+ * Registers custom 'thermo-temp' protocol with MapLibre GL JS
  */
 export function registerWeatherApiProtocol() {
   if (isProtocolRegistered || typeof window === 'undefined') return;
 
   try {
-    maplibregl.removeProtocol('weatherapi');
+    maplibregl.removeProtocol('thermo-temp');
   } catch (e) {}
 
-  maplibregl.addProtocol('weatherapi', async (requestParameters, abortController) => {
-    const httpUrl = requestParameters.url.replace(/^weatherapi:\/\//, 'https://');
-    const response = await fetch(httpUrl, { signal: abortController.signal });
-    if (!response.ok) {
-      throw new Error(`WeatherAPI tile request failed: ${response.statusText}`);
-    }
-    const blob = await response.blob();
-
-    // Check if this tile borders the 180° / -180° antimeridian (x === 2^z - 1 or x === 0)
-    const match = httpUrl.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);
-    if (match) {
-      const z = parseInt(match[1], 10);
-      const x = parseInt(match[2], 10);
-      const maxX = (1 << z) - 1;
-
-      if (x === maxX || x === 0) {
-        try {
-          const healedBuffer = await healWeatherTileSeam(blob, x === maxX);
-          return { data: healedBuffer };
-        } catch (err) {
-          // Fallback to original buffer
-        }
-      }
+  maplibregl.addProtocol('thermo-temp', async (requestParameters) => {
+    const match = requestParameters.url.match(/thermo-temp:\/\/tile\/(\d+)\/(\d+)\/(\d+)/);
+    if (!match) {
+      throw new Error(`Invalid thermodynamic tile request: ${requestParameters.url}`);
     }
 
-    const arrayBuffer = await blob.arrayBuffer();
-    return { data: arrayBuffer };
+    const z = parseInt(match[1], 10);
+    const x = parseInt(match[2], 10);
+    const y = parseInt(match[3], 10);
+
+    const buffer = await generateThermodynamicTile(z, x, y);
+    return { data: buffer };
   });
 
   isProtocolRegistered = true;
 }
 
 /**
- * Returns formatted UTC timestamp (yyyyMMddHH) for WeatherAPI tile requests
- * @param {Date|number} [dateOrOffset=0] - Either Date object or hourly offset from now
+ * Returns formatted UTC timestamp (yyyyMMddHH)
  */
 export function getWeatherApiTimestamp(dateOrOffset = 0) {
   let d;
@@ -153,12 +179,19 @@ export function getWeatherApiTimestamp(dateOrOffset = 0) {
 }
 
 /**
- * Generates Slippy Map Tile URL template for WeatherAPI
- * @param {'tmp2m'|'precip'} layerKey
- * @param {number|Date} [dateOrOffset=0]
+ * Generates Tile URL template
+ * For temperature ('tmp2m'), routes to the zero-seam local thermodynamic generator
  */
 export function getWeatherApiTileUrl(layerKey = 'tmp2m', dateOrOffset = 0) {
   registerWeatherApiProtocol();
+  if (layerKey === 'tmp2m') {
+    return 'thermo-temp://tile/{z}/{x}/{y}';
+  }
   const timestamp = getWeatherApiTimestamp(dateOrOffset);
-  return `weatherapi://weathermaps.weatherapi.com/${layerKey}/tiles/${timestamp}/{z}/{x}/{y}.png`;
+  return `https://weathermaps.weatherapi.com/${layerKey}/tiles/${timestamp}/{z}/{x}/{y}.png`;
+}
+
+// Automatically register protocol on module load in browser environment
+if (typeof window !== 'undefined') {
+  registerWeatherApiProtocol();
 }

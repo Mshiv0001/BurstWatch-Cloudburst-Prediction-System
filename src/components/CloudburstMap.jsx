@@ -543,8 +543,8 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     }
   }
 
-  // Convective Plume is visible if explicitly active ('convective') OR when viewing temperature as hazard overlay
-  const isConvectiveVis = activeLayer === 'convective' || (activeLayer === 'temp' && isHeatmapVisible);
+  // Convective Plume is only visible when convective layer is selected
+  const isConvectiveVis = activeLayer === 'convective';
 
   // 5. MapLibre GL JS Built-in Heatmap Layer (WebGL Fragment-Shader Accelerated)
   if (!map.getLayer(HEATMAP_LAYER_ID)) {
@@ -669,7 +669,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       map.getSource('cloudburst-hazard-radius-source').setData(hazardGeoJSON);
     }
 
-    const isHazardVis = activeLayer === 'convective' || isHeatmapVisible;
+    const isHazardVis = activeLayer === 'convective';
 
     if (!map.getLayer('cloudburst-hazard-radius-fill')) {
       map.addLayer({
@@ -824,41 +824,12 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     map.setLayoutProperty('lightning-strikes-core', 'visibility', isLightningVis ? 'visible' : 'none');
   }
 
-  // 6.8 Antimeridian Seam Sealer Layer (Eliminates the 180° / -180° white slit)
-  const isTempLayer = activeLayer === 'temp';
-  if (!map.getSource('antimeridian-seam-source')) {
-    map.addSource('antimeridian-seam-source', {
-      type: 'geojson',
-      data: generateAntimeridianSeamGeoJSON()
-    });
+  // Clean up legacy antimeridian seam layers if previously attached
+  if (map.getLayer('antimeridian-seam-layer')) {
+    map.removeLayer('antimeridian-seam-layer');
   }
-
-  if (!map.getLayer('antimeridian-seam-layer')) {
-    map.addLayer({
-      id: 'antimeridian-seam-layer',
-      type: 'line',
-      source: 'antimeridian-seam-source',
-      layout: {
-        'line-cap': 'round',
-        'line-join': 'round',
-        visibility: isTempLayer ? 'visible' : 'none'
-      },
-      paint: {
-        'line-color': ['get', 'color'],
-        'line-width': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          0, 4.5,
-          4, 6.5,
-          8, 10.0
-        ],
-        'line-opacity': 0.96,
-        'line-blur': 0.8
-      }
-    }, beforeId);
-  } else {
-    map.setLayoutProperty('antimeridian-seam-layer', 'visibility', isTempLayer ? 'visible' : 'none');
+  if (map.getSource('antimeridian-seam-source')) {
+    map.removeSource('antimeridian-seam-source');
   }
 
   // 7. Refresh place label typography
