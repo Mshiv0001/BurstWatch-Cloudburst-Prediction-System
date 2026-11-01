@@ -14,7 +14,7 @@ export const STATIONS_NETWORK = [
   },
   {
     id: "dehradun",
-    name: "Dehradun IMD Base (Model Target Cell)",
+    name: "Dehradun IMD Base",
     region: "Uttarakhand",
     state: "Uttarakhand",
     lat: 30.3165,
@@ -537,7 +537,7 @@ export const STATIONS_NETWORK = [
   // --- WESTERN GHATS & NON-HIMALAYAN CLOUDBURST BASINS ---
   {
     id: "mumbai",
-    name: "Mumbai (Santacruz IMD - 2005 Deluge)",
+    name: "Mumbai (Santacruz IMD)",
     region: "Konkan / Western Ghats",
     state: "Maharashtra",
     lat: 19.0760,
@@ -555,7 +555,7 @@ export const STATIONS_NETWORK = [
   },
   {
     id: "barmer",
-    name: "Barmer (Thar Desert Cloudburst Basin)",
+    name: "Barmer (Thar Desert Basin)",
     region: "Thar Desert",
     state: "Rajasthan",
     lat: 25.7532,

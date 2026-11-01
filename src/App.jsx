@@ -451,7 +451,7 @@ export default function App() {
           windSpeed={windSpeed}
           tcwv={tcwv}
           riskPercent={threatData.riskPercent}
-          currentTimeStr={currentTimePoint.label}
+          currentTimeStr={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           userLocation={userLocation}
           activeLayer={activeLayer}
           onChangeActiveLayer={setActiveLayer}
