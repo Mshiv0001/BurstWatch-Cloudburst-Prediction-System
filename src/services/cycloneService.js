@@ -244,6 +244,14 @@ export async function fetchLiveCyclones() {
         const eventType = it.getElementsByTagNameNS('http://www.gdacs.org', 'eventtype')[0]?.textContent;
 
         if (eventType === 'TC' || title.toLowerCase().includes('cyclone')) {
+          // Only keep active systems updated within the last 48 hours
+          const pubDateStr = it.querySelector('pubDate')?.textContent;
+          if (pubDateStr) {
+            const pubDate = new Date(pubDateStr);
+            const ageHours = (Date.now() - pubDate.getTime()) / (1000 * 3600);
+            if (ageHours > 48) continue;
+          }
+
           const name = it.getElementsByTagNameNS('http://www.gdacs.org', 'eventname')[0]?.textContent || 'Tropical Storm';
           if (seen.has(name)) continue;
           seen.add(name);

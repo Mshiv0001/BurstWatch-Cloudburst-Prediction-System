@@ -168,6 +168,17 @@ def create_app(settings: Optional[Settings] = None,
                 for it in items:
                     eventtype = it.findtext("{http://www.gdacs.org}eventtype", "")
                     if eventtype == "TC":
+                        # Only keep active systems updated within the last 48 hours
+                        pub_date = it.findtext("pubDate", "")
+                        if pub_date:
+                            try:
+                                import email.utils
+                                pub_dt = email.utils.parsedate_to_datetime(pub_date)
+                                if (dt.datetime.now(dt.timezone.utc) - pub_dt).total_seconds() > 48 * 3600:
+                                    continue
+                            except Exception:
+                                pass
+
                         name = it.findtext("{http://www.gdacs.org}eventname", "")
                         if not name or name in seen:
                             continue
