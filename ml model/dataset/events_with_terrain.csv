@@ -1,0 +1,24 @@
+event_id,event_name,state,region_type,latitude,longitude,timestamp_utc,rainfall_rate_mm_hr,label,description,elevation_m,slope_deg,aspect_deg
+EVT_001,Leh_Cloudburst,Ladakh,Himalayan_Cold_Desert,34.1526,77.5771,2010-08-05T18:30:00Z,130.0,1,Catastrophic high-altitude cloudburst over Leh town,3414.0,3.44,332.0
+EVT_002,Kedarnath_Valley,Uttarakhand,Himalayan_High_Altitude,30.7346,79.0669,2013-06-16T11:00:00Z,120.0,1,Severe cloudburst in upper catchment triggering Chorabari breach,3549.0,6.37,28.6
+EVT_003,Pithoragarh_Bastari,Uttarakhand,Himalayan_Valley,29.742,80.258,2016-07-01T01:30:00Z,105.0,1,Intense localized downpour and mudflow in Bastari village,1749.0,13.22,143.2
+EVT_004,Dharamshala_Bhagsunag,Himachal Pradesh,Himalayan_Foothills,32.2471,76.3533,2021-07-12T04:00:00Z,115.0,1,Localized flash cloudburst in Bhagsunag nallah,2557.0,18.59,7.1
+EVT_005,Chamoli_Tharali,Uttarakhand,Himalayan_Valley,30.0531,79.5089,2021-05-04T13:00:00Z,100.0,1,Rapid convective cloudburst over Tharali region,1614.0,23.16,175.7
+EVT_006,Amarnath_HolyCave,Jammu & Kashmir,Himalayan_High_Altitude,34.2157,75.5036,2022-07-08T11:30:00Z,110.0,1,Localized cloudburst in higher reaches near Baltal-Amarnath,3894.0,10.03,49.7
+EVT_007,Dehradun_Maldeota,Uttarakhand,Himalayan_Foothills,30.3472,78.1418,2022-08-19T18:45:00Z,115.0,1,Severe cloudburst and flash flood in Song river basin,861.0,15.74,245.5
+EVT_008,Mandi_Thunag,Himachal Pradesh,Himalayan_Valley,31.554,77.164,2023-07-09T03:00:00Z,108.0,1,Extreme convective burst triggering widespread flash flooding,1894.0,2.75,98.6
+EVT_009,Shimla_Summerhill,Himachal Pradesh,Himalayan_Foothills,31.109,77.135,2023-08-14T02:00:00Z,125.0,1,Lethal localized cloudburst over Shiv temple and Summerhill,1930.0,19.8,291.9
+EVT_010,Sikkim_SouthLhonak,Sikkim,Himalayan_Glacial,27.915,88.204,2023-10-03T18:30:00Z,100.0,1,Intense cloudburst over South Lhonak lake contributing to GLOF,5222.0,9.31,6.8
+EVT_011,Kullu_Samej,Himachal Pradesh,Himalayan_Valley,31.428,77.615,2024-07-31T18:30:00Z,130.0,1,Devastating cloudburst sweeping away Samej and Rampur valleys,1253.0,27.93,105.3
+EVT_012,Mumbai_Metropolis,Maharashtra,Western_Ghats_Coast,19.076,72.8777,2005-07-26T08:30:00Z,190.0,1,Historic convective downpour with extreme orographic moisture flux,6.0,0.49,213.5
+EVT_013,Chiplun_Konkan,Maharashtra,Western_Ghats_Foot,17.5323,73.5186,2021-07-22T14:00:00Z,110.0,1,Western Ghats orographic cloudburst flooding Vashishti basin,8.0,0.31,119.8
+EVT_014,Wayanad_Meppadi,Kerala,Western_Ghats_High,11.551,76.128,2024-07-29T20:30:00Z,140.0,1,Extreme localized torrential burst precipitating catastrophic landslides,892.0,4.17,202.2
+EVT_015,Delhi_Safdarjung,Delhi,Plains_Urban,28.584,77.206,2024-06-27T23:30:00Z,102.0,1,Record urban convective burst within 3 hours,213.0,0.23,90.0
+NEG_001,Kedarnath_NormalMonsoon,Uttarakhand,Himalayan_High_Altitude,30.7346,79.0669,2022-07-15T12:00:00Z,22.0,0,Steady moderate monsoon rain without extreme convective spike,3549.0,6.37,28.6
+NEG_002,Shimla_HeavyRain_NonBurst,Himachal Pradesh,Himalayan_Foothills,31.109,77.135,2023-07-20T06:00:00Z,42.0,0,Continuous heavy orographic rain without cloudburst intensity,1930.0,19.8,291.9
+NEG_003,Leh_ClearSummer_Instability,Ladakh,Himalayan_Cold_Desert,34.1526,77.5771,2021-08-10T14:00:00Z,0.0,0,High solar heating and instability but dry moisture deficit,3414.0,3.44,332.0
+NEG_004,Dehradun_ModerateShower,Uttarakhand,Himalayan_Foothills,30.3472,78.1418,2022-08-05T10:00:00Z,35.0,0,"Heavy passing monsoon shower, convective cell dissipated",861.0,15.74,245.5
+NEG_005,Mumbai_StandardMonsoon,Maharashtra,Western_Ghats_Coast,19.076,72.8777,2023-07-10T08:00:00Z,45.0,0,Standard active monsoon day without localized mesoscale burst,6.0,0.49,213.5
+NEG_006,Wayanad_MonsoonSurge,Kerala,Western_Ghats_High,11.551,76.128,2023-07-18T12:00:00Z,38.0,0,Continuous southwest monsoon rainfall without burst failure,892.0,4.17,202.2
+NEG_007,Mandi_OvercastDrizzle,Himachal Pradesh,Himalayan_Valley,31.554,77.164,2023-08-01T15:00:00Z,12.0,0,"Continuous stratiform rain, no convective updraft",1894.0,2.75,98.6
+NEG_008,Delhi_PreMonsoonThunderstorm,Delhi,Plains_Urban,28.584,77.206,2023-06-15T16:00:00Z,28.0,0,Thunderstorm gust front with short moderate shower,213.0,0.23,90.0

@@ -122,7 +122,7 @@ export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected 
 
   const apiKey = getWeatherApiKey();
   if (!apiKey) {
-    console.warn('[WeatherAPI] VITE_WEATHERAPI_KEY is not configured; using baseline data.');
+    console.warn('[WeatherAPI] VITE_WEATHERAPI_KEY is not configured; showing estimated baseline data, not live observations.');
     return createFallbackLiveData(lat, lon, stationName);
   }
 
@@ -263,7 +263,7 @@ function createFallbackLiveData(lat, lon, stationName) {
 
   const fallbackData = {
     isLive: false,
-    source: 'Station Sensor Model (Offline Cache)',
+    source: 'Geographic baseline estimate (offline; not live)',
     fetchedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     localtime: null,
     localtimeEpoch: Date.now(),

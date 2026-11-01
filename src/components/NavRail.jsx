@@ -27,7 +27,7 @@ export default function NavRail({
   const navItems = [
     { id: 'home', icon: Home, label: 'Overview' },
     { id: 'dashboard', icon: LayoutGrid, label: 'Convective Grid' },
-    { id: 'meteo', icon: Radio, label: 'Open-Meteo Live Data' },
+    { id: 'meteo', icon: Radio, label: 'Weather Data' },
     { id: 'radar', icon: Radar, label: 'Doppler Radar Scan' },
     { id: 'analytics', icon: BarChart3, label: 'Threat Analytics' }
   ];

@@ -1,0 +1,45 @@
+{
+  "model_name": "Physics-Informed Dual-Engine Ensemble (LightGBM + XGBoost)",
+  "model_type": "physics_informed_dual_ensemble",
+  "version": "2.5.0",
+  "target": "Pan-India Convective Cloudburst & Flash Flood (1 to 6 Hours Lead Time)",
+  "positive_label_definition": "Meteorological cloudburst and severe orographic convective burst (>= 100 mm/h convective rate or catastrophic localized flash flood flash-points)",
+  "calibrator": "Platt Scaling (Logistic Probability Calibrator)",
+  "threshold": 0.18,
+  "thresholds": {
+    "watch_raw_prob": 0.10,
+    "warn_raw_prob": 0.18,
+    "baseline_prob": 0.04,
+    "ceiling_prob": 0.28
+  },
+  "blend_weights": {
+    "lgb": 0.50,
+    "xgb": 0.50
+  },
+  "features": [
+    "elevation_m",
+    "slope_deg",
+    "aspect_deg",
+    "temperature_c",
+    "dew_point_c",
+    "dew_point_depression_c",
+    "relative_humidity_pct",
+    "surface_pressure_hpa",
+    "wind_speed_kmh",
+    "theta_e_k",
+    "valley_trapping_index",
+    "orographic_lift_ms"
+  ],
+  "training_rows": 557,
+  "date_start": "2010-01-01",
+  "date_end": "2024-12-31",
+  "validation_auc": 0.8005,
+  "validation_pr_auc": 0.4461,
+  "brier_score": 0.0605,
+  "disaster_catch_rate": 1.0,
+  "watch_recall": 0.6818,
+  "warn_recall": 0.4318,
+  "validation_threshold": 0.18,
+  "geographic_scope": "Pan-India (Western Himalayas, Eastern Himalayas / Northeast, Western Ghats, Urban Plains)",
+  "caveat": "High-fidelity convective early warning system with 30m DEM terrain integration. Evaluates rapid thermodynamic instability, theta_e surges, and orographic lift."
+}

@@ -2,27 +2,6 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 
 @font-face {
-  font-family: 'Arual';
-  src: url('/arual.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-.font-arual {
-  font-family: 'Arual', Arial, sans-serif;
-}
-
-.burstwatch-logo-arual {
-  font-family: 'Arual', Arial, sans-serif;
-  letter-spacing: 0.18em;
-  font-weight: 900;
-  -webkit-text-stroke: 1.45px currentColor;
-  paint-order: stroke fill;
-  text-shadow: 0 0 0.8px currentColor;
-}
-
-@font-face {
   font-family: 'Orbitron';
   src: url('/orbitron-900.ttf') format('truetype');
   font-weight: 900;
@@ -479,4 +458,47 @@ input[type="range"].cloudburst-slider::-webkit-slider-thumb:active {
 
 .animate-beacon {
   animation: beacon-glow 1.5s ease-in-out infinite;
+}
+
+/* Lightning strike flash glow and shockwave ripple */
+@keyframes lightning-flash-burst {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+    filter: drop-shadow(0 0 20px #ffffff) drop-shadow(0 0 35px #38bdf8);
+  }
+  20% {
+    transform: scale(1.8);
+    opacity: 1;
+    filter: drop-shadow(0 0 25px #ffffff) drop-shadow(0 0 45px #c084fc);
+  }
+  45% {
+    transform: scale(1.1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.0);
+    opacity: 0.85;
+  }
+}
+
+@keyframes lightning-shockwave {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.95;
+    border-color: rgba(255, 255, 255, 0.95);
+  }
+  100% {
+    transform: scale(3.8);
+    opacity: 0;
+    border-color: rgba(168, 85, 247, 0);
+  }
+}
+
+.animate-lightning-flash {
+  animation: lightning-flash-burst 0.65s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+.animate-lightning-shockwave {
+  animation: lightning-shockwave 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) forwards;
 }

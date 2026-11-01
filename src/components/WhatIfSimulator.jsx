@@ -42,10 +42,10 @@ export default function WhatIfSimulator({
             <h3 className="text-xs font-semibold text-slate-100 tracking-tight flex items-center gap-1.5">
               What-If Simulator
               <span className="apple-liquid-glass-pill text-[9px] font-mono text-amber-300 px-2 py-0.2 rounded-full">
-                &tau;=0.875
+                &tau;=0.18
               </span>
             </h3>
-            <p className="text-[10px] text-slate-400">Logistic Model Feature Stress-Test</p>
+            <p className="text-[10px] text-slate-400">Physics-Informed Dual-Engine Ensemble</p>
           </div>
         </div>
 
@@ -60,8 +60,8 @@ export default function WhatIfSimulator({
 
       {/* Model Targets Note */}
       <div className="apple-liquid-glass-well px-3 py-2 rounded-2xl flex items-center justify-between text-[10px]">
-        <span className="text-slate-300">Target: Next-day rain &ge;50mm</span>
-        <span className="text-emerald-400 font-mono font-medium">Dehradun Grid</span>
+        <span className="text-slate-300">Target: Cloudburst &ge;100mm/h</span>
+        <span className="text-emerald-400 font-mono font-medium">Pan-India Scope</span>
       </div>
 
       {/* Interactive Model Feature Controls */}

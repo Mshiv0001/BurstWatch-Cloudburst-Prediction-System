@@ -4,30 +4,45 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { 
   Plus, 
   Minus, 
-  Compass, 
   Zap, 
   Thermometer, 
   CloudRain, 
-  Wind, 
+  Wind,
   Sparkles, 
-  MapPin 
+  MapPin,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { STATIONS_NETWORK } from '../data/cloudburstData';
 import { isIndiaSector } from '../utils/geoUtils';
 import { 
   celsiusToFahrenheit,
   computeGlobalThermodynamicTemp,
-  ACTIVE_CYCLONES,
   getWindSpeedColor,
   getWindSpeedCategory,
   getTempColorHex
 } from '../utils/temperatureUtils';
+import {
+  getActiveCyclones,
+  subscribeActiveCyclones,
+  fetchLiveCyclones,
+  computeCycloneVelocity,
+  computeCyclonePrecipitation,
+  computeCyclonePressureDrop,
+  getSurfaceFrictionMultiplier
+} from '../services/cycloneService';
 import { generateCloudburstHeatmapGeoJSON } from '../utils/heatmapGeoJson';
-import { WEATHER_LAYERS, getWeatherApiTileUrl } from '../utils/weatherTiles';
+import { WEATHER_LAYERS, getWeatherApiTileUrl, getWeatherApiTimestamp } from '../utils/weatherTiles';
 import {
   LIGHTNING_STRIKES_GEOJSON,
   getLocalRadarDbz
 } from '../utils/radarEchoesData';
+import {
+  subscribeLightningStrikes,
+  subscribeLightningFlashes,
+  getLightningStrikesGeoJSON,
+  thunderSynth
+} from '../services/lightningService';
 import { generateHazardRadiusGeoJSON } from '../services/cloudburstEventModel';
 
 const BASEMAP_STYLE = {
@@ -42,9 +57,20 @@ const BASEMAP_STYLE = {
   },
   layers: [
     {
+      id: 'background',
+      type: 'background',
+      paint: {
+        'background-color': '#060d1a'
+      }
+    },
+    {
       id: 'basemap',
       type: 'raster',
-      source: 'basemap'
+      source: 'basemap',
+      paint: {
+        'raster-fade-duration': 0,
+        'raster-resampling': 'linear'
+      }
     }
   ]
 };
@@ -54,121 +80,95 @@ const HEATMAP_SOURCE_ID = 'cloudburst-heatmap-source';
 const HEATMAP_LAYER_ID = 'cloudburst-heatmap-layer';
 const HEATMAP_POINT_LAYER_ID = 'cloudburst-heatmap-points';
 
+// Shortest delta longitude along spherical surface [-180, +180]
+function deltaLon(lon1, lon2) {
+  return ((((lon1 - lon2 + 180) % 360) + 360) % 360) - 180;
+}
+
 // Globally Continuous, Infinitely Differentiable (C^inf) Atmospheric Vector Field
+// Adheres strictly to Windy/Ventusky streamline fluid flow principles:
+// 1. Zero hard-threshold boundary discontinuities (C^inf smooth Gaussian decays everywhere)
+// 2. Strict periodic zonal wavenumbers (eliminates any 180-degree antimeridian seam)
+// 3. Shortest spherical great-circle delta-longitude wrapping (no seam kinks across meridians)
 function getWindVector(lon, lat) {
-  const normLon = ((((lon + 180) % 360) + 360) % 360) - 180;
-  const latRad = (lat * Math.PI) / 180;
+  const latRad = (lat * Math.PI) / 180.0;
+  const lonRad = (lon * Math.PI) / 180.0;
   const cosLat = Math.cos(latRad);
   
-  let u = 0;
-  let v = 0;
+  let u = 0.0;
+  let v = 0.0;
 
-  // 1. Globally Continuous Planetary Circulation (Zero piecewise boundaries or step functions)
+  // 1. Zonal Planetary Circulation (Smooth Fourier representation)
   // - Easterly Trade Winds in the Tropics (lat -30 to +30)
   // - Westerly Jet Stream in Mid-Latitudes (lat 30 to 60)
   // - Gentle Polar Easterlies at high latitudes
   u += -3.4 * Math.cos(latRad * 3.0) + 1.1 * cosLat;
   v += -0.85 * Math.sin(latRad * 2.0);
 
-  // 2. Continuous Subtropical Anticyclonic Ocean Gyres (Clockwise North, Counter-clockwise South)
-  if (Math.abs(lat) < 70) {
-    const gyreAtl = Math.sin((normLon + 45) * 0.055);
-    const gyrePac = Math.sin((normLon + 140) * 0.045);
-    v += (gyreAtl + gyrePac) * 1.2 * Math.cos(latRad * 1.5);
-    u += Math.cos(latRad * 2.5) * 0.8;
+  // 2. Subtropical Anticyclonic Ocean Gyres with smooth polar tapering (zero piecewise steps)
+  if (Math.abs(lat) < 80) {
+    const gyreFactor = Math.cos(Math.min(1.0, Math.abs(lat) / 80.0) * (Math.PI / 2.0));
+    const gyre1 = Math.sin(lonRad * 1.0 + 0.8);
+    const gyre2 = Math.sin(lonRad * 2.0 + 2.4);
+    v += (gyre1 + gyre2 * 0.6) * 1.1 * Math.cos(latRad * 1.2) * gyreFactor;
+    u += Math.cos(latRad * 2.0) * 0.8 * gyreFactor;
   }
 
-  // 3. Multi-octave Divergence-Free Streamfunction Waves (Parallel laminar ribbons)
-  const k1 = 0.10, m1 = 0.08;
-  u += -1.4 * m1 * Math.sin(normLon * k1) * Math.sin(lat * m1);
-  v += -1.4 * k1 * Math.cos(normLon * k1) * Math.cos(lat * m1);
+  // 3. Divergence-Free Streamfunction Waves with integer zonal wavenumbers (strictly periodic)
+  // Planetary Rossby Wave 1 (m=3, n=2)
+  u += -1.4 * 0.08 * Math.sin(lonRad * 3.0) * Math.sin(latRad * 2.0);
+  v += -1.4 * 0.10 * Math.cos(lonRad * 3.0) * Math.cos(latRad * 2.0);
 
-  const k2 = 0.22, m2 = 0.16;
-  u += 0.7 * m2 * Math.cos(normLon * k2) * Math.cos(lat * m2);
-  v += 0.7 * k2 * Math.sin(normLon * k2) * Math.sin(lat * m2);
+  // Synoptic Rossby Wave 2 (m=5, n=3)
+  u += 0.7 * 0.12 * Math.cos(lonRad * 5.0) * Math.cos(latRad * 3.0);
+  v += 0.7 * 0.14 * Math.sin(lonRad * 5.0) * Math.sin(latRad * 3.0);
 
   // 4. Arabian Sea & Indian Ocean Cross-Equatorial Monsoon Jet
-  // Smooth 2D Gaussian envelope centered at (Lon 70°E, Lat 9°N) with wide sigmas (zero boundary cuts)
-  const dLonMon = normLon - 70.0;
+  // Smooth 2D Gaussian envelope centered at (Lon 70°E, Lat 9°N) with wide sigmas (zero step cutoffs)
+  const dLonMon = deltaLon(lon, 70.0);
   const dLatMon = lat - 9.0;
   const envMon = Math.exp(-(dLonMon * dLonMon) / (2 * 18 * 18) - (dLatMon * dLatMon) / (2 * 11 * 11));
-  if (envMon > 0.005) {
-    // Flows northeastward across Arabian Sea, turning eastward south of India/Sri Lanka
-    u += envMon * 5.2;
-    v += envMon * (2.1 - 0.06 * dLonMon);
-  }
+  u += envMon * 5.2;
+  v += envMon * (2.1 - 0.05 * dLonMon);
 
-  // 5. Bay of Bengal Cyclonic Depression (Centering precisely at 17°03'N 88°20'E: Lon 88.33°E, Lat 17.05°N)
-  // Continuous Gaussian-Rankine vortex with solid-body core (zero singularity) and asymptotic decay
-  const dxBoB = normLon - 88.33;
+  // 5. Bay of Bengal Cyclonic Depression (Centering at Lon 88.33°E, Lat 17.05°N)
+  // Gaussian-Rankine vortex with solid-body core and asymptotic smooth decay (zero artificial if-gate)
+  const dxBoB = deltaLon(lon, 88.33);
   const dyBoB = lat - 17.05;
   const rSqBoB = dxBoB * dxBoB + dyBoB * dyBoB;
-  const envBoB = Math.exp(-rSqBoB / (2 * 6.5 * 6.5));
-  if (envBoB > 0.005) {
-    const r = Math.sqrt(rSqBoB);
-    const rCore = 2.4;
-    // Tangential speed: linear at center, peaks at rCore, then smoothly decays
-    const vTan = (13.5 * (r / rCore)) / (1.0 + (r / rCore) ** 2) * envBoB;
-    const invR = 1.0 / (r + 0.15);
-    // Solenoidal counter-clockwise rotation (Northern hemisphere)
-    const uCirc = (-dyBoB * invR) * vTan;
-    const vCirc = (dxBoB * invR) * vTan;
-    // Smooth inward cyclonic spiral (~16° inflow angle)
-    const uInflow = (-dxBoB * invR) * (vTan * 0.20);
-    const vInflow = (-dyBoB * invR) * (vTan * 0.20);
-    u += uCirc + uInflow;
-    v += vCirc + vInflow;
-  }
+  const envBoB = Math.exp(-rSqBoB / (2 * 6.8 * 6.8));
+  const rBoB = Math.sqrt(rSqBoB);
+  const rCoreBoB = 2.4;
+  const vTanBoB = (13.5 * (rBoB / rCoreBoB)) / (1.0 + (rBoB / rCoreBoB) ** 2) * envBoB;
+  const invRBoB = 1.0 / (rBoB + 0.15);
+  u += (-dyBoB * invRBoB) * vTanBoB + (-dxBoB * invRBoB) * (vTanBoB * 0.18);
+  v += (dxBoB * invRBoB) * vTanBoB + (-dyBoB * invRBoB) * (vTanBoB * 0.18);
 
   // 6. Sri Lanka & Gulf of Mannar Coastal Deflection (Lon 80.6°E, Lat 7.8°N)
-  const dxSL = normLon - 80.6;
+  const dxSL = deltaLon(lon, 80.6);
   const dySL = lat - 7.8;
   const rSqSL = dxSL * dxSL + dySL * dySL;
-  const envSL = Math.exp(-rSqSL / (2 * 3.4 * 3.4));
-  if (envSL > 0.01) {
-    const r = Math.sqrt(rSqSL);
-    const invR = 1.0 / (r + 0.2);
-    // Aerodynamic potential deflection around island
-    u += (-dySL * invR) * (envSL * 3.8);
-    v += (dxSL * invR) * (envSL * 3.8) - envSL * 0.8;
-  }
+  const envSL = Math.exp(-rSqSL / (2 * 3.5 * 3.5));
+  const invRSL = 1.0 / (Math.sqrt(rSqSL) + 0.2);
+  u += (-dySL * invRSL) * (envSL * 3.8);
+  v += (dxSL * invRSL) * (envSL * 3.8) - envSL * 0.8;
 
   // 6b. Palk Strait & Jaffna Coastal Eddy (Lon 80.2°E, Lat 9.8°N)
-  const dxJ = normLon - 80.2;
+  const dxJ = deltaLon(lon, 80.2);
   const dyJ = lat - 9.8;
   const rSqJ = dxJ * dxJ + dyJ * dyJ;
   const envJ = Math.exp(-rSqJ / (2 * 2.2 * 2.2));
-  if (envJ > 0.01) {
-    const r = Math.sqrt(rSqJ);
-    const invR = 1.0 / (r + 0.2);
-    u += (-dyJ * invR) * (envJ * 2.6);
-    v += (dxJ * invR) * (envJ * 2.6);
-  }
+  const invRJ = 1.0 / (Math.sqrt(rSqJ) + 0.2);
+  u += (-dyJ * invRJ) * (envJ * 2.6);
+  v += (dxJ * invRJ) * (envJ * 2.6);
 
-  // 7. Tropical Cyclone Vance (Eastern Pacific: Lon -105.4°E, Lat 15.2°N)
-  const dxVance = normLon - (-105.4);
-  const dyVance = lat - 15.2;
-  const rSqVance = dxVance * dxVance + dyVance * dyVance;
-  const envVance = Math.exp(-rSqVance / (2 * 5.0 * 5.0));
-  if (envVance > 0.01) {
-    const r = Math.sqrt(rSqVance);
-    const vTan = (10.0 * (r / 2.2)) / (1.0 + (r / 2.2) ** 2) * envVance;
-    const invR = 1.0 / (r + 0.15);
-    u += (-dyVance * invR) * vTan - (dxVance * invR) * (vTan * 0.2);
-    v += (dxVance * invR) * vTan - (dyVance * invR) * (vTan * 0.2);
-  }
-
-  // 8. Tropical Cyclone Infa (Western Pacific: Lon 162.0°E, Lat 15.5°N)
-  const dxInfa = normLon - 162.0;
-  const dyInfa = lat - 15.5;
-  const rSqInfa = dxInfa * dxInfa + dyInfa * dyInfa;
-  const envInfa = Math.exp(-rSqInfa / (2 * 5.0 * 5.0));
-  if (envInfa > 0.01) {
-    const r = Math.sqrt(rSqInfa);
-    const vTan = (10.5 * (r / 2.2)) / (1.0 + (r / 2.2) ** 2) * envInfa;
-    const invR = 1.0 / (r + 0.15);
-    u += (-dyInfa * invR) * vTan - (dxInfa * invR) * (vTan * 0.2);
-    v += (dxInfa * invR) * vTan - (dyInfa * invR) * (vTan * 0.2);
+  // 7. Dynamic Tropical Cyclones (Rankine-Holland vortex with hemisphere Coriolis spin & inward spiral)
+  // Naturally animates streamlines rotating around every active cyclone across the globe
+  const activeCyclones = getActiveCyclones();
+  for (let i = 0; i < activeCyclones.length; i++) {
+    const cVec = computeCycloneVelocity(lon, lat, activeCyclones[i]);
+    u += cVec.u;
+    v += cVec.v;
   }
 
   const mag = Math.sqrt(u * u + v * v);
@@ -178,6 +178,7 @@ function getWindVector(lon, lat) {
 function getLocalTemperature(lon, lat) {
   return Math.round(computeGlobalThermodynamicTemp(lon, lat));
 }
+
 
 function getLocalWindSpeed(lon, lat) {
   const vec = getWindVector(lon, lat);
@@ -208,29 +209,19 @@ function getLocalPrecipitation(lon, lat, stations = STATIONS_NETWORK) {
       }
     }
   }
-  for (const c of ACTIVE_CYCLONES) {
-    const dLat = lat - c.lat;
-    const dLon = (lon - c.lon) * Math.cos((lat * Math.PI) / 180);
-    const distSq = dLat * dLat + dLon * dLon;
-    if (distSq < 16) {
-      const dist = Math.sqrt(distSq);
-      const cRain = 55 * Math.exp(-dist / 1.6);
-      rain = Math.max(rain, cRain);
-    }
+  const dynamicCyclones = getActiveCyclones();
+  for (let i = 0; i < dynamicCyclones.length; i++) {
+    const cRain = computeCyclonePrecipitation(lon, lat, dynamicCyclones[i]);
+    rain = Math.max(rain, cRain);
   }
   return Math.round(rain * 10) / 10;
 }
 
 function getLocalPressure(lon, lat) {
   let p = 1013;
-  for (const c of ACTIVE_CYCLONES) {
-    const dLat = lat - c.lat;
-    const dLon = (lon - c.lon) * Math.cos((lat * Math.PI) / 180);
-    const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-    if (dist < 5.0) {
-      const drop = 35 * Math.exp(-dist / 1.8);
-      p -= drop;
-    }
+  const dynamicCyclones = getActiveCyclones();
+  for (let i = 0; i < dynamicCyclones.length; i++) {
+    p -= computeCyclonePressureDrop(lon, lat, dynamicCyclones[i]);
   }
   if (lat >= 29.0 && lat <= 36.0 && lon >= 74.0 && lon <= 88.0) {
     p -= 12;
@@ -452,14 +443,11 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     map.addSource('esri-satellite', {
       type: 'raster',
       tiles: [
-        'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
       ],
       tileSize: 256,
       maxzoom: 20,
-      attribution: '&copy; Satellite Imagery'
+      attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
     });
   }
 
@@ -490,8 +478,8 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     map.setPaintProperty('base-satellite', 'raster-opacity', isSatellite ? 1.0 : 0);
   }
 
-  // 3. WeatherAPI Global Continuous Raster Layers (tmp2m, precip, wind, pressure)
-  const weatherRasterKeys = ['temp', 'precip', 'wind', 'pressure'];
+  // 3. WeatherAPI Global Continuous Raster Layers
+  const weatherRasterKeys = ['temp', 'precip'];
   weatherRasterKeys.forEach((key) => {
     const cfg = WEATHER_LAYERS[key];
     if (!cfg) return;
@@ -505,10 +493,21 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         maxzoom: 6, // Crucial: tell MapLibre to overscale beyond zoom 6 to prevent 404s
         attribution: '&copy; WeatherAPI.com'
       });
+
+      ['weatherapi-wind-layer', 'weatherapi-pressure-layer'].forEach((layerId) => {
+        if (map.getLayer(layerId)) {
+          map.removeLayer(layerId);
+        }
+      });
+      ['weatherapi-wind-source', 'weatherapi-pressure-source'].forEach((sourceId) => {
+        if (map.getSource(sourceId)) {
+          map.removeSource(sourceId);
+        }
+      });
     }
 
     // Rain radar (precip) uses the authentic multi-tier Doppler radar reflectivity & dark relief basemap
-    const isThisRasterVisible = (activeLayer === key) && !isSatellite && (key !== 'precip');
+    const isThisRasterVisible = activeLayer === key && key !== 'precip';
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -520,11 +519,15 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         },
         paint: {
           'raster-opacity': cfg.opacity,
-          'raster-fade-duration': 250
+          'raster-fade-duration': 0,
+          'raster-resampling': 'linear'
         }
       }, beforeId);
     } else {
       map.setLayoutProperty(cfg.layerId, 'visibility', isThisRasterVisible ? 'visible' : 'none');
+      try {
+        map.setPaintProperty(cfg.layerId, 'raster-resampling', 'linear');
+      } catch (e) {}
     }
   });
 
@@ -541,7 +544,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   }
 
   // Convective Plume is visible if explicitly active ('convective') OR when viewing temperature as hazard overlay
-  const isConvectiveVis = (!isSatellite && (activeLayer === 'convective' || (activeLayer === 'temp' && isHeatmapVisible)));
+  const isConvectiveVis = activeLayer === 'convective' || (activeLayer === 'temp' && isHeatmapVisible);
 
   // 5. MapLibre GL JS Built-in Heatmap Layer (WebGL Fragment-Shader Accelerated)
   if (!map.getLayer(HEATMAP_LAYER_ID)) {
@@ -666,7 +669,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       map.getSource('cloudburst-hazard-radius-source').setData(hazardGeoJSON);
     }
 
-    const isHazardVis = (!isSatellite && (activeLayer === 'convective' || isHeatmapVisible));
+    const isHazardVis = activeLayer === 'convective' || isHeatmapVisible;
 
     if (!map.getLayer('cloudburst-hazard-radius-fill')) {
       map.addLayer({
@@ -709,7 +712,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   }
 
   // 6.5 Strictly Live Real-Time Doppler Weather Radar (DWR) Layers
-  const isRadar = (!isSatellite && activeLayer === 'precip');
+  const isRadar = activeLayer === 'precip';
 
   // A. Clean up any legacy simulated plume or dark basemap rasters
   ['ventusky-radar-plume-layer', 'radar-dark-base-layer', 'radar-dark-ref-layer', 'radar-echo-purple', 'radar-echo-red', 'radar-echo-orange', 'radar-echo-yellow', 'radar-echo-green', 'radar-echo-cyan', 'radar-echo-blue', 'radar-disks-fill', 'radar-disks-stroke'].forEach((id) => {
@@ -735,8 +738,8 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
 
   // C. Live RainViewer Doppler Radar Tiles (High-Definition Smooth Raster)
   if (radarTimestampPath) {
-    // 512px Retina tiles, Dark Sky color scheme 8, smooth blur option 1_1
-    const dopplerTileUrl = `https://tilecache.rainviewer.com${radarTimestampPath}/512/{z}/{x}/{y}/8/1_1.png`;
+    // RainViewer currently documents Universal Blue as scheme 2; radar values are dBZ.
+    const dopplerTileUrl = `https://tilecache.rainviewer.com${radarTimestampPath}/512/{z}/{x}/{y}/2/1_1.png`;
 
     // Invalidate existing source if missing maxzoom: 7 or using old 256px resolution
     const existingSource = map.getSource('doppler-radar-source');
@@ -772,46 +775,90 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     } else {
       map.setLayoutProperty('doppler-radar-layer', 'visibility', isRadar ? 'visible' : 'none');
     }
+  } else if (map.getLayer('doppler-radar-layer')) {
+    map.setLayoutProperty('doppler-radar-layer', 'visibility', 'none');
   }
 
-  // E. Real-Time Lightning Strikes (Blitzortung)
+  // E. Live Real-Time Lightning Strikes Feed (Direct Blitzortung + Convective Storms)
+  const isLightningVis = isRadar || activeLayer === 'precip' || activeLayer === 'radar' || activeLayer === 'thunderstorms';
+  const lightningData = getLightningStrikesGeoJSON();
+
   if (!map.getSource('lightning-strikes-source')) {
     map.addSource('lightning-strikes-source', {
       type: 'geojson',
-      data: LIGHTNING_STRIKES_GEOJSON
+      data: lightningData
     });
+  } else {
+    map.getSource('lightning-strikes-source').setData(lightningData);
   }
   if (!map.getLayer('lightning-strikes-glow')) {
     map.addLayer({
       id: 'lightning-strikes-glow',
       type: 'circle',
       source: 'lightning-strikes-source',
-      layout: { visibility: isRadar ? 'visible' : 'none' },
+      layout: { visibility: isLightningVis ? 'visible' : 'none' },
       paint: {
-        'circle-radius': 14,
+        'circle-radius': 16,
         'circle-color': '#facc15',
-        'circle-opacity': 0.35,
-        'circle-blur': 0.8
+        'circle-opacity': 0.45,
+        'circle-blur': 0.85
       }
     }, beforeId);
   } else {
-    map.setLayoutProperty('lightning-strikes-glow', 'visibility', isRadar ? 'visible' : 'none');
+    map.setLayoutProperty('lightning-strikes-glow', 'visibility', isLightningVis ? 'visible' : 'none');
   }
   if (!map.getLayer('lightning-strikes-core')) {
     map.addLayer({
       id: 'lightning-strikes-core',
       type: 'circle',
       source: 'lightning-strikes-source',
-      layout: { visibility: isRadar ? 'visible' : 'none' },
+      layout: { visibility: isLightningVis ? 'visible' : 'none' },
       paint: {
-        'circle-radius': 3.5,
+        'circle-radius': 4.0,
         'circle-color': '#ffffff',
         'circle-stroke-color': '#eab308',
-        'circle-stroke-width': 1.5
+        'circle-stroke-width': 2.0
       }
     }, beforeId);
   } else {
-    map.setLayoutProperty('lightning-strikes-core', 'visibility', isRadar ? 'visible' : 'none');
+    map.setLayoutProperty('lightning-strikes-core', 'visibility', isLightningVis ? 'visible' : 'none');
+  }
+
+  // 6.8 Antimeridian Seam Sealer Layer (Eliminates the 180° / -180° white slit)
+  const isTempLayer = activeLayer === 'temp';
+  if (!map.getSource('antimeridian-seam-source')) {
+    map.addSource('antimeridian-seam-source', {
+      type: 'geojson',
+      data: generateAntimeridianSeamGeoJSON()
+    });
+  }
+
+  if (!map.getLayer('antimeridian-seam-layer')) {
+    map.addLayer({
+      id: 'antimeridian-seam-layer',
+      type: 'line',
+      source: 'antimeridian-seam-source',
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+        visibility: isTempLayer ? 'visible' : 'none'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          0, 4.5,
+          4, 6.5,
+          8, 10.0
+        ],
+        'line-opacity': 0.96,
+        'line-blur': 0.8
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('antimeridian-seam-layer', 'visibility', isTempLayer ? 'visible' : 'none');
   }
 
   // 7. Refresh place label typography
@@ -860,8 +907,10 @@ export default function CloudburstMap({
   const windModeRef = useRef(windParticleMode);
   windModeRef.current = windParticleMode;
 
-  // Active weather overlay layer ('temp' | 'precip' | 'wind' | 'pressure' | 'convective' | 'none')
+  // Active weather overlay layer ('temp' | 'precip' | 'convective' | 'none')
   const [selectedWeatherLayer, setSelectedWeatherLayer] = useState(activeLayer || 'temp');
+  const [tileError, setTileError] = useState(null);
+  const weatherTileTimestampRef = useRef(getWeatherApiTimestamp());
 
   useEffect(() => {
     if (activeLayer) {
@@ -883,6 +932,11 @@ export default function CloudburstMap({
 
   const mapViewRef = useRef(mapView);
   mapViewRef.current = mapView;
+  const selectedWeatherLayerRef = useRef(selectedWeatherLayer);
+
+  useEffect(() => {
+    selectedWeatherLayerRef.current = selectedWeatherLayer;
+  }, [selectedWeatherLayer]);
 
   // Dynamic map scale bar state (Metric vs Imperial)
   const [scaleUnit, setScaleUnit] = useState('metric');
@@ -901,6 +955,9 @@ export default function CloudburstMap({
   probeScreenPosRef.current = probeScreenPos;
   isProbeVisibleRef.current = isProbeVisible;
   const mouseMoveRafRef = useRef(null);
+
+  // Muted Thunder Synthesizer state
+  const [isThunderMuted, setIsThunderMuted] = useState(() => thunderSynth.isMuted());
 
   // Update probe inspector (hoisted early to avoid TDZ reference errors)
   const updateProbeAtCoords = useCallback((lng, lat) => {
@@ -934,32 +991,56 @@ export default function CloudburstMap({
     isProbeVisibleRef.current = true;
   }, [stations, threatData]);
 
-  // Live RainViewer real-time Doppler radar timestamp path & time
+  // RainViewer radar timestamp path & loading status
   const [radarTimestampPath, setRadarTimestampPath] = useState(null);
   const [radarTimestampTime, setRadarTimestampTime] = useState(null);
+  const [radarStatus, setRadarStatus] = useState('loading');
   // Default pin centered on Bay of Bengal storm eye matching user screenshot (17°03'N 88°20'E)
   const [pinnedCoords, setPinnedCoords] = useState([88.33, 17.05]);
   const [pinnedScreenPos, setPinnedScreenPos] = useState({ x: 0, y: 0 });
 
-  // Fetch strictly live Doppler Radar timestamp from RainViewer Public API with 10-minute auto-refresh
+  // Fetch the latest available RainViewer radar frame and refresh every 10 minutes
   useEffect(() => {
     let isMounted = true;
-    const fetchRadarTimestamp = () => {
-      fetch("https://api.rainviewer.com/public/weather-maps.json")
-        .then((res) => res.json())
-        .then((data) => {
-          if (!isMounted) return;
-          const past = data?.radar?.past;
-          if (past && past.length > 0) {
-            const latest = past[past.length - 1];
-            setRadarTimestampPath(latest.path);
-            if (latest.time) {
-              const d = new Date(latest.time * 1000);
-              setRadarTimestampTime(d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
-            }
-          }
-        })
-        .catch(() => {});
+    const fetchRadarTimestamp = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
+          signal: controller.signal
+        });
+        if (!response.ok) {
+          throw new Error(`RainViewer returned HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!isMounted) return;
+
+        const past = data?.radar?.past;
+        const latest = Array.isArray(past) ? past[past.length - 1] : null;
+        if (!latest?.path) {
+          setRadarTimestampPath(null);
+          setRadarTimestampTime(null);
+          setRadarStatus('unavailable');
+          return;
+        }
+
+        setRadarTimestampPath(latest.path);
+        setRadarTimestampTime(
+          latest.time
+            ? new Date(latest.time * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : null
+        );
+        setRadarStatus('ready');
+      } catch (error) {
+        if (!isMounted) return;
+        console.warn('[RainViewer] Unable to load radar timestamp:', error);
+        setRadarTimestampPath(null);
+        setRadarTimestampTime(null);
+        setRadarStatus('unavailable');
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
 
     fetchRadarTimestamp();
@@ -1056,7 +1137,7 @@ export default function CloudburstMap({
       const [lon, lat] = cloudburstEvent.coordinates;
       const epicenterEl = document.createElement('div');
       epicenterEl.className = 'custom-cloudburst-epicenter relative flex items-center justify-center cursor-pointer select-none group pointer-events-auto';
-      epicenterEl.title = `${cloudburstEvent.title} — Predicted Rain Rate: ${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h (Click to Focus)`;
+      epicenterEl.title = `Illustrative scenario, not an official forecast or warning. ${cloudburstEvent.title} — Modelled rain rate: ${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h (Click to focus)`;
 
       epicenterEl.innerHTML = `
         <div class="relative flex items-center justify-center pointer-events-auto">
@@ -1069,7 +1150,7 @@ export default function CloudburstMap({
           <!-- Core Mission Control Badge -->
           <div class="relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white font-mono text-[11px] font-black shadow-[0_0_24px_rgba(239,68,68,0.9)] border-2 border-white scale-100 group-hover:scale-110 transition-transform">
             <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
-            <span class="tracking-wide uppercase">⚡ ${cloudburstEvent.metrics?.riskPercent ? `${cloudburstEvent.metrics.riskPercent}% RISK • ` : ''}${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h</span>
+            <span class="tracking-wide uppercase">⚡ SCENARIO • ${cloudburstEvent.metrics?.riskPercent ? `${cloudburstEvent.metrics.riskPercent}% MODEL RISK • ` : ''}${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h</span>
           </div>
         </div>
       `;
@@ -1120,9 +1201,50 @@ export default function CloudburstMap({
     mapRef.current = map;
     window.map = map;
 
+    const handleMapError = (event) => {
+      if (event.sourceId === 'basemap') {
+        setTileError({
+          scope: 'base',
+          message: 'Street map tiles could not be loaded. Check your connection and try again.'
+        });
+        return;
+      }
+
+      if (event.sourceId === 'esri-satellite' && mapViewRef.current === 'satellite') {
+        setTileError({
+          scope: 'map',
+          mapView: 'satellite',
+          message: 'Satellite imagery is temporarily unavailable. Switch back to the street map or try again later.'
+        });
+        return;
+      }
+
+      if (event.sourceId === 'doppler-radar-source' && selectedWeatherLayerRef.current === 'precip') {
+        setTileError({
+          scope: 'layer',
+          layer: 'precip',
+          message: 'Rain radar tiles are temporarily unavailable.'
+        });
+        return;
+      }
+
+      const failedWeatherLayer = Object.values(WEATHER_LAYERS).find(
+        (layer) => layer.sourceId === event.sourceId
+      );
+      if (failedWeatherLayer && selectedWeatherLayerRef.current === failedWeatherLayer.id) {
+        setTileError({
+          scope: 'layer',
+          layer: failedWeatherLayer.id,
+          message: `${failedWeatherLayer.label} tiles are temporarily unavailable.`
+        });
+      }
+    };
+
+    map.on('error', handleMapError);
+
     const onStyleReady = () => {
       const isSat = mapViewRef.current === 'satellite';
-      const isHeatmapVis = showTemperature && !isSat;
+      const isHeatmapVis = showTemperature;
 
       applyMapLayersAndHeatmap(map, isSat, selectedWeatherLayer, isHeatmapVis, heatmapGeoJSON, radarTimestampPath, cloudburstEvent);
       apply3DState(is3DRef.current, false);
@@ -1215,16 +1337,89 @@ export default function CloudburstMap({
     };
   }, []);
 
+  // Live Real-Time Lightning Strikes Stream & Flash Glow Animation
+  useEffect(() => {
+    // 1. Subscribe to strike GeoJSON stream
+    const unsubscribeStrikes = subscribeLightningStrikes((strikes, geojson) => {
+      const activeMap = mapRef.current;
+      if (activeMap && activeMap.isStyleLoaded() && activeMap.getSource('lightning-strikes-source')) {
+        activeMap.getSource('lightning-strikes-source').setData(geojson);
+      }
+    });
+
+    // 2. Subscribe to individual strike arrival for CSS flash glow animation
+    const unsubscribeFlashes = subscribeLightningFlashes((strike) => {
+      const activeMap = mapRef.current;
+      if (!activeMap) return;
+
+      // Create glowing flash element with shockwave ripple
+      const el = document.createElement('div');
+      el.className = 'lightning-flash-marker pointer-events-none select-none -translate-x-1/2 -translate-y-1/2';
+      el.innerHTML = `
+        <div class="relative flex items-center justify-center">
+          <span class="absolute w-14 h-14 rounded-full border border-white/95 animate-lightning-shockwave"></span>
+          <span class="absolute w-8 h-8 rounded-full bg-cyan-300/40 blur-xs animate-ping"></span>
+          <div class="relative w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-[0_0_18px_#ffffff,0_0_30px_#38bdf8] animate-lightning-flash">
+            <svg class="w-3.5 h-3.5 text-cyan-500 fill-cyan-400" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+        </div>
+      `;
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([strike.lon, strike.lat])
+        .addTo(activeMap);
+
+      // Clean up after flash animation finishes
+      setTimeout(() => {
+        try {
+          marker.remove();
+        } catch (e) {}
+      }, 1900);
+    });
+
+    return () => {
+      unsubscribeStrikes();
+      unsubscribeFlashes();
+    };
+  }, []);
+
   // Reactively update Built-in Heatmap, WeatherAPI, Cloudburst Hazard & Doppler Radar Layers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
     const isSat = mapView === 'satellite';
-    const isHeatmapVis = showTemperature && !isSat;
+    const isHeatmapVis = showTemperature;
 
     applyMapLayersAndHeatmap(map, isSat, selectedWeatherLayer, isHeatmapVis, heatmapGeoJSON, radarTimestampPath, cloudburstEvent);
   }, [heatmapGeoJSON, showTemperature, mapView, selectedWeatherLayer, radarTimestampPath, cloudburstEvent]);
+
+  useEffect(() => {
+    const refreshForecastTiles = () => {
+      const validTime = new Date();
+      validTime.setUTCMinutes(0, 0, 0);
+      const timestamp = getWeatherApiTimestamp(validTime);
+      if (timestamp === weatherTileTimestampRef.current) return;
+
+      weatherTileTimestampRef.current = timestamp;
+
+      const map = mapRef.current;
+      if (!map?.isStyleLoaded()) return;
+
+      ['temp', 'precip'].forEach((key) => {
+        const layer = WEATHER_LAYERS[key];
+        const source = map.getSource(layer.sourceId);
+        if (source && 'setTiles' in source && typeof source.setTiles === 'function') {
+          source.setTiles([getWeatherApiTileUrl(layer.layerKey, validTime)]);
+        }
+      });
+    };
+
+    const intervalId = window.setInterval(refreshForecastTiles, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   // Reactively recompute scale when scaleUnit toggles
   useEffect(() => {
@@ -1274,9 +1469,9 @@ export default function CloudburstMap({
           p.y[i] = ry;
           p.prevX[i] = rx;
           p.prevY[i] = ry;
-          p.age[i] = Math.floor(Math.random() * 85);
-          p.maxAge[i] = 70 + Math.floor(Math.random() * 85);
-          p.speed[i] = 0.90 + Math.random() * 1.10;
+          p.age[i] = Math.floor(Math.random() * 45);
+          p.maxAge[i] = 40 + Math.floor(Math.random() * 45);
+          p.speed[i] = 0.85 + Math.random() * 0.30;
         }
       }
     };
@@ -1284,37 +1479,58 @@ export default function CloudburstMap({
     resize();
     map.on('resize', resize);
 
-    let west = 0, east = 0, north = 0, south = 0, dLng = 1, dLat = 1;
-    let zoom = 2;
-    let globeRadiusSq = Infinity;
-    let globeCenterX = canvas.width * 0.5;
-    let globeCenterY = canvas.height * 0.5;
+    let centerLng = 78.96, centerLat = 22.50, scale = 1, cX = 0, cY = 0;
+    let isPitchedOrRotated = false;
 
     const updateCameraCache = () => {
       try {
-        const bounds = map.getBounds();
-        west = bounds.getWest();
-        east = bounds.getEast();
-        north = bounds.getNorth();
-        south = bounds.getSouth();
-        dLng = east - west;
-        dLat = north - south;
-        zoom = map.getZoom();
+        const center = map.getCenter();
+        centerLng = center.lng;
+        centerLat = center.lat;
+        const z = map.getZoom();
+        const pitch = map.getPitch();
+        const bearing = map.getBearing();
+        isPitchedOrRotated = (pitch !== 0 || bearing !== 0);
 
-        const w = canvas.width;
-        const h = canvas.height;
-        globeRadiusSq = Infinity;
+        scale = 512 * Math.pow(2, z);
+        cX = scale * (centerLng / 360 + 0.5);
+        const latRad = (centerLat * Math.PI) / 180;
+        cY = scale * (0.5 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / (2 * Math.PI));
       } catch (e) {}
     };
 
-    updateCameraCache();
-    map.on('move', updateCameraCache);
-    map.on('zoom', updateCameraCache);
-
-    const onZoomStart = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Closed-form Web Mercator unprojection (Zero-overhead, immune to antimeridian seam bugs)
+    const screenToLngLat = (px, py) => {
+      if (isPitchedOrRotated) {
+        const pt = map.unproject([px, py]);
+        return { lng: pt.lng, lat: pt.lat };
+      }
+      const wx = cX + (px - canvas.width * 0.5);
+      const wy = cY + (py - canvas.height * 0.5);
+      const lng = ((wx / scale) - 0.5) * 360;
+      const lat = (2 * Math.atan(Math.exp((0.5 - wy / scale) * 2 * Math.PI)) - Math.PI / 2) * (180 / Math.PI);
+      return { lng, lat };
     };
-    map.on('zoomstart', onZoomStart);
+
+    const clearCanvasTrails = () => {
+      if (canvas && ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    updateCameraCache();
+    map.on('movestart', clearCanvasTrails);
+    map.on('move', () => {
+      updateCameraCache();
+      clearCanvasTrails();
+    });
+    map.on('moveend', updateCameraCache);
+    map.on('zoomstart', clearCanvasTrails);
+    map.on('zoom', () => {
+      updateCameraCache();
+      clearCanvasTrails();
+    });
+    map.on('zoomend', updateCameraCache);
 
     let isRunning = true;
 
@@ -1325,54 +1541,54 @@ export default function CloudburstMap({
         return;
       }
 
-      // Dynamic mode parameters matching the 4 reference pictures exactly
-      // 1. Pic 1 (Normal): Soft white glowing oblong dashes, moderate spacing, length ~18-24px
-      let activeCount = 2200;
-      let speedMult = 0.38; // Gently decreased slightly from 0.52 for extra calm, silky wind drift
-      let fadeRate = 0.046; // Tuned persistence so streaks remain graceful, soft, and continuous
-      let strokeFine = 'rgba(240, 248, 255, 0.45)';
-      let widthFine = 1.8;
-      let strokeMid = 'rgba(255, 255, 255, 0.78)';
-      let widthMid = 2.3;
-      let strokeStrong = 'rgba(255, 255, 255, 0.98)';
-      let widthStrong = 2.8;
+      // Authentic Windy-Style Soothing Wind Particles (Smaller, Slower, Tranquil Flow)
+      // 1. Pic 1 (Normal): Ultra-fine, delicate glowing specks/dashes drifting calmly
+      let activeCount = 2800;
+      let speedMult = 0.14; // Slower, tranquil, silky, soothing drift
+      let fadeRate = 0.26; // High fade rate removes long tails, leaving short discrete dashes (3-6px) matching Windy
+      let strokeFine = 'rgba(235, 245, 255, 0.45)';
+      let widthFine = 0.70;
+      let strokeMid = 'rgba(255, 255, 255, 0.75)';
+      let widthMid = 0.95;
+      let strokeStrong = 'rgba(255, 255, 255, 0.95)';
+      let widthStrong = 1.25;
 
       if (mode === 'strong') {
-        // 2. Pic 2 (Strong): Ultra-dense, fine, sharp, brilliant white threads
-        activeCount = 4000;
-        speedMult = 1.22;
-        fadeRate = 0.048; // long persistence creating dense silk weave
-        strokeFine = 'rgba(245, 250, 255, 0.60)';
-        widthFine = 0.95;
-        strokeMid = 'rgba(255, 255, 255, 0.90)';
-        widthMid = 1.25;
-        strokeStrong = 'rgba(255, 255, 255, 1.0)';
-        widthStrong = 1.55;
-      } else if (mode === 'dark') {
-        // 3. Pic 3 (Dark): Discrete charcoal/black dashes of moderate density
-        activeCount = 2200;
-        speedMult = 0.38;
-        fadeRate = 0.044;
-        strokeFine = 'rgba(50, 50, 60, 0.50)';
-        widthFine = 1.6;
-        strokeMid = 'rgba(20, 20, 28, 0.82)';
-        widthMid = 2.1;
-        strokeStrong = 'rgba(5, 5, 12, 0.98)';
-        widthStrong = 2.6;
-      } else if (mode === 'fast') {
-        // 4. Pic 4 (Fast-motion): Dense, striated black velocity lines with smoothly dialed-down speed
+        // 2. Pic 2 (Strong): Fine, dense, crisp luminous threads
         activeCount = 3800;
-        speedMult = 1.38;
-        fadeRate = 0.058;
+        speedMult = 0.24;
+        fadeRate = 0.22;
+        strokeFine = 'rgba(245, 250, 255, 0.55)';
+        widthFine = 0.80;
+        strokeMid = 'rgba(255, 255, 255, 0.85)';
+        widthMid = 1.10;
+        strokeStrong = 'rgba(255, 255, 255, 1.0)';
+        widthStrong = 1.35;
+      } else if (mode === 'dark') {
+        // 3. Pic 3 (Dark): Discrete charcoal/slate dashes of moderate density
+        activeCount = 2800;
+        speedMult = 0.14;
+        fadeRate = 0.25;
         strokeFine = 'rgba(50, 50, 60, 0.45)';
-        widthFine = 0.95;
-        strokeMid = 'rgba(22, 22, 30, 0.82)';
-        widthMid = 1.25;
-        strokeStrong = 'rgba(2, 2, 8, 0.98)';
-        widthStrong = 1.60;
+        widthFine = 0.75;
+        strokeMid = 'rgba(20, 20, 28, 0.78)';
+        widthMid = 1.05;
+        strokeStrong = 'rgba(5, 5, 12, 0.95)';
+        widthStrong = 1.30;
+      } else if (mode === 'fast') {
+        // 4. Pic 4 (Fast-motion): Smooth velocity ribbons
+        activeCount = 3200;
+        speedMult = 0.30;
+        fadeRate = 0.20;
+        strokeFine = 'rgba(50, 50, 60, 0.45)';
+        widthFine = 0.80;
+        strokeMid = 'rgba(22, 22, 30, 0.80)';
+        widthMid = 1.10;
+        strokeStrong = 'rgba(2, 2, 8, 0.95)';
+        widthStrong = 1.35;
       }
 
-      // Authentic Ventusky Ghost Trail Persistence
+      // Authentic Ventusky/Windy Ghost Trail Persistence
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = `rgba(0, 0, 0, ${fadeRate})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1382,9 +1598,6 @@ export default function CloudburstMap({
 
       const width = canvas.width;
       const height = canvas.height;
-      const invW = 1 / Math.max(1, width);
-      const invH = 1 / Math.max(1, height);
-      const is3DCurrent = is3DRef.current;
 
       const tierFine = [];   // delicate background streamlines
       const tierMid = [];    // standard active streamlines
@@ -1394,46 +1607,62 @@ export default function CloudburstMap({
         const currX = p.x[i];
         const currY = p.y[i];
 
+        // --- 2nd-Order Runge-Kutta (RK2 Midpoint) with Physical Velocity Scaling & Land/Water Friction ---
+        // 1. Initial State (Stage 0)
+        const pos0 = screenToLngLat(currX, currY);
+        const cosLat0 = Math.max(0.18, Math.cos((pos0.lat * Math.PI) / 180));
+        
+        const k1 = getWindVector(pos0.lng, pos0.lat);
+        const uNorm1 = k1.u / cosLat0;
+        const mag1 = Math.sqrt(uNorm1 * uNorm1 + k1.v * k1.v);
 
+        // Planetary Boundary Layer Aerodynamic Surface Drag (Fast on Water, Slow on Land)
+        const fMult1 = getSurfaceFrictionMultiplier(pos0.lng, pos0.lat);
+        const factor1 = (mag1 < 0.001) ? (1.0 / 3.5) : (Math.tanh(mag1 / 3.5) / mag1);
+        const dispScale1 = Math.max(0.18 / (mag1 + 0.15), 0.14 + 1.25 * factor1) * (speedMult * fMult1) * p.speed[i];
 
-        // --- 2nd-Order Runge-Kutta (RK2 Midpoint) Integration with Strictly Bounded Screen Micro-Steps ---
-        const lng0 = west + currX * invW * dLng;
-        const lat0 = north - currY * invH * dLat;
-        const k1 = getWindVector(lng0, lat0);
-        const mag1 = Math.sqrt(k1.u * k1.u + k1.v * k1.v);
+        // Midpoint predictor (half step along tangent)
+        const midX = currX + (uNorm1 * dispScale1) * 0.5;
+        const midY = currY - (k1.v * dispScale1) * 0.5;
 
-        // Screen displacement strictly bounded between 1.3 and 3.2 pixels per frame
-        // This eliminates coarse polygonal chords and guarantees smooth continuous curvature
-        const speedPx = (1.2 + Math.min(2.0, mag1 * 0.32)) * p.speed[i] * speedMult;
-        const invMag1 = 1 / (mag1 + 0.001);
+        // 2. Midpoint Evaluation (Stage 1)
+        const posMid = screenToLngLat(midX, midY);
+        const cosLatMid = Math.max(0.18, Math.cos((posMid.lat * Math.PI) / 180));
 
-        // Midpoint predictor (half step)
-        const midX = currX + (k1.u * invMag1) * (speedPx * 0.5);
-        const midY = currY - (k1.v * invMag1) * (speedPx * 0.5);
-        const lngMid = west + midX * invW * dLng;
-        const latMid = north - midY * invH * dLat;
+        const k2 = getWindVector(posMid.lng, posMid.lat);
+        const uNorm2 = k2.u / cosLatMid;
+        const mag2 = Math.sqrt(uNorm2 * uNorm2 + k2.v * k2.v);
 
-        // Sample vector at midpoint
-        const k2 = getWindVector(lngMid, latMid);
-        const mag2 = Math.sqrt(k2.u * k2.u + k2.v * k2.v);
-        const invMag2 = 1 / (mag2 + 0.001);
+        // Corrector: advance particle along midpoint tangent with surface drag
+        const fMult2 = getSurfaceFrictionMultiplier(posMid.lng, posMid.lat);
+        const factor2 = (mag2 < 0.001) ? (1.0 / 3.5) : (Math.tanh(mag2 / 3.5) / mag2);
+        const dispScale2 = Math.max(0.18 / (mag2 + 0.15), 0.14 + 1.25 * factor2) * (speedMult * fMult2) * p.speed[i];
+        const stepX = uNorm2 * dispScale2;
+        const stepY = -k2.v * dispScale2;
 
-        // Corrector: advance particle from currX, currY to nextX, nextY along midpoint tangent
-        const nextX = currX + (k2.u * invMag2) * speedPx;
-        const nextY = currY - (k2.v * invMag2) * speedPx;
+        const nextX = currX + stepX;
+        const nextY = currY + stepY;
 
         const lifeRatio = p.age[i] / p.maxAge[i];
         const alpha = Math.sin(lifeRatio * Math.PI);
 
-        // Draw ONE continuous micro-segment per frame connecting with historical ghost trail
-        if (p.age[i] > 1 && alpha > 0.04) {
-          let targetTier = tierFine;
-          if (mag2 >= 5.2 || alpha > 0.82) {
-            targetTier = tierStrong;
-          } else if (mag2 >= 2.6 || alpha > 0.48) {
-            targetTier = tierMid;
+        // Delta Threshold Clipping (Windy Architecture Section 9):
+        // Suppresses screen-crossing streaks on boundary wrap or respawn
+        const dx = nextX - currX;
+        const dy = nextY - currY;
+        const maxJump = Math.max(20, Math.sqrt(stepX * stepX + stepY * stepY) * 3.5);
+
+        if (Math.abs(dx) <= maxJump && Math.abs(dy) <= maxJump) {
+          if (p.age[i] > 1 && alpha > 0.04) {
+            let targetTier = tierFine;
+            if (mag2 >= 5.2 || alpha > 0.82) {
+              targetTier = tierStrong;
+            } else if (mag2 >= 2.6 || alpha > 0.48) {
+              targetTier = tierMid;
+            }
+            // Continuous 2-micro-step curvilinear path (curr -> mid -> next) eliminates angular crease
+            targetTier.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
           }
-          targetTier.push(currX, currY, nextX, nextY);
         }
 
         p.prevX[i] = currX;
@@ -1447,13 +1676,15 @@ export default function CloudburstMap({
           nextY < -20 || nextY > height + 20 ||
           p.age[i] >= p.maxAge[i]
         ) {
-          p.x[i] = Math.random() * width;
-          p.y[i] = Math.random() * height;
-          p.prevX[i] = p.x[i];
-          p.prevY[i] = p.y[i];
+          const spawnX = Math.random() * width;
+          const spawnY = Math.random() * height;
+          p.x[i] = spawnX;
+          p.y[i] = spawnY;
+          p.prevX[i] = spawnX;
+          p.prevY[i] = spawnY;
           p.age[i] = 0;
-          p.maxAge[i] = (mode === 'fast' ? 45 : 75) + Math.floor(Math.random() * (mode === 'fast' ? 45 : 85));
-          p.speed[i] = 0.90 + Math.random() * 0.40;
+          p.maxAge[i] = 35 + Math.floor(Math.random() * 40);
+          p.speed[i] = 0.85 + Math.random() * 0.30;
         }
       }
 
@@ -1505,9 +1736,12 @@ export default function CloudburstMap({
         animFrameRef.current = null;
       }
       map.off('resize', resize);
-      map.off('zoomstart', onZoomStart);
+      map.off('movestart', clearCanvasTrails);
       map.off('move', updateCameraCache);
+      map.off('moveend', updateCameraCache);
+      map.off('zoomstart', clearCanvasTrails);
       map.off('zoom', updateCameraCache);
+      map.off('zoomend', updateCameraCache);
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1609,44 +1843,54 @@ export default function CloudburstMap({
     cycloneMarkersRef.current.forEach(m => m.remove());
     cycloneMarkersRef.current = [];
 
-    if (!showTemperature) return;
+    // Fetch live cyclones on mount
+    fetchLiveCyclones().catch(() => {});
 
-    ACTIVE_CYCLONES.forEach(cyclone => {
-      const el = document.createElement('div');
-      el.className = 'custom-cyclone-marker flex items-center gap-1.5 apple-liquid-glass px-2.5 py-1 rounded-full shadow-2xl cursor-pointer select-none transition-transform hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto';
-      el.title = `${cyclone.name} (${cyclone.status}) — Wind: ${cyclone.windKmh} km/h, Pressure: ${cyclone.pressureHpa} hPa`;
-      el.innerHTML = `
-        <span class="w-4 h-4 flex items-center justify-center animate-spin text-rose-400" style="animation-duration: 3.5s;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-3.5 h-3.5 text-rose-400">
-            <path d="M12 2a10 10 0 0 1 7.07 17.07l-2.12-2.12A7 7 0 0 0 12 5v-3z"/>
-            <path d="M12 22a10 10 0 0 1-7.07-17.07l2.12 2.12A7 7 0 0 0 12 19v3z"/>
-          </svg>
-        </span>
-        <span class="text-[11px] font-bold text-white tracking-wide">${cyclone.name}</span>
-      `;
+    const updateCycloneMarkers = (cyclones) => {
+      cycloneMarkersRef.current.forEach(m => m.remove());
+      cycloneMarkersRef.current = [];
 
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        map.flyTo({
-          center: [cyclone.lon, cyclone.lat],
-          zoom: 5.5,
-          speed: 1.2
+      (cyclones || []).forEach(cyclone => {
+        const el = document.createElement('div');
+        el.className = 'custom-cyclone-marker flex items-center gap-1.5 apple-liquid-glass px-2.5 py-1 rounded-full shadow-2xl cursor-pointer select-none transition-transform hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto';
+        el.title = `${cyclone.name} (${cyclone.status || cyclone.category}) — Wind: ${cyclone.windKmh} km/h, Pressure: ${cyclone.pressureHpa} hPa`;
+        el.innerHTML = `
+          <span class="w-4 h-4 flex items-center justify-center animate-spin text-rose-400" style="animation-duration: 3.5s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-3.5 h-3.5 text-rose-400">
+              <path d="M12 2a10 10 0 0 1 7.07 17.07l-2.12-2.12A7 7 0 0 0 12 5v-3z"/>
+              <path d="M12 22a10 10 0 0 1-7.07-17.07l2.12 2.12A7 7 0 0 0 12 19v3z"/>
+            </svg>
+          </span>
+          <span class="text-[11px] font-bold text-white tracking-wide">${cyclone.name}</span>
+          <span class="text-[9px] font-mono px-1 rounded bg-rose-500/30 text-rose-300 font-semibold">${cyclone.windKmh}k</span>
+        `;
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          map.flyTo({
+            center: [cyclone.lon, cyclone.lat],
+            zoom: 5.5,
+            speed: 1.2
+          });
+          updateProbeAtCoords(cyclone.lon, cyclone.lat);
         });
-        updateProbeAtCoords(cyclone.lon, cyclone.lat);
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([cyclone.lon, cyclone.lat])
+          .addTo(map);
+
+        cycloneMarkersRef.current.push(marker);
       });
+    };
 
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([cyclone.lon, cyclone.lat])
-        .addTo(map);
-
-      cycloneMarkersRef.current.push(marker);
-    });
+    const unsubscribe = subscribeActiveCyclones(updateCycloneMarkers);
 
     return () => {
+      unsubscribe();
       cycloneMarkersRef.current.forEach(m => m.remove());
       cycloneMarkersRef.current = [];
     };
-  }, [showTemperature, updateProbeAtCoords]);
+  }, [updateProbeAtCoords]);
 
   // Update probe coordinates on map pan/zoom/scroll
   useEffect(() => {
@@ -1780,12 +2024,28 @@ export default function CloudburstMap({
         className="relative w-full h-full z-[1]" 
       />
 
+      {tileError && (
+        (tileError.scope === 'base' ||
+          (tileError.scope === 'map' && tileError.mapView === mapView) ||
+          (tileError.scope === 'layer' && tileError.layer === selectedWeatherLayer)) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute top-14 left-1/2 z-40 -translate-x-1/2 rounded-full border border-amber-300/30 bg-slate-950/90 px-3 py-1.5 text-center text-[11px] font-medium text-amber-100 shadow-xl"
+        >
+          {tileError.message}
+        </div>
+        )
+      )}
+
       {/* 2. Streamline particles (hardware-composited on top of heatmap at 120 FPS) */}
       <canvas
         ref={particleCanvasRef}
         className="pointer-events-none absolute inset-0 z-[10] w-full h-full transition-opacity duration-150"
         style={{
-          opacity: (showParticles && windParticleMode !== 'off') ? 1 : 0,
+          opacity: (showParticles && windParticleMode !== 'off')
+            ? 1
+            : 0,
           pointerEvents: 'none'
         }}
       />
@@ -1803,7 +2063,6 @@ export default function CloudburstMap({
             { id: 'convective', label: 'Cloudburst', icon: Zap },
             { id: 'precip', label: 'Rain Radar', icon: CloudRain },
             { id: 'wind', label: 'Wind Speed', icon: Wind },
-            { id: 'pressure', label: 'Pressure', icon: Compass },
           ].map((item) => {
             const Icon = item.icon;
             const isActive = selectedWeatherLayer === item.id;
@@ -1834,6 +2093,14 @@ export default function CloudburstMap({
             >
               ✕
             </button>
+          )}
+          {selectedWeatherLayer === 'convective' && mapView !== 'satellite' && (
+            <span
+              title="Illustrative model output, not an official forecast or warning"
+              className="shrink-0 rounded-full border border-amber-300/30 px-2 py-1 text-[9px] font-semibold text-amber-100"
+            >
+              Illustrative model · not an official forecast
+            </span>
           )}
         </div>
       )}
@@ -1888,21 +2155,29 @@ export default function CloudburstMap({
         >
           <div 
             id="cursor-temp-pill"
-            className="bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full shadow-lg border border-black/15 flex items-center justify-center select-none"
+            className="bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-lg border border-black/15 flex flex-col items-center justify-center select-none"
           >
+            <span className="text-[8px] font-bold uppercase tracking-wide text-slate-500">
+              {selectedWeatherLayer === 'temp'
+                ? 'Model estimate'
+                : selectedWeatherLayer === 'precip'
+                  ? 'Radar Reflectivity'
+                  : selectedWeatherLayer === 'convective'
+                    ? 'Cloudburst Threat'
+                    : selectedWeatherLayer === 'wind'
+                      ? 'Wind Speed'
+                      : 'Model estimate'}
+            </span>
             <span className="font-sans font-bold text-[13px] text-slate-900 tracking-tight leading-none whitespace-nowrap">
               {(() => {
                 if (selectedWeatherLayer === 'precip') {
-                  return `${probe.precip ?? 0} mm/h`;
-                }
-                if (selectedWeatherLayer === 'wind') {
-                  return `${probe.wind ?? 0} km/h`;
-                }
-                if (selectedWeatherLayer === 'pressure') {
-                  return `${probe.pressure ?? 1013} hPa`;
+                  return `${probe.dbz ?? 0} dBZ`;
                 }
                 if (selectedWeatherLayer === 'convective') {
                   return `${probe.convectiveRisk ?? 85}% Risk`;
+                }
+                if (selectedWeatherLayer === 'wind') {
+                  return `${Math.round(probe.wind ?? 25)} km/h`;
                 }
                 const val = tempUnit === 'F' ? celsiusToFahrenheit(probe.temp) : probe.temp;
                 const sign = val < 0 ? '\u2212' : '';
@@ -1915,10 +2190,16 @@ export default function CloudburstMap({
 
 
 
-      {/* 4.8 Bottom Left Timestamp Pill */}
+      {/* 4.8 Radar source and time */}
       {selectedWeatherLayer === 'precip' && !isHomeView && (
-        <div className="absolute bottom-16 left-4 z-20 apple-liquid-glass-pill px-3 py-1 rounded-full text-xs font-mono font-bold text-slate-100 shadow-xl border border-white/20 select-none pointer-events-auto">
-          {radarTimestampTime || '3:45 AM'}
+        <div className="absolute bottom-16 left-4 z-20 apple-liquid-glass-pill px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold text-slate-100 shadow-xl border border-white/20 select-none pointer-events-auto">
+          <div>
+            RainViewer radar · {radarStatus === 'ready' ? radarTimestampTime || 'time unavailable' : radarStatus === 'loading' ? 'loading' : 'unavailable'}
+          </div>
+          <div className="mt-0.5 font-sans font-medium text-amber-300 flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-amber-300 fill-amber-300 animate-pulse" />
+            Live Lightning Strikes · {isThunderMuted ? 'Audio Muted' : 'Thunder Sound Active'}
+          </div>
         </div>
       )}
 
@@ -1938,6 +2219,25 @@ export default function CloudburstMap({
             className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
           >
             <Minus className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              const nextMuted = !isThunderMuted;
+              thunderSynth.setMuted(nextMuted);
+              setIsThunderMuted(nextMuted);
+              if (!nextMuted) {
+                thunderSynth.play();
+              }
+            }}
+            title={isThunderMuted ? "Enable Muted Thunder Audio" : "Mute Thunder Audio (Currently Active)"}
+            className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+              isThunderMuted 
+                ? 'text-slate-400 hover:text-white hover:bg-white/15' 
+                : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+            }`}
+          >
+            {isThunderMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
           <button

@@ -20,7 +20,7 @@ export const CLOUDBURST_PRESET_EVENTS = {
     detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     leadTimeMinutes: 38,
     mlModel: {
-      name: "ConvLSTM + LightGBM Cloudburst Ensemble v2.4",
+      name: "Physics-Informed Dual-Engine Ensemble (LightGBM + XGBoost) v2.5",
       confidencePercent: 96.4,
       riskLevel: "EXTREME_HAZARD"
     },
@@ -51,7 +51,7 @@ export const CLOUDBURST_PRESET_EVENTS = {
     detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     leadTimeMinutes: 45,
     mlModel: {
-      name: "ConvLSTM + LightGBM Cloudburst Ensemble v2.4",
+      name: "Physics-Informed Dual-Engine Ensemble (LightGBM + XGBoost) v2.5",
       confidencePercent: 91.8,
       riskLevel: "HIGH_HAZARD"
     },

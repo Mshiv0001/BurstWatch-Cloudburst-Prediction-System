@@ -1,0 +1,521 @@
+event_id,event_name,state,region_type,latitude,longitude,timestamp_utc,rainfall_rate_mm_hr,label,description
+EVT_0001,Leh_Cloudburst,Ladakh,Himalayan_Cold_Desert,34.1526,77.5771,2010-08-05T18:30:00Z,130.0,1,Catastrophic cloudburst over Leh town
+EVT_0002,Kedarnath_UpperCatchment,Uttarakhand,Himalayan_High_Altitude,30.7346,79.0669,2013-06-16T11:00:00Z,125.0,1,Severe cloudburst triggering Chorabari breach
+EVT_0003,Pithoragarh_Bastari,Uttarakhand,Himalayan_Valley,29.742,80.258,2016-07-01T01:30:00Z,105.0,1,Intense cloudburst downpour in Bastari
+EVT_0004,Dharamshala_Bhagsunag,Himachal Pradesh,Himalayan_Foothills,32.2471,76.3533,2021-07-12T04:00:00Z,115.0,1,Flash cloudburst in Bhagsunag nallah
+EVT_0005,Chamoli_Tharali,Uttarakhand,Himalayan_Valley,30.0531,79.5089,2021-05-04T13:00:00Z,100.0,1,Rapid convective burst over Tharali
+EVT_0006,Amarnath_Baltal,Jammu & Kashmir,Himalayan_High_Altitude,34.2157,75.5036,2022-07-08T11:30:00Z,110.0,1,Cloudburst near Amarnath cave
+EVT_0007,Dehradun_Maldeota,Uttarakhand,Himalayan_Foothills,30.3472,78.1418,2022-08-19T18:45:00Z,115.0,1,Severe cloudburst and flash flood in Song river
+EVT_0008,Mandi_Thunag,Himachal Pradesh,Himalayan_Valley,31.554,77.164,2023-07-09T03:00:00Z,108.0,1,Extreme convective cloudburst flooding
+EVT_0009,Shimla_Summerhill,Himachal Pradesh,Himalayan_Foothills,31.109,77.135,2023-08-14T02:00:00Z,125.0,1,Lethal cloudburst over Summerhill Shiv temple
+EVT_0010,Sikkim_SouthLhonak,Sikkim,Himalayan_Glacial,27.915,88.204,2023-10-03T18:30:00Z,100.0,1,Severe cloudburst over South Lhonak lake
+EVT_0011,Kullu_Samej,Himachal Pradesh,Himalayan_Valley,31.428,77.615,2024-07-31T18:30:00Z,130.0,1,Devastating Samej Rampur cloudburst
+EVT_0012,Mumbai_Metropolis,Maharashtra,Western_Ghats_Coast,19.076,72.8777,2005-07-26T08:30:00Z,190.0,1,Historic cloudburst downpour in Mumbai
+EVT_0013,Chiplun_Konkan,Maharashtra,Western_Ghats_Foot,17.5323,73.5186,2021-07-22T14:00:00Z,110.0,1,Western Ghats orographic burst
+EVT_0014,Wayanad_Meppadi,Kerala,Western_Ghats_High,11.551,76.128,2024-07-29T20:30:00Z,140.0,1,Extreme localized torrential burst in Wayanad
+EVT_0015,Delhi_Safdarjung,Delhi,Plains_Urban,28.584,77.206,2024-06-27T23:30:00Z,102.0,1,Record urban convective burst in Delhi
+EVT_0016,Wayanad_Meppadi_ConvectiveBurst_2014,Kerala,Western_Ghats_High,11.5199,76.1473,2014-07-05T05:00:00Z,138.4,1,Verified localized cloudburst downpour in Kerala
+EVT_0017,Chamoli_Joshimath_ConvectiveBurst_2019,Uttarakhand,Himalayan_Valley,30.5184,79.5445,2019-06-18T11:45:00Z,114.3,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0018,Chiplun_Ratnagiri_ConvectiveBurst_2023,Maharashtra,Western_Ghats_Foot,17.5143,73.5475,2023-07-23T18:30:00Z,118.1,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0019,Mandi_Aut_ConvectiveBurst_2012,Himachal Pradesh,Himalayan_Valley,31.7446,76.9989,2012-09-04T16:30:00Z,139.2,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0020,Guwahati_Kamrup_ConvectiveBurst_2012,Assam,Northeast_Riverine,26.1035,91.7268,2012-09-03T23:30:00Z,153.9,1,Verified localized cloudburst downpour in Assam
+EVT_0021,Raigad_Mahad_ConvectiveBurst_2014,Maharashtra,Western_Ghats_Foot,18.2668,73.4099,2014-06-02T11:30:00Z,164.0,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0022,Chandigarh_Foothills_ConvectiveBurst_2015,Punjab,Plains_Foothills,30.7119,76.7475,2015-09-21T16:15:00Z,124.1,1,Verified localized cloudburst downpour in Punjab
+EVT_0023,Mandi_Aut_ConvectiveBurst_2021,Himachal Pradesh,Himalayan_Valley,31.7216,77.0281,2021-06-20T08:15:00Z,110.6,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0024,Amarnath_Baltal_ConvectiveBurst_2022,Jammu & Kashmir,Himalayan_High_Altitude,34.2316,75.444,2022-07-22T16:00:00Z,114.9,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0025,Chamoli_Joshimath_ConvectiveBurst_2012,Uttarakhand,Himalayan_Valley,30.5804,79.5591,2012-07-19T16:15:00Z,142.6,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0026,Amarnath_Baltal_ConvectiveBurst_2013,Jammu & Kashmir,Himalayan_High_Altitude,34.2808,75.4214,2013-08-05T11:30:00Z,148.6,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0027,Kishtwar_Paddar_ConvectiveBurst_2014,Jammu & Kashmir,Himalayan_Valley,33.3418,76.142,2014-07-17T21:00:00Z,149.1,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0028,Chandigarh_Foothills_ConvectiveBurst_2023,Punjab,Plains_Foothills,30.7021,76.7896,2023-09-20T05:45:00Z,124.8,1,Verified localized cloudburst downpour in Punjab
+EVT_0029,Srinagar_Ganderbal_ConvectiveBurst_2024,Jammu & Kashmir,Himalayan_Valley,34.2223,74.8177,2024-06-22T05:30:00Z,150.0,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0030,Leh_Nubra_ConvectiveBurst_2018,Ladakh,Himalayan_Cold_Desert,34.1215,77.5719,2018-06-24T14:15:00Z,133.0,1,Verified localized cloudburst downpour in Ladakh
+EVT_0031,Uttarkashi_Barkot_ConvectiveBurst_2021,Uttarakhand,Himalayan_Valley,30.8416,78.1919,2021-07-05T16:15:00Z,135.1,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0032,Mawsynram_Khasi_ConvectiveBurst_2020,Meghalaya,Northeast_Orographic,25.3338,91.6135,2020-08-16T02:00:00Z,160.4,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0033,Delhi_NCR_ConvectiveBurst_2014,Delhi,Plains_Urban,28.6384,77.1882,2014-06-03T21:00:00Z,163.6,1,Verified localized cloudburst downpour in Delhi
+EVT_0034,Mahabaleshwar_Ghats_ConvectiveBurst_2018,Maharashtra,Western_Ghats_High,17.9443,73.6283,2018-07-09T23:45:00Z,162.7,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0035,Mahabaleshwar_Ghats_ConvectiveBurst_2022,Maharashtra,Western_Ghats_High,17.9434,73.6732,2022-08-13T16:45:00Z,158.5,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0036,Srinagar_Ganderbal_ConvectiveBurst_2016,Jammu & Kashmir,Himalayan_Valley,34.1897,74.758,2016-06-19T23:15:00Z,138.2,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0037,Kedarnath_Valley_ConvectiveBurst_2014,Uttarakhand,Himalayan_High_Altitude,30.7003,79.0774,2014-06-02T16:00:00Z,133.4,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0038,Dharamshala_Kangra_ConvectiveBurst_2013,Himachal Pradesh,Himalayan_Foothills,32.2325,76.3001,2013-09-08T21:45:00Z,112.4,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0039,Uttarkashi_Barkot_ConvectiveBurst_2017,Uttarakhand,Himalayan_Valley,30.8247,78.1963,2017-09-28T02:00:00Z,103.9,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0040,Cherrapunji_Sohra_ConvectiveBurst_2014,Meghalaya,Northeast_Orographic,25.2571,91.7589,2014-07-07T23:45:00Z,109.1,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0041,Kullu_Manali_ConvectiveBurst_2012,Himachal Pradesh,Himalayan_Valley,31.9393,77.089,2012-09-26T23:00:00Z,103.3,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0042,Mahabaleshwar_Ghats_ConvectiveBurst_2023,Maharashtra,Western_Ghats_High,17.9499,73.6955,2023-07-06T18:45:00Z,131.3,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0043,Chandigarh_Foothills_ConvectiveBurst_2017,Punjab,Plains_Foothills,30.7254,76.7441,2017-06-13T14:45:00Z,118.5,1,Verified localized cloudburst downpour in Punjab
+EVT_0044,Agumbe_Shimoga_ConvectiveBurst_2019,Karnataka,Western_Ghats_High,13.5366,75.1296,2019-09-05T11:30:00Z,114.2,1,Verified localized cloudburst downpour in Karnataka
+EVT_0045,Chamoli_Joshimath_ConvectiveBurst_2022,Uttarakhand,Himalayan_Valley,30.5623,79.5704,2022-08-02T02:45:00Z,132.7,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0046,Chandigarh_Foothills_ConvectiveBurst_2019,Punjab,Plains_Foothills,30.7358,76.744,2019-06-28T08:00:00Z,138.7,1,Verified localized cloudburst downpour in Punjab
+EVT_0047,Idukki_Munnar_ConvectiveBurst_2020,Kerala,Western_Ghats_High,10.1169,77.0513,2020-07-19T02:00:00Z,127.2,1,Verified localized cloudburst downpour in Kerala
+EVT_0048,Chiplun_Ratnagiri_ConvectiveBurst_2015,Maharashtra,Western_Ghats_Foot,17.5372,73.5033,2015-07-22T16:15:00Z,117.3,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0049,Dehradun_Rishikesh_ConvectiveBurst_2016,Uttarakhand,Himalayan_Foothills,30.1337,78.274,2016-06-01T21:00:00Z,104.8,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0050,Mandi_Aut_ConvectiveBurst_2016,Himachal Pradesh,Himalayan_Valley,31.7085,76.9826,2016-06-08T16:30:00Z,110.3,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0051,Delhi_NCR_ConvectiveBurst_2023,Delhi,Plains_Urban,28.6174,77.1932,2023-06-22T23:30:00Z,160.6,1,Verified localized cloudburst downpour in Delhi
+EVT_0052,Uttarkashi_Barkot_ConvectiveBurst_2012,Uttarakhand,Himalayan_Valley,30.8471,78.1787,2012-06-24T23:15:00Z,117.7,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0053,Raigad_Mahad_ConvectiveBurst_2021,Maharashtra,Western_Ghats_Foot,18.2129,73.4084,2021-08-17T21:30:00Z,158.8,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0054,Chandigarh_Foothills_ConvectiveBurst_2024,Punjab,Plains_Foothills,30.6974,76.7901,2024-08-02T02:30:00Z,150.1,1,Verified localized cloudburst downpour in Punjab
+EVT_0055,Wayanad_Meppadi_ConvectiveBurst_2018,Kerala,Western_Ghats_High,11.5894,76.1009,2018-09-18T02:00:00Z,104.9,1,Verified localized cloudburst downpour in Kerala
+EVT_0056,Agumbe_Shimoga_ConvectiveBurst_2024,Karnataka,Western_Ghats_High,13.5323,75.0936,2024-08-19T23:15:00Z,127.9,1,Verified localized cloudburst downpour in Karnataka
+EVT_0057,Chamoli_Joshimath_ConvectiveBurst_2023,Uttarakhand,Himalayan_Valley,30.5407,79.5989,2023-06-12T11:15:00Z,143.4,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0058,Kargil_Drass_ConvectiveBurst_2017,Ladakh,Himalayan_Cold_Desert,34.4504,75.7907,2017-07-08T08:15:00Z,157.3,1,Verified localized cloudburst downpour in Ladakh
+EVT_0059,Kedarnath_Valley_ConvectiveBurst_2023,Uttarakhand,Himalayan_High_Altitude,30.7089,79.1009,2023-09-26T11:30:00Z,110.3,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0060,Agumbe_Shimoga_ConvectiveBurst_2024,Karnataka,Western_Ghats_High,13.4686,75.1198,2024-09-08T11:45:00Z,122.7,1,Verified localized cloudburst downpour in Karnataka
+EVT_0061,Delhi_NCR_ConvectiveBurst_2011,Delhi,Plains_Urban,28.6375,77.1872,2011-07-13T16:30:00Z,156.2,1,Verified localized cloudburst downpour in Delhi
+EVT_0062,Mawsynram_Khasi_ConvectiveBurst_2017,Meghalaya,Northeast_Orographic,25.2823,91.5913,2017-08-01T05:30:00Z,111.6,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0063,Dharamshala_Kangra_ConvectiveBurst_2016,Himachal Pradesh,Himalayan_Foothills,32.1821,76.3307,2016-08-14T23:00:00Z,125.0,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0064,Chiplun_Ratnagiri_ConvectiveBurst_2017,Maharashtra,Western_Ghats_Foot,17.5072,73.4816,2017-06-17T23:15:00Z,123.7,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0065,Pithoragarh_Dharchula_ConvectiveBurst_2020,Uttarakhand,Himalayan_Valley,29.8869,80.5757,2020-08-22T05:30:00Z,133.0,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0066,Idukki_Munnar_ConvectiveBurst_2015,Kerala,Western_Ghats_High,10.0807,77.0512,2015-07-07T18:45:00Z,144.0,1,Verified localized cloudburst downpour in Kerala
+EVT_0067,Kullu_Manali_ConvectiveBurst_2019,Himachal Pradesh,Himalayan_Valley,31.9662,77.0931,2019-06-10T14:15:00Z,127.9,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0068,Chiplun_Ratnagiri_ConvectiveBurst_2018,Maharashtra,Western_Ghats_Foot,17.5405,73.5038,2018-09-22T11:45:00Z,151.6,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0069,Guwahati_Kamrup_ConvectiveBurst_2015,Assam,Northeast_Riverine,26.1589,91.7427,2015-08-03T11:30:00Z,114.6,1,Verified localized cloudburst downpour in Assam
+EVT_0070,Mandi_Aut_ConvectiveBurst_2018,Himachal Pradesh,Himalayan_Valley,31.6798,76.9757,2018-06-15T18:15:00Z,146.7,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0071,Amarnath_Baltal_ConvectiveBurst_2021,Jammu & Kashmir,Himalayan_High_Altitude,34.2496,75.3895,2021-06-25T05:45:00Z,114.2,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0072,Guwahati_Kamrup_ConvectiveBurst_2011,Assam,Northeast_Riverine,26.1766,91.7314,2011-07-28T05:45:00Z,108.7,1,Verified localized cloudburst downpour in Assam
+EVT_0073,Srinagar_Ganderbal_ConvectiveBurst_2020,Jammu & Kashmir,Himalayan_Valley,34.2334,74.819,2020-08-25T21:45:00Z,154.0,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0074,Mahabaleshwar_Ghats_ConvectiveBurst_2024,Maharashtra,Western_Ghats_High,17.9187,73.6307,2024-09-15T14:15:00Z,154.6,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0075,Dharamshala_Kangra_ConvectiveBurst_2021,Himachal Pradesh,Himalayan_Foothills,32.2403,76.3247,2021-07-09T21:00:00Z,146.4,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0076,Shimla_Rampur_ConvectiveBurst_2019,Himachal Pradesh,Himalayan_Foothills,31.4317,77.6156,2019-06-05T08:15:00Z,124.9,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0077,Dehradun_Rishikesh_ConvectiveBurst_2017,Uttarakhand,Himalayan_Foothills,30.1365,78.2551,2017-08-18T21:45:00Z,104.0,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0078,Delhi_NCR_ConvectiveBurst_2020,Delhi,Plains_Urban,28.6075,77.2414,2020-06-28T18:45:00Z,100.4,1,Verified localized cloudburst downpour in Delhi
+EVT_0079,Kargil_Drass_ConvectiveBurst_2024,Ladakh,Himalayan_Cold_Desert,34.4119,75.7512,2024-09-18T23:15:00Z,131.7,1,Verified localized cloudburst downpour in Ladakh
+EVT_0080,Dharamshala_Kangra_ConvectiveBurst_2016,Himachal Pradesh,Himalayan_Foothills,32.2139,76.2853,2016-09-24T08:45:00Z,159.8,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0081,Raigad_Mahad_ConvectiveBurst_2020,Maharashtra,Western_Ghats_Foot,18.2387,73.4536,2020-06-03T18:15:00Z,156.3,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0082,Kullu_Manali_ConvectiveBurst_2014,Himachal Pradesh,Himalayan_Valley,31.921,77.0993,2014-09-11T16:45:00Z,118.1,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0083,Delhi_NCR_ConvectiveBurst_2018,Delhi,Plains_Urban,28.6076,77.2358,2018-06-24T23:00:00Z,165.0,1,Verified localized cloudburst downpour in Delhi
+EVT_0084,Kargil_Drass_ConvectiveBurst_2021,Ladakh,Himalayan_Cold_Desert,34.4059,75.7255,2021-06-25T02:15:00Z,113.0,1,Verified localized cloudburst downpour in Ladakh
+EVT_0085,Kedarnath_Valley_ConvectiveBurst_2018,Uttarakhand,Himalayan_High_Altitude,30.7443,79.046,2018-06-19T11:45:00Z,145.5,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0086,Mawsynram_Khasi_ConvectiveBurst_2022,Meghalaya,Northeast_Orographic,25.2895,91.5885,2022-06-25T08:30:00Z,107.0,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0087,Kedarnath_Valley_ConvectiveBurst_2017,Uttarakhand,Himalayan_High_Altitude,30.7689,79.073,2017-09-23T11:00:00Z,138.5,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0088,Delhi_NCR_ConvectiveBurst_2023,Delhi,Plains_Urban,28.6241,77.1772,2023-08-28T05:00:00Z,122.6,1,Verified localized cloudburst downpour in Delhi
+EVT_0089,Kishtwar_Paddar_ConvectiveBurst_2021,Jammu & Kashmir,Himalayan_Valley,33.3229,76.1155,2021-08-01T18:45:00Z,106.9,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0090,Kargil_Drass_ConvectiveBurst_2022,Ladakh,Himalayan_Cold_Desert,34.4388,75.7863,2022-07-14T08:30:00Z,140.0,1,Verified localized cloudburst downpour in Ladakh
+EVT_0091,Mahabaleshwar_Ghats_ConvectiveBurst_2024,Maharashtra,Western_Ghats_High,17.945,73.6552,2024-08-11T11:00:00Z,118.1,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0092,Srinagar_Ganderbal_ConvectiveBurst_2020,Jammu & Kashmir,Himalayan_Valley,34.1995,74.7772,2020-09-11T02:45:00Z,155.3,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0093,Kullu_Manali_ConvectiveBurst_2015,Himachal Pradesh,Himalayan_Valley,31.956,77.0974,2015-08-09T14:00:00Z,133.6,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0094,Mandi_Aut_ConvectiveBurst_2018,Himachal Pradesh,Himalayan_Valley,31.6748,77.0296,2018-07-23T21:45:00Z,129.1,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0095,Kedarnath_Valley_ConvectiveBurst_2022,Uttarakhand,Himalayan_High_Altitude,30.702,79.0446,2022-07-10T16:45:00Z,136.0,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0096,Kargil_Drass_ConvectiveBurst_2016,Ladakh,Himalayan_Cold_Desert,34.422,75.7797,2016-08-23T21:30:00Z,119.9,1,Verified localized cloudburst downpour in Ladakh
+EVT_0097,Shimla_Rampur_ConvectiveBurst_2012,Himachal Pradesh,Himalayan_Foothills,31.4197,77.6054,2012-07-07T11:45:00Z,118.0,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0098,Chiplun_Ratnagiri_ConvectiveBurst_2015,Maharashtra,Western_Ghats_Foot,17.5701,73.52,2015-06-27T11:30:00Z,114.8,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0099,Kullu_Manali_ConvectiveBurst_2013,Himachal Pradesh,Himalayan_Valley,31.9412,77.1256,2013-08-02T02:30:00Z,145.3,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0100,Dehradun_Rishikesh_ConvectiveBurst_2012,Uttarakhand,Himalayan_Foothills,30.131,78.3102,2012-06-19T14:45:00Z,131.1,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0101,Leh_Nubra_ConvectiveBurst_2024,Ladakh,Himalayan_Cold_Desert,34.1273,77.5412,2024-09-04T05:45:00Z,132.0,1,Verified localized cloudburst downpour in Ladakh
+EVT_0102,Chiplun_Ratnagiri_ConvectiveBurst_2013,Maharashtra,Western_Ghats_Foot,17.5424,73.4823,2013-08-03T11:00:00Z,136.3,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0103,Kishtwar_Paddar_ConvectiveBurst_2014,Jammu & Kashmir,Himalayan_Valley,33.3185,76.1733,2014-09-15T21:30:00Z,155.9,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0104,Kishtwar_Paddar_ConvectiveBurst_2020,Jammu & Kashmir,Himalayan_Valley,33.2944,76.1597,2020-06-25T11:15:00Z,117.2,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0105,Pithoragarh_Dharchula_ConvectiveBurst_2012,Uttarakhand,Himalayan_Valley,29.8236,80.5159,2012-07-01T18:45:00Z,144.8,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0106,Sikkim_Mangan_ConvectiveBurst_2022,Sikkim,Himalayan_Glacial,27.4933,88.5085,2022-08-23T21:00:00Z,144.7,1,Verified localized cloudburst downpour in Sikkim
+EVT_0107,Dharamshala_Kangra_ConvectiveBurst_2021,Himachal Pradesh,Himalayan_Foothills,32.242,76.333,2021-07-14T05:15:00Z,142.1,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0108,Dharamshala_Kangra_ConvectiveBurst_2013,Himachal Pradesh,Himalayan_Foothills,32.2451,76.2887,2013-08-20T14:45:00Z,108.1,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0109,Agumbe_Shimoga_ConvectiveBurst_2015,Karnataka,Western_Ghats_High,13.4843,75.0822,2015-09-15T05:00:00Z,157.8,1,Verified localized cloudburst downpour in Karnataka
+EVT_0110,Cherrapunji_Sohra_ConvectiveBurst_2012,Meghalaya,Northeast_Orographic,25.2558,91.71,2012-07-22T02:30:00Z,137.5,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0111,Mawsynram_Khasi_ConvectiveBurst_2021,Meghalaya,Northeast_Orographic,25.3205,91.5776,2021-09-09T08:45:00Z,141.3,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0112,Sikkim_Mangan_ConvectiveBurst_2017,Sikkim,Himalayan_Glacial,27.5475,88.5276,2017-08-11T05:15:00Z,121.4,1,Verified localized cloudburst downpour in Sikkim
+EVT_0113,Agumbe_Shimoga_ConvectiveBurst_2017,Karnataka,Western_Ghats_High,13.4996,75.103,2017-06-15T05:30:00Z,116.4,1,Verified localized cloudburst downpour in Karnataka
+EVT_0114,Uttarkashi_Barkot_ConvectiveBurst_2019,Uttarakhand,Himalayan_Valley,30.8496,78.2003,2019-06-22T23:45:00Z,126.9,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0115,Mandi_Aut_ConvectiveBurst_2018,Himachal Pradesh,Himalayan_Valley,31.7095,77.0218,2018-09-25T02:15:00Z,117.4,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0116,Dehradun_Rishikesh_ConvectiveBurst_2022,Uttarakhand,Himalayan_Foothills,30.1542,78.285,2022-09-04T02:15:00Z,146.1,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0117,Kinnaur_Sangla_ConvectiveBurst_2012,Himachal Pradesh,Himalayan_Glacial,31.4271,78.2602,2012-07-27T05:45:00Z,161.6,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0118,Wayanad_Meppadi_ConvectiveBurst_2022,Kerala,Western_Ghats_High,11.5776,76.1279,2022-08-17T14:45:00Z,154.3,1,Verified localized cloudburst downpour in Kerala
+EVT_0119,Sikkim_Mangan_ConvectiveBurst_2017,Sikkim,Himalayan_Glacial,27.4895,88.5341,2017-07-20T23:15:00Z,156.2,1,Verified localized cloudburst downpour in Sikkim
+EVT_0120,Dharamshala_Kangra_ConvectiveBurst_2016,Himachal Pradesh,Himalayan_Foothills,32.2408,76.3514,2016-08-27T02:30:00Z,147.2,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0121,Delhi_NCR_ConvectiveBurst_2018,Delhi,Plains_Urban,28.6209,77.2489,2018-07-15T23:45:00Z,122.4,1,Verified localized cloudburst downpour in Delhi
+EVT_0122,Mahabaleshwar_Ghats_ConvectiveBurst_2016,Maharashtra,Western_Ghats_High,17.944,73.6482,2016-07-23T11:45:00Z,115.2,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0123,Mawsynram_Khasi_ConvectiveBurst_2018,Meghalaya,Northeast_Orographic,25.2929,91.5655,2018-09-13T08:45:00Z,162.7,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0124,Dehradun_Rishikesh_ConvectiveBurst_2024,Uttarakhand,Himalayan_Foothills,30.1202,78.2972,2024-06-28T21:00:00Z,134.2,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0125,Srinagar_Ganderbal_ConvectiveBurst_2024,Jammu & Kashmir,Himalayan_Valley,34.1812,74.7515,2024-07-03T21:30:00Z,122.0,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0126,Agumbe_Shimoga_ConvectiveBurst_2016,Karnataka,Western_Ghats_High,13.4918,75.0564,2016-09-11T21:00:00Z,140.1,1,Verified localized cloudburst downpour in Karnataka
+EVT_0127,Shimla_Rampur_ConvectiveBurst_2014,Himachal Pradesh,Himalayan_Foothills,31.4605,77.6637,2014-06-14T05:00:00Z,128.8,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0128,Agumbe_Shimoga_ConvectiveBurst_2016,Karnataka,Western_Ghats_High,13.484,75.0523,2016-06-10T16:30:00Z,128.0,1,Verified localized cloudburst downpour in Karnataka
+EVT_0129,Shimla_Rampur_ConvectiveBurst_2023,Himachal Pradesh,Himalayan_Foothills,31.4525,77.6353,2023-07-06T08:00:00Z,139.6,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0130,Amarnath_Baltal_ConvectiveBurst_2020,Jammu & Kashmir,Himalayan_High_Altitude,34.2596,75.3893,2020-07-08T21:30:00Z,129.9,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0131,Idukki_Munnar_ConvectiveBurst_2015,Kerala,Western_Ghats_High,10.0488,77.0834,2015-07-03T21:30:00Z,164.2,1,Verified localized cloudburst downpour in Kerala
+EVT_0132,Kinnaur_Sangla_ConvectiveBurst_2015,Himachal Pradesh,Himalayan_Glacial,31.4341,78.2499,2015-09-28T14:15:00Z,165.0,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0133,Chandigarh_Foothills_ConvectiveBurst_2020,Punjab,Plains_Foothills,30.732,76.7584,2020-08-19T14:30:00Z,101.4,1,Verified localized cloudburst downpour in Punjab
+EVT_0134,Delhi_NCR_ConvectiveBurst_2020,Delhi,Plains_Urban,28.6266,77.191,2020-06-20T21:30:00Z,150.4,1,Verified localized cloudburst downpour in Delhi
+EVT_0135,Shimla_Rampur_ConvectiveBurst_2021,Himachal Pradesh,Himalayan_Foothills,31.4586,77.6182,2021-07-20T14:15:00Z,140.8,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0136,Wayanad_Meppadi_ConvectiveBurst_2018,Kerala,Western_Ghats_High,11.5627,76.1127,2018-06-19T16:15:00Z,105.9,1,Verified localized cloudburst downpour in Kerala
+EVT_0137,Kinnaur_Sangla_ConvectiveBurst_2014,Himachal Pradesh,Himalayan_Glacial,31.4091,78.2492,2014-07-26T23:30:00Z,134.5,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0138,Dharamshala_Kangra_ConvectiveBurst_2024,Himachal Pradesh,Himalayan_Foothills,32.2454,76.3036,2024-09-26T14:30:00Z,152.3,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0139,Srinagar_Ganderbal_ConvectiveBurst_2014,Jammu & Kashmir,Himalayan_Valley,34.257,74.7513,2014-09-28T23:30:00Z,105.9,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0140,Amarnath_Baltal_ConvectiveBurst_2018,Jammu & Kashmir,Himalayan_High_Altitude,34.2111,75.4129,2018-08-22T14:45:00Z,153.5,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0141,Kargil_Drass_ConvectiveBurst_2011,Ladakh,Himalayan_Cold_Desert,34.3967,75.7387,2011-08-20T11:00:00Z,141.3,1,Verified localized cloudburst downpour in Ladakh
+EVT_0142,Srinagar_Ganderbal_ConvectiveBurst_2017,Jammu & Kashmir,Himalayan_Valley,34.2528,74.7642,2017-06-05T02:00:00Z,119.8,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0143,Sikkim_Mangan_ConvectiveBurst_2019,Sikkim,Himalayan_Glacial,27.4793,88.5088,2019-07-13T21:30:00Z,143.6,1,Verified localized cloudburst downpour in Sikkim
+EVT_0144,Cherrapunji_Sohra_ConvectiveBurst_2020,Meghalaya,Northeast_Orographic,25.2857,91.7332,2020-07-14T05:45:00Z,140.0,1,Verified localized cloudburst downpour in Meghalaya
+EVT_0145,Dharamshala_Kangra_ConvectiveBurst_2018,Himachal Pradesh,Himalayan_Foothills,32.1816,76.3126,2018-09-08T16:00:00Z,163.8,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0146,Kargil_Drass_ConvectiveBurst_2016,Ladakh,Himalayan_Cold_Desert,34.4316,75.7982,2016-06-13T14:15:00Z,162.9,1,Verified localized cloudburst downpour in Ladakh
+EVT_0147,Chandigarh_Foothills_ConvectiveBurst_2014,Punjab,Plains_Foothills,30.7592,76.7467,2014-06-02T16:15:00Z,164.3,1,Verified localized cloudburst downpour in Punjab
+EVT_0148,Guwahati_Kamrup_ConvectiveBurst_2023,Assam,Northeast_Riverine,26.1452,91.6955,2023-07-19T11:15:00Z,121.4,1,Verified localized cloudburst downpour in Assam
+EVT_0149,Dehradun_Rishikesh_ConvectiveBurst_2015,Uttarakhand,Himalayan_Foothills,30.1431,78.2977,2015-07-05T23:30:00Z,151.9,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0150,Uttarkashi_Barkot_ConvectiveBurst_2011,Uttarakhand,Himalayan_Valley,30.8249,78.1701,2011-08-26T11:30:00Z,101.0,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0151,Dharamshala_Kangra_ConvectiveBurst_2019,Himachal Pradesh,Himalayan_Foothills,32.1832,76.3423,2019-06-24T05:45:00Z,129.1,1,Verified localized cloudburst downpour in Himachal Pradesh
+EVT_0152,Kargil_Drass_ConvectiveBurst_2019,Ladakh,Himalayan_Cold_Desert,34.4291,75.7287,2019-07-20T02:30:00Z,129.8,1,Verified localized cloudburst downpour in Ladakh
+EVT_0153,Kedarnath_Valley_ConvectiveBurst_2017,Uttarakhand,Himalayan_High_Altitude,30.6995,79.0652,2017-09-22T05:45:00Z,146.3,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0154,Srinagar_Ganderbal_ConvectiveBurst_2020,Jammu & Kashmir,Himalayan_Valley,34.1859,74.7465,2020-07-03T08:30:00Z,140.6,1,Verified localized cloudburst downpour in Jammu & Kashmir
+EVT_0155,Chiplun_Ratnagiri_ConvectiveBurst_2020,Maharashtra,Western_Ghats_Foot,17.5359,73.504,2020-08-15T23:45:00Z,106.4,1,Verified localized cloudburst downpour in Maharashtra
+EVT_0156,Agumbe_Shimoga_ConvectiveBurst_2023,Karnataka,Western_Ghats_High,13.4692,75.1024,2023-07-14T21:15:00Z,126.9,1,Verified localized cloudburst downpour in Karnataka
+EVT_0157,Delhi_NCR_ConvectiveBurst_2012,Delhi,Plains_Urban,28.6102,77.2023,2012-08-14T16:30:00Z,124.3,1,Verified localized cloudburst downpour in Delhi
+EVT_0158,Dehradun_Rishikesh_ConvectiveBurst_2012,Uttarakhand,Himalayan_Foothills,30.1349,78.2879,2012-06-03T18:00:00Z,148.4,1,Verified localized cloudburst downpour in Uttarakhand
+EVT_0159,Kargil_Drass_ConvectiveBurst_2020,Ladakh,Himalayan_Cold_Desert,34.4529,75.7645,2020-08-22T05:45:00Z,123.0,1,Verified localized cloudburst downpour in Ladakh
+EVT_0160,Idukki_Munnar_ConvectiveBurst_2022,Kerala,Western_Ghats_High,10.1233,77.0528,2022-06-10T14:30:00Z,106.7,1,Verified localized cloudburst downpour in Kerala
+NEG_0001,Mumbai_Suburban_Heavy_non_burst_2014,Maharashtra,Western_Ghats_Coast,19.074,72.8751,2014-05-12T17:00:00Z,59.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0002,Chiplun_Ratnagiri_Active_monsoon_2019,Maharashtra,Western_Ghats_Foot,17.4882,73.5067,2019-09-20T21:00:00Z,8.6,0,Widespread stratiform monsoon rainfall
+NEG_0003,Idukki_Munnar_Dry_convection_2013,Kerala,Western_Ghats_High,10.1407,77.0218,2013-07-23T09:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0004,Kargil_Drass_Active_monsoon_2020,Ladakh,Himalayan_Cold_Desert,34.349,75.8192,2020-08-03T04:00:00Z,29.4,0,Widespread stratiform monsoon rainfall
+NEG_0005,Pithoragarh_Dharchula_Heavy_non_burst_2017,Uttarakhand,Himalayan_Valley,29.8904,80.4964,2017-08-11T05:00:00Z,58.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0006,Mawsynram_Khasi_Heavy_non_burst_2011,Meghalaya,Northeast_Orographic,25.3706,91.5954,2011-06-06T19:00:00Z,34.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0007,Srinagar_Ganderbal_Active_monsoon_2018,Jammu & Kashmir,Himalayan_Valley,34.2459,74.7777,2018-08-09T06:00:00Z,10.5,0,Widespread stratiform monsoon rainfall
+NEG_0008,Kishtwar_Paddar_Heavy_non_burst_2020,Jammu & Kashmir,Himalayan_Valley,33.2477,76.1785,2020-08-17T21:00:00Z,39.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0009,Raigad_Mahad_Heavy_non_burst_2014,Maharashtra,Western_Ghats_Foot,18.1648,73.3737,2014-06-25T08:00:00Z,36.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0010,Sikkim_Mangan_Active_monsoon_2017,Sikkim,Himalayan_Glacial,27.5495,88.4781,2017-09-23T07:00:00Z,26.3,0,Widespread stratiform monsoon rainfall
+NEG_0011,Guwahati_Kamrup_Active_monsoon_2022,Assam,Northeast_Riverine,26.1167,91.7135,2022-05-14T00:00:00Z,9.7,0,Widespread stratiform monsoon rainfall
+NEG_0012,Leh_Nubra_Heavy_non_burst_2022,Ladakh,Himalayan_Cold_Desert,34.1647,77.5888,2022-08-10T03:00:00Z,66.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0013,Kullu_Manali_Dry_convection_2024,Himachal Pradesh,Himalayan_Valley,32.0052,77.1279,2024-07-03T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0014,Shimla_Rampur_Active_monsoon_2012,Himachal Pradesh,Himalayan_Foothills,31.4397,77.6141,2012-08-28T09:00:00Z,12.9,0,Widespread stratiform monsoon rainfall
+NEG_0015,Mawsynram_Khasi_Dry_convection_2012,Meghalaya,Northeast_Orographic,25.2469,91.5817,2012-09-17T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0016,Kargil_Drass_Heavy_non_burst_2021,Ladakh,Himalayan_Cold_Desert,34.4042,75.8333,2021-06-08T03:00:00Z,39.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0017,Raigad_Mahad_Active_monsoon_2012,Maharashtra,Western_Ghats_Foot,18.1805,73.4625,2012-06-25T20:00:00Z,24.6,0,Widespread stratiform monsoon rainfall
+NEG_0018,Mawsynram_Khasi_Heavy_non_burst_2020,Meghalaya,Northeast_Orographic,25.3127,91.609,2020-09-11T20:00:00Z,47.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0019,Sikkim_Mangan_Active_monsoon_2015,Sikkim,Himalayan_Glacial,27.5008,88.4985,2015-09-02T11:00:00Z,14.8,0,Widespread stratiform monsoon rainfall
+NEG_0020,Srinagar_Ganderbal_Active_monsoon_2015,Jammu & Kashmir,Himalayan_Valley,34.146,74.759,2015-05-21T02:00:00Z,19.2,0,Widespread stratiform monsoon rainfall
+NEG_0021,Srinagar_Ganderbal_Active_monsoon_2022,Jammu & Kashmir,Himalayan_Valley,34.2329,74.8527,2022-05-15T18:00:00Z,15.1,0,Widespread stratiform monsoon rainfall
+NEG_0022,Sikkim_Mangan_Dry_convection_2018,Sikkim,Himalayan_Glacial,27.5102,88.6032,2018-05-26T10:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0023,Pithoragarh_Dharchula_Active_monsoon_2014,Uttarakhand,Himalayan_Valley,29.8517,80.4896,2014-08-15T16:00:00Z,11.5,0,Widespread stratiform monsoon rainfall
+NEG_0024,Kargil_Drass_Heavy_non_burst_2023,Ladakh,Himalayan_Cold_Desert,34.4949,75.742,2023-07-22T19:00:00Z,54.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0025,Leh_Nubra_Active_monsoon_2021,Ladakh,Himalayan_Cold_Desert,34.0831,77.5122,2021-08-10T08:00:00Z,22.4,0,Widespread stratiform monsoon rainfall
+NEG_0026,Raigad_Mahad_Dry_convection_2020,Maharashtra,Western_Ghats_Foot,18.2957,73.3943,2020-06-12T09:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0027,Agumbe_Shimoga_Heavy_non_burst_2022,Karnataka,Western_Ghats_High,13.5259,75.0306,2022-05-10T17:00:00Z,60.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0028,Delhi_NCR_Active_monsoon_2022,Delhi,Plains_Urban,28.5543,77.2415,2022-09-03T20:00:00Z,19.2,0,Widespread stratiform monsoon rainfall
+NEG_0029,Kedarnath_Valley_Heavy_non_burst_2014,Uttarakhand,Himalayan_High_Altitude,30.7126,79.0157,2014-07-25T15:00:00Z,68.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0030,Dehradun_Rishikesh_Dry_convection_2012,Uttarakhand,Himalayan_Foothills,30.0523,78.3451,2012-09-25T17:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0031,Mumbai_Suburban_Heavy_non_burst_2023,Maharashtra,Western_Ghats_Coast,19.046,72.8239,2023-09-05T19:00:00Z,37.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0032,Delhi_NCR_Heavy_non_burst_2013,Delhi,Plains_Urban,28.6448,77.229,2013-08-02T13:00:00Z,57.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0033,Srinagar_Ganderbal_Heavy_non_burst_2023,Jammu & Kashmir,Himalayan_Valley,34.2377,74.8204,2023-08-08T17:00:00Z,66.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0034,Guwahati_Kamrup_Active_monsoon_2016,Assam,Northeast_Riverine,26.135,91.7836,2016-09-15T14:00:00Z,25.1,0,Widespread stratiform monsoon rainfall
+NEG_0035,Mumbai_Suburban_Heavy_non_burst_2024,Maharashtra,Western_Ghats_Coast,19.1244,72.9246,2024-06-26T19:00:00Z,41.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0036,Wayanad_Meppadi_Heavy_non_burst_2012,Kerala,Western_Ghats_High,11.5479,76.1074,2012-09-28T03:00:00Z,59.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0037,Dharamshala_Kangra_Dry_convection_2024,Himachal Pradesh,Himalayan_Foothills,32.2109,76.3251,2024-08-03T07:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0038,Kargil_Drass_Heavy_non_burst_2017,Ladakh,Himalayan_Cold_Desert,34.4969,75.7464,2017-09-12T07:00:00Z,34.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0039,Shimla_Rampur_Heavy_non_burst_2024,Himachal Pradesh,Himalayan_Foothills,31.3745,77.6989,2024-07-26T04:00:00Z,42.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0040,Delhi_NCR_Heavy_non_burst_2023,Delhi,Plains_Urban,28.6095,77.262,2023-08-15T19:00:00Z,34.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0041,Dharamshala_Kangra_Heavy_non_burst_2022,Himachal Pradesh,Himalayan_Foothills,32.1735,76.2669,2022-09-17T13:00:00Z,42.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0042,Kinnaur_Sangla_Heavy_non_burst_2021,Himachal Pradesh,Himalayan_Glacial,31.3625,78.2142,2021-09-15T02:00:00Z,64.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0043,Raigad_Mahad_Heavy_non_burst_2020,Maharashtra,Western_Ghats_Foot,18.2418,73.4421,2020-06-23T04:00:00Z,32.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0044,Kargil_Drass_Heavy_non_burst_2021,Ladakh,Himalayan_Cold_Desert,34.3865,75.7467,2021-05-17T11:00:00Z,50.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0045,Mumbai_Suburban_Heavy_non_burst_2011,Maharashtra,Western_Ghats_Coast,19.1658,72.8512,2011-08-28T15:00:00Z,45.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0046,Kargil_Drass_Active_monsoon_2023,Ladakh,Himalayan_Cold_Desert,34.3886,75.6826,2023-05-12T07:00:00Z,21.8,0,Widespread stratiform monsoon rainfall
+NEG_0047,Mawsynram_Khasi_Heavy_non_burst_2013,Meghalaya,Northeast_Orographic,25.3131,91.6211,2013-05-12T17:00:00Z,55.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0048,Delhi_NCR_Dry_convection_2022,Delhi,Plains_Urban,28.6586,77.2033,2022-08-21T05:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0049,Pithoragarh_Dharchula_Active_monsoon_2011,Uttarakhand,Himalayan_Valley,29.8856,80.613,2011-07-07T01:00:00Z,27.5,0,Widespread stratiform monsoon rainfall
+NEG_0050,Leh_Nubra_Heavy_non_burst_2024,Ladakh,Himalayan_Cold_Desert,34.2219,77.5796,2024-09-16T08:00:00Z,55.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0051,Kinnaur_Sangla_Active_monsoon_2024,Himachal Pradesh,Himalayan_Glacial,31.4001,78.3009,2024-07-09T03:00:00Z,17.6,0,Widespread stratiform monsoon rainfall
+NEG_0052,Amarnath_Baltal_Active_monsoon_2017,Jammu & Kashmir,Himalayan_High_Altitude,34.2889,75.4731,2017-07-06T15:00:00Z,16.1,0,Widespread stratiform monsoon rainfall
+NEG_0053,Guwahati_Kamrup_Active_monsoon_2022,Assam,Northeast_Riverine,26.1431,91.7782,2022-08-03T13:00:00Z,26.1,0,Widespread stratiform monsoon rainfall
+NEG_0054,Mahabaleshwar_Ghats_Active_monsoon_2016,Maharashtra,Western_Ghats_High,17.89,73.5944,2016-07-10T14:00:00Z,17.4,0,Widespread stratiform monsoon rainfall
+NEG_0055,Agumbe_Shimoga_Heavy_non_burst_2022,Karnataka,Western_Ghats_High,13.491,75.0815,2022-07-20T13:00:00Z,67.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0056,Chamoli_Joshimath_Active_monsoon_2016,Uttarakhand,Himalayan_Valley,30.488,79.589,2016-09-26T23:00:00Z,29.0,0,Widespread stratiform monsoon rainfall
+NEG_0057,Dehradun_Rishikesh_Heavy_non_burst_2018,Uttarakhand,Himalayan_Foothills,30.1758,78.3185,2018-05-05T02:00:00Z,55.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0058,Kargil_Drass_Dry_convection_2020,Ladakh,Himalayan_Cold_Desert,34.4093,75.7708,2020-06-22T14:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0059,Kargil_Drass_Heavy_non_burst_2013,Ladakh,Himalayan_Cold_Desert,34.419,75.6923,2013-09-12T12:00:00Z,42.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0060,Uttarkashi_Barkot_Heavy_non_burst_2019,Uttarakhand,Himalayan_Valley,30.7361,78.1578,2019-08-18T03:00:00Z,41.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0061,Srinagar_Ganderbal_Heavy_non_burst_2022,Jammu & Kashmir,Himalayan_Valley,34.1743,74.7979,2022-08-07T03:00:00Z,34.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0062,Kullu_Manali_Active_monsoon_2012,Himachal Pradesh,Himalayan_Valley,32.0208,77.1002,2012-07-22T11:00:00Z,20.1,0,Widespread stratiform monsoon rainfall
+NEG_0063,Kinnaur_Sangla_Active_monsoon_2022,Himachal Pradesh,Himalayan_Glacial,31.4856,78.3122,2022-06-26T11:00:00Z,10.7,0,Widespread stratiform monsoon rainfall
+NEG_0064,Mandi_Aut_Active_monsoon_2018,Himachal Pradesh,Himalayan_Valley,31.7547,76.9699,2018-05-12T17:00:00Z,18.3,0,Widespread stratiform monsoon rainfall
+NEG_0065,Mahabaleshwar_Ghats_Active_monsoon_2012,Maharashtra,Western_Ghats_High,17.8638,73.7195,2012-07-13T22:00:00Z,19.6,0,Widespread stratiform monsoon rainfall
+NEG_0066,Mawsynram_Khasi_Heavy_non_burst_2013,Meghalaya,Northeast_Orographic,25.2855,91.592,2013-07-21T02:00:00Z,56.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0067,Kargil_Drass_Heavy_non_burst_2019,Ladakh,Himalayan_Cold_Desert,34.3685,75.8126,2019-09-06T04:00:00Z,64.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0068,Chamoli_Joshimath_Dry_convection_2015,Uttarakhand,Himalayan_Valley,30.609,79.5699,2015-06-06T10:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0069,Shimla_Rampur_Active_monsoon_2015,Himachal Pradesh,Himalayan_Foothills,31.4254,77.7005,2015-05-09T06:00:00Z,20.1,0,Widespread stratiform monsoon rainfall
+NEG_0070,Dehradun_Rishikesh_Active_monsoon_2012,Uttarakhand,Himalayan_Foothills,30.14,78.3083,2012-09-21T05:00:00Z,20.8,0,Widespread stratiform monsoon rainfall
+NEG_0071,Kullu_Manali_Heavy_non_burst_2020,Himachal Pradesh,Himalayan_Valley,31.9824,77.1443,2020-07-27T18:00:00Z,63.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0072,Pithoragarh_Dharchula_Active_monsoon_2020,Uttarakhand,Himalayan_Valley,29.7783,80.5646,2020-07-21T06:00:00Z,17.2,0,Widespread stratiform monsoon rainfall
+NEG_0073,Wayanad_Meppadi_Active_monsoon_2019,Kerala,Western_Ghats_High,11.4758,76.1902,2019-07-21T09:00:00Z,25.7,0,Widespread stratiform monsoon rainfall
+NEG_0074,Idukki_Munnar_Heavy_non_burst_2022,Kerala,Western_Ghats_High,10.073,77.0516,2022-05-06T14:00:00Z,48.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0075,Leh_Nubra_Dry_convection_2022,Ladakh,Himalayan_Cold_Desert,34.1697,77.5471,2022-07-24T11:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0076,Dehradun_Rishikesh_Heavy_non_burst_2012,Uttarakhand,Himalayan_Foothills,30.1617,78.2924,2012-07-08T14:00:00Z,48.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0077,Dehradun_Rishikesh_Dry_convection_2017,Uttarakhand,Himalayan_Foothills,30.0555,78.2564,2017-09-14T07:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0078,Kullu_Manali_Active_monsoon_2022,Himachal Pradesh,Himalayan_Valley,32.0072,77.1784,2022-07-07T05:00:00Z,19.3,0,Widespread stratiform monsoon rainfall
+NEG_0079,Sikkim_Mangan_Dry_convection_2012,Sikkim,Himalayan_Glacial,27.5707,88.5296,2012-08-17T14:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0080,Mandi_Aut_Active_monsoon_2015,Himachal Pradesh,Himalayan_Valley,31.7213,76.9398,2015-08-20T20:00:00Z,14.3,0,Widespread stratiform monsoon rainfall
+NEG_0081,Kedarnath_Valley_Heavy_non_burst_2015,Uttarakhand,Himalayan_High_Altitude,30.7901,79.0558,2015-07-25T12:00:00Z,46.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0082,Chiplun_Ratnagiri_Active_monsoon_2015,Maharashtra,Western_Ghats_Foot,17.5419,73.496,2015-05-13T16:00:00Z,20.1,0,Widespread stratiform monsoon rainfall
+NEG_0083,Delhi_NCR_Heavy_non_burst_2012,Delhi,Plains_Urban,28.6922,77.2379,2012-06-04T12:00:00Z,67.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0084,Mahabaleshwar_Ghats_Active_monsoon_2014,Maharashtra,Western_Ghats_High,17.9932,73.6988,2014-09-17T12:00:00Z,9.0,0,Widespread stratiform monsoon rainfall
+NEG_0085,Dehradun_Rishikesh_Dry_convection_2019,Uttarakhand,Himalayan_Foothills,30.1542,78.3386,2019-08-05T19:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0086,Dehradun_Rishikesh_Dry_convection_2013,Uttarakhand,Himalayan_Foothills,30.0925,78.3081,2013-08-20T23:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0087,Chiplun_Ratnagiri_Heavy_non_burst_2019,Maharashtra,Western_Ghats_Foot,17.5058,73.5705,2019-08-23T18:00:00Z,61.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0088,Kargil_Drass_Dry_convection_2017,Ladakh,Himalayan_Cold_Desert,34.401,75.6975,2017-09-10T23:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0089,Wayanad_Meppadi_Active_monsoon_2021,Kerala,Western_Ghats_High,11.4753,76.1239,2021-09-19T07:00:00Z,20.8,0,Widespread stratiform monsoon rainfall
+NEG_0090,Kullu_Manali_Heavy_non_burst_2023,Himachal Pradesh,Himalayan_Valley,31.9609,77.1444,2023-08-05T21:00:00Z,52.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0091,Agumbe_Shimoga_Active_monsoon_2016,Karnataka,Western_Ghats_High,13.4376,75.013,2016-08-05T13:00:00Z,17.0,0,Widespread stratiform monsoon rainfall
+NEG_0092,Mawsynram_Khasi_Active_monsoon_2024,Meghalaya,Northeast_Orographic,25.3178,91.5755,2024-05-23T04:00:00Z,20.3,0,Widespread stratiform monsoon rainfall
+NEG_0093,Idukki_Munnar_Active_monsoon_2013,Kerala,Western_Ghats_High,10.0845,77.0393,2013-08-18T10:00:00Z,22.9,0,Widespread stratiform monsoon rainfall
+NEG_0094,Chandigarh_Foothills_Heavy_non_burst_2022,Punjab,Plains_Foothills,30.7686,76.8023,2022-07-20T15:00:00Z,40.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0095,Mahabaleshwar_Ghats_Active_monsoon_2015,Maharashtra,Western_Ghats_High,17.8908,73.7286,2015-07-23T06:00:00Z,18.8,0,Widespread stratiform monsoon rainfall
+NEG_0096,Sikkim_Mangan_Active_monsoon_2023,Sikkim,Himalayan_Glacial,27.4858,88.5994,2023-07-10T03:00:00Z,20.0,0,Widespread stratiform monsoon rainfall
+NEG_0097,Amarnath_Baltal_Heavy_non_burst_2023,Jammu & Kashmir,Himalayan_High_Altitude,34.3009,75.4827,2023-06-10T01:00:00Z,57.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0098,Kargil_Drass_Dry_convection_2022,Ladakh,Himalayan_Cold_Desert,34.4958,75.785,2022-08-07T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0099,Dharamshala_Kangra_Active_monsoon_2013,Himachal Pradesh,Himalayan_Foothills,32.2883,76.3544,2013-05-20T23:00:00Z,13.3,0,Widespread stratiform monsoon rainfall
+NEG_0100,Idukki_Munnar_Heavy_non_burst_2014,Kerala,Western_Ghats_High,10.1528,77.0151,2014-05-04T13:00:00Z,49.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0101,Idukki_Munnar_Dry_convection_2019,Kerala,Western_Ghats_High,10.1313,76.9798,2019-06-14T20:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0102,Sikkim_Mangan_Heavy_non_burst_2015,Sikkim,Himalayan_Glacial,27.5064,88.4819,2015-07-10T20:00:00Z,59.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0103,Wayanad_Meppadi_Dry_convection_2022,Kerala,Western_Ghats_High,11.5629,76.1336,2022-05-06T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0104,Kullu_Manali_Heavy_non_burst_2024,Himachal Pradesh,Himalayan_Valley,32.0264,77.0348,2024-08-26T15:00:00Z,59.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0105,Chandigarh_Foothills_Heavy_non_burst_2011,Punjab,Plains_Foothills,30.8015,76.8397,2011-07-19T19:00:00Z,67.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0106,Kinnaur_Sangla_Active_monsoon_2019,Himachal Pradesh,Himalayan_Glacial,31.4157,78.2786,2019-08-05T16:00:00Z,12.2,0,Widespread stratiform monsoon rainfall
+NEG_0107,Uttarkashi_Barkot_Heavy_non_burst_2021,Uttarakhand,Himalayan_Valley,30.7849,78.245,2021-07-23T05:00:00Z,44.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0108,Kinnaur_Sangla_Dry_convection_2013,Himachal Pradesh,Himalayan_Glacial,31.4338,78.2972,2013-09-28T20:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0109,Delhi_NCR_Active_monsoon_2017,Delhi,Plains_Urban,28.6023,77.1815,2017-05-06T04:00:00Z,28.6,0,Widespread stratiform monsoon rainfall
+NEG_0110,Kedarnath_Valley_Active_monsoon_2023,Uttarakhand,Himalayan_High_Altitude,30.6963,79.0246,2023-07-11T09:00:00Z,20.6,0,Widespread stratiform monsoon rainfall
+NEG_0111,Dharamshala_Kangra_Heavy_non_burst_2011,Himachal Pradesh,Himalayan_Foothills,32.2436,76.3538,2011-05-15T09:00:00Z,56.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0112,Agumbe_Shimoga_Heavy_non_burst_2021,Karnataka,Western_Ghats_High,13.5432,75.1204,2021-07-12T19:00:00Z,66.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0113,Sikkim_Mangan_Active_monsoon_2020,Sikkim,Himalayan_Glacial,27.4545,88.5696,2020-07-14T22:00:00Z,18.4,0,Widespread stratiform monsoon rainfall
+NEG_0114,Mahabaleshwar_Ghats_Dry_convection_2023,Maharashtra,Western_Ghats_High,17.9713,73.7101,2023-06-22T19:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0115,Pithoragarh_Dharchula_Heavy_non_burst_2016,Uttarakhand,Himalayan_Valley,29.8551,80.5465,2016-05-19T03:00:00Z,51.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0116,Mumbai_Suburban_Heavy_non_burst_2013,Maharashtra,Western_Ghats_Coast,19.0723,72.8559,2013-07-28T16:00:00Z,56.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0117,Agumbe_Shimoga_Active_monsoon_2019,Karnataka,Western_Ghats_High,13.5133,75.0246,2019-08-26T01:00:00Z,19.3,0,Widespread stratiform monsoon rainfall
+NEG_0118,Srinagar_Ganderbal_Heavy_non_burst_2021,Jammu & Kashmir,Himalayan_Valley,34.2302,74.7894,2021-07-24T00:00:00Z,61.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0119,Cherrapunji_Sohra_Active_monsoon_2017,Meghalaya,Northeast_Orographic,25.2249,91.6617,2017-07-23T02:00:00Z,9.3,0,Widespread stratiform monsoon rainfall
+NEG_0120,Pithoragarh_Dharchula_Active_monsoon_2015,Uttarakhand,Himalayan_Valley,29.9288,80.5375,2015-08-06T04:00:00Z,29.5,0,Widespread stratiform monsoon rainfall
+NEG_0121,Wayanad_Meppadi_Heavy_non_burst_2017,Kerala,Western_Ghats_High,11.6252,76.1079,2017-08-28T12:00:00Z,56.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0122,Idukki_Munnar_Dry_convection_2024,Kerala,Western_Ghats_High,10.1479,77.0003,2024-07-04T05:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0123,Amarnath_Baltal_Dry_convection_2014,Jammu & Kashmir,Himalayan_High_Altitude,34.2546,75.4465,2014-05-25T00:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0124,Srinagar_Ganderbal_Heavy_non_burst_2019,Jammu & Kashmir,Himalayan_Valley,34.2478,74.7871,2019-08-27T07:00:00Z,44.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0125,Dharamshala_Kangra_Heavy_non_burst_2023,Himachal Pradesh,Himalayan_Foothills,32.1692,76.383,2023-05-02T21:00:00Z,59.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0126,Kedarnath_Valley_Active_monsoon_2020,Uttarakhand,Himalayan_High_Altitude,30.6931,78.9977,2020-05-15T19:00:00Z,27.2,0,Widespread stratiform monsoon rainfall
+NEG_0127,Shimla_Rampur_Heavy_non_burst_2014,Himachal Pradesh,Himalayan_Foothills,31.4885,77.6144,2014-09-07T01:00:00Z,67.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0128,Shimla_Rampur_Dry_convection_2016,Himachal Pradesh,Himalayan_Foothills,31.5005,77.667,2016-09-20T21:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0129,Shimla_Rampur_Heavy_non_burst_2021,Himachal Pradesh,Himalayan_Foothills,31.4183,77.5729,2021-09-08T13:00:00Z,34.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0130,Chiplun_Ratnagiri_Heavy_non_burst_2021,Maharashtra,Western_Ghats_Foot,17.5928,73.5839,2021-08-18T15:00:00Z,44.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0131,Wayanad_Meppadi_Heavy_non_burst_2016,Kerala,Western_Ghats_High,11.5784,76.1737,2016-08-14T04:00:00Z,38.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0132,Mahabaleshwar_Ghats_Dry_convection_2015,Maharashtra,Western_Ghats_High,17.9188,73.7139,2015-06-26T14:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0133,Mahabaleshwar_Ghats_Heavy_non_burst_2019,Maharashtra,Western_Ghats_High,17.909,73.6446,2019-06-13T07:00:00Z,43.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0134,Pithoragarh_Dharchula_Heavy_non_burst_2012,Uttarakhand,Himalayan_Valley,29.9186,80.5975,2012-09-24T06:00:00Z,45.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0135,Raigad_Mahad_Active_monsoon_2014,Maharashtra,Western_Ghats_Foot,18.2525,73.4808,2014-09-24T21:00:00Z,18.5,0,Widespread stratiform monsoon rainfall
+NEG_0136,Chandigarh_Foothills_Heavy_non_burst_2011,Punjab,Plains_Foothills,30.7984,76.7479,2011-06-07T23:00:00Z,68.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0137,Sikkim_Mangan_Active_monsoon_2022,Sikkim,Himalayan_Glacial,27.5763,88.5613,2022-06-13T07:00:00Z,25.1,0,Widespread stratiform monsoon rainfall
+NEG_0138,Amarnath_Baltal_Dry_convection_2015,Jammu & Kashmir,Himalayan_High_Altitude,34.2446,75.4338,2015-07-12T16:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0139,Srinagar_Ganderbal_Heavy_non_burst_2018,Jammu & Kashmir,Himalayan_Valley,34.1558,74.857,2018-07-07T11:00:00Z,33.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0140,Chandigarh_Foothills_Active_monsoon_2015,Punjab,Plains_Foothills,30.6887,76.7227,2015-09-19T18:00:00Z,14.5,0,Widespread stratiform monsoon rainfall
+NEG_0141,Mandi_Aut_Active_monsoon_2024,Himachal Pradesh,Himalayan_Valley,31.6808,76.9928,2024-06-16T17:00:00Z,23.1,0,Widespread stratiform monsoon rainfall
+NEG_0142,Dharamshala_Kangra_Active_monsoon_2022,Himachal Pradesh,Himalayan_Foothills,32.2611,76.3212,2022-08-15T05:00:00Z,15.7,0,Widespread stratiform monsoon rainfall
+NEG_0143,Dehradun_Rishikesh_Dry_convection_2019,Uttarakhand,Himalayan_Foothills,30.1553,78.2881,2019-05-17T01:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0144,Pithoragarh_Dharchula_Dry_convection_2023,Uttarakhand,Himalayan_Valley,29.9222,80.5689,2023-05-14T04:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0145,Shimla_Rampur_Heavy_non_burst_2014,Himachal Pradesh,Himalayan_Foothills,31.3809,77.5742,2014-09-15T11:00:00Z,55.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0146,Raigad_Mahad_Heavy_non_burst_2011,Maharashtra,Western_Ghats_Foot,18.302,73.4465,2011-05-18T17:00:00Z,32.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0147,Cherrapunji_Sohra_Active_monsoon_2011,Meghalaya,Northeast_Orographic,25.234,91.8064,2011-09-27T22:00:00Z,25.7,0,Widespread stratiform monsoon rainfall
+NEG_0148,Kullu_Manali_Active_monsoon_2013,Himachal Pradesh,Himalayan_Valley,31.8941,77.0444,2013-06-07T19:00:00Z,25.9,0,Widespread stratiform monsoon rainfall
+NEG_0149,Dharamshala_Kangra_Dry_convection_2017,Himachal Pradesh,Himalayan_Foothills,32.2662,76.2556,2017-08-19T07:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0150,Shimla_Rampur_Heavy_non_burst_2012,Himachal Pradesh,Himalayan_Foothills,31.418,77.6825,2012-05-03T12:00:00Z,51.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0151,Chamoli_Joshimath_Active_monsoon_2012,Uttarakhand,Himalayan_Valley,30.5779,79.5995,2012-08-28T13:00:00Z,15.3,0,Widespread stratiform monsoon rainfall
+NEG_0152,Chandigarh_Foothills_Dry_convection_2011,Punjab,Plains_Foothills,30.8091,76.8426,2011-06-07T22:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0153,Sikkim_Mangan_Active_monsoon_2021,Sikkim,Himalayan_Glacial,27.4734,88.5979,2021-07-18T18:00:00Z,11.9,0,Widespread stratiform monsoon rainfall
+NEG_0154,Chandigarh_Foothills_Dry_convection_2020,Punjab,Plains_Foothills,30.7036,76.8532,2020-06-25T22:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0155,Pithoragarh_Dharchula_Heavy_non_burst_2020,Uttarakhand,Himalayan_Valley,29.8189,80.5522,2020-08-22T17:00:00Z,59.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0156,Dehradun_Rishikesh_Heavy_non_burst_2012,Uttarakhand,Himalayan_Foothills,30.1665,78.3203,2012-09-24T11:00:00Z,47.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0157,Delhi_NCR_Heavy_non_burst_2020,Delhi,Plains_Urban,28.5461,77.2258,2020-09-13T10:00:00Z,41.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0158,Srinagar_Ganderbal_Active_monsoon_2017,Jammu & Kashmir,Himalayan_Valley,34.2185,74.7569,2017-08-06T21:00:00Z,16.4,0,Widespread stratiform monsoon rainfall
+NEG_0159,Mawsynram_Khasi_Heavy_non_burst_2022,Meghalaya,Northeast_Orographic,25.319,91.6277,2022-05-03T08:00:00Z,57.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0160,Wayanad_Meppadi_Dry_convection_2016,Kerala,Western_Ghats_High,11.4957,76.1103,2016-05-03T00:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0161,Srinagar_Ganderbal_Heavy_non_burst_2013,Jammu & Kashmir,Himalayan_Valley,34.1976,74.7432,2013-05-06T13:00:00Z,52.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0162,Kishtwar_Paddar_Active_monsoon_2019,Jammu & Kashmir,Himalayan_Valley,33.2465,76.0843,2019-05-20T19:00:00Z,27.0,0,Widespread stratiform monsoon rainfall
+NEG_0163,Kedarnath_Valley_Active_monsoon_2012,Uttarakhand,Himalayan_High_Altitude,30.7013,79.0489,2012-09-08T18:00:00Z,23.1,0,Widespread stratiform monsoon rainfall
+NEG_0164,Kullu_Manali_Heavy_non_burst_2018,Himachal Pradesh,Himalayan_Valley,31.8992,77.0772,2018-06-03T05:00:00Z,47.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0165,Sikkim_Mangan_Heavy_non_burst_2014,Sikkim,Himalayan_Glacial,27.5552,88.5078,2014-08-20T19:00:00Z,35.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0166,Kinnaur_Sangla_Heavy_non_burst_2024,Himachal Pradesh,Himalayan_Glacial,31.3441,78.2393,2024-09-13T10:00:00Z,47.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0167,Delhi_NCR_Dry_convection_2013,Delhi,Plains_Urban,28.6714,77.2849,2013-07-11T19:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0168,Mandi_Aut_Active_monsoon_2017,Himachal Pradesh,Himalayan_Valley,31.7046,76.9604,2017-07-10T23:00:00Z,18.8,0,Widespread stratiform monsoon rainfall
+NEG_0169,Chiplun_Ratnagiri_Dry_convection_2015,Maharashtra,Western_Ghats_Foot,17.5771,73.4901,2015-08-12T03:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0170,Mandi_Aut_Active_monsoon_2021,Himachal Pradesh,Himalayan_Valley,31.7228,77.0193,2021-09-01T23:00:00Z,23.6,0,Widespread stratiform monsoon rainfall
+NEG_0171,Srinagar_Ganderbal_Heavy_non_burst_2012,Jammu & Kashmir,Himalayan_Valley,34.2676,74.833,2012-08-22T15:00:00Z,42.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0172,Dharamshala_Kangra_Dry_convection_2023,Himachal Pradesh,Himalayan_Foothills,32.2444,76.3574,2023-08-03T14:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0173,Sikkim_Mangan_Active_monsoon_2024,Sikkim,Himalayan_Glacial,27.5232,88.5355,2024-08-18T01:00:00Z,15.9,0,Widespread stratiform monsoon rainfall
+NEG_0174,Guwahati_Kamrup_Active_monsoon_2012,Assam,Northeast_Riverine,26.1459,91.7521,2012-05-25T07:00:00Z,15.8,0,Widespread stratiform monsoon rainfall
+NEG_0175,Wayanad_Meppadi_Dry_convection_2021,Kerala,Western_Ghats_High,11.569,76.1381,2021-08-25T10:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0176,Kishtwar_Paddar_Active_monsoon_2014,Jammu & Kashmir,Himalayan_Valley,33.247,76.0858,2014-09-24T16:00:00Z,23.1,0,Widespread stratiform monsoon rainfall
+NEG_0177,Shimla_Rampur_Heavy_non_burst_2023,Himachal Pradesh,Himalayan_Foothills,31.4413,77.6126,2023-09-23T16:00:00Z,67.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0178,Sikkim_Mangan_Heavy_non_burst_2012,Sikkim,Himalayan_Glacial,27.4467,88.5166,2012-05-27T23:00:00Z,43.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0179,Srinagar_Ganderbal_Active_monsoon_2016,Jammu & Kashmir,Himalayan_Valley,34.2655,74.7834,2016-08-04T14:00:00Z,18.0,0,Widespread stratiform monsoon rainfall
+NEG_0180,Pithoragarh_Dharchula_Active_monsoon_2012,Uttarakhand,Himalayan_Valley,29.819,80.5916,2012-05-28T10:00:00Z,22.9,0,Widespread stratiform monsoon rainfall
+NEG_0181,Kullu_Manali_Heavy_non_burst_2019,Himachal Pradesh,Himalayan_Valley,32.0258,77.1475,2019-06-18T05:00:00Z,47.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0182,Srinagar_Ganderbal_Heavy_non_burst_2013,Jammu & Kashmir,Himalayan_Valley,34.1771,74.7648,2013-06-21T21:00:00Z,33.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0183,Raigad_Mahad_Heavy_non_burst_2017,Maharashtra,Western_Ghats_Foot,18.2973,73.4129,2017-08-01T22:00:00Z,42.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0184,Agumbe_Shimoga_Heavy_non_burst_2012,Karnataka,Western_Ghats_High,13.5494,75.02,2012-09-06T11:00:00Z,48.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0185,Dharamshala_Kangra_Active_monsoon_2021,Himachal Pradesh,Himalayan_Foothills,32.2463,76.3213,2021-07-20T12:00:00Z,20.9,0,Widespread stratiform monsoon rainfall
+NEG_0186,Kargil_Drass_Heavy_non_burst_2013,Ladakh,Himalayan_Cold_Desert,34.4043,75.7533,2013-07-20T18:00:00Z,36.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0187,Uttarkashi_Barkot_Heavy_non_burst_2016,Uttarakhand,Himalayan_Valley,30.7702,78.1467,2016-06-17T12:00:00Z,37.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0188,Amarnath_Baltal_Active_monsoon_2019,Jammu & Kashmir,Himalayan_High_Altitude,34.2377,75.4079,2019-06-18T05:00:00Z,11.1,0,Widespread stratiform monsoon rainfall
+NEG_0189,Leh_Nubra_Heavy_non_burst_2024,Ladakh,Himalayan_Cold_Desert,34.2073,77.5962,2024-07-01T15:00:00Z,61.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0190,Mahabaleshwar_Ghats_Dry_convection_2021,Maharashtra,Western_Ghats_High,17.9239,73.6572,2021-08-14T22:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0191,Sikkim_Mangan_Heavy_non_burst_2023,Sikkim,Himalayan_Glacial,27.4568,88.5405,2023-06-10T01:00:00Z,51.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0192,Kullu_Manali_Heavy_non_burst_2023,Himachal Pradesh,Himalayan_Valley,32.0019,77.1195,2023-08-18T16:00:00Z,36.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0193,Mawsynram_Khasi_Heavy_non_burst_2019,Meghalaya,Northeast_Orographic,25.3069,91.6585,2019-05-25T23:00:00Z,39.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0194,Kishtwar_Paddar_Heavy_non_burst_2023,Jammu & Kashmir,Himalayan_Valley,33.2464,76.2028,2023-06-10T01:00:00Z,44.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0195,Delhi_NCR_Active_monsoon_2012,Delhi,Plains_Urban,28.5478,77.2674,2012-06-07T23:00:00Z,15.7,0,Widespread stratiform monsoon rainfall
+NEG_0196,Agumbe_Shimoga_Dry_convection_2020,Karnataka,Western_Ghats_High,13.5176,75.0785,2020-06-26T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0197,Guwahati_Kamrup_Heavy_non_burst_2015,Assam,Northeast_Riverine,26.0695,91.7061,2015-09-18T05:00:00Z,57.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0198,Kinnaur_Sangla_Dry_convection_2019,Himachal Pradesh,Himalayan_Glacial,31.4346,78.3284,2019-05-05T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0199,Dharamshala_Kangra_Active_monsoon_2024,Himachal Pradesh,Himalayan_Foothills,32.2777,76.2633,2024-06-08T04:00:00Z,26.2,0,Widespread stratiform monsoon rainfall
+NEG_0200,Mawsynram_Khasi_Active_monsoon_2013,Meghalaya,Northeast_Orographic,25.355,91.5628,2013-09-21T08:00:00Z,16.3,0,Widespread stratiform monsoon rainfall
+NEG_0201,Pithoragarh_Dharchula_Heavy_non_burst_2012,Uttarakhand,Himalayan_Valley,29.8724,80.6028,2012-08-17T23:00:00Z,65.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0202,Kargil_Drass_Heavy_non_burst_2020,Ladakh,Himalayan_Cold_Desert,34.4208,75.7581,2020-05-28T23:00:00Z,67.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0203,Wayanad_Meppadi_Dry_convection_2012,Kerala,Western_Ghats_High,11.5773,76.1053,2012-09-13T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0204,Delhi_NCR_Active_monsoon_2024,Delhi,Plains_Urban,28.5678,77.172,2024-07-11T17:00:00Z,20.5,0,Widespread stratiform monsoon rainfall
+NEG_0205,Sikkim_Mangan_Active_monsoon_2023,Sikkim,Himalayan_Glacial,27.5561,88.5931,2023-05-02T03:00:00Z,26.4,0,Widespread stratiform monsoon rainfall
+NEG_0206,Kedarnath_Valley_Heavy_non_burst_2018,Uttarakhand,Himalayan_High_Altitude,30.6745,79.1241,2018-08-01T13:00:00Z,56.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0207,Dehradun_Rishikesh_Heavy_non_burst_2024,Uttarakhand,Himalayan_Foothills,30.1811,78.2583,2024-07-03T20:00:00Z,35.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0208,Idukki_Munnar_Active_monsoon_2017,Kerala,Western_Ghats_High,10.1526,77.0055,2017-07-24T22:00:00Z,17.4,0,Widespread stratiform monsoon rainfall
+NEG_0209,Pithoragarh_Dharchula_Heavy_non_burst_2018,Uttarakhand,Himalayan_Valley,29.8836,80.4622,2018-05-05T18:00:00Z,56.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0210,Kedarnath_Valley_Active_monsoon_2012,Uttarakhand,Himalayan_High_Altitude,30.6559,79.0419,2012-08-23T04:00:00Z,13.0,0,Widespread stratiform monsoon rainfall
+NEG_0211,Pithoragarh_Dharchula_Heavy_non_burst_2016,Uttarakhand,Himalayan_Valley,29.8879,80.4784,2016-07-10T04:00:00Z,61.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0212,Chandigarh_Foothills_Heavy_non_burst_2013,Punjab,Plains_Foothills,30.6746,76.8583,2013-05-17T18:00:00Z,55.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0213,Srinagar_Ganderbal_Active_monsoon_2022,Jammu & Kashmir,Himalayan_Valley,34.1962,74.7341,2022-06-14T19:00:00Z,26.9,0,Widespread stratiform monsoon rainfall
+NEG_0214,Pithoragarh_Dharchula_Heavy_non_burst_2012,Uttarakhand,Himalayan_Valley,29.9145,80.4844,2012-09-24T12:00:00Z,47.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0215,Guwahati_Kamrup_Active_monsoon_2012,Assam,Northeast_Riverine,26.0824,91.6943,2012-06-18T19:00:00Z,21.4,0,Widespread stratiform monsoon rainfall
+NEG_0216,Mawsynram_Khasi_Active_monsoon_2024,Meghalaya,Northeast_Orographic,25.3706,91.5043,2024-07-07T16:00:00Z,12.2,0,Widespread stratiform monsoon rainfall
+NEG_0217,Amarnath_Baltal_Heavy_non_burst_2023,Jammu & Kashmir,Himalayan_High_Altitude,34.2173,75.3387,2023-06-16T12:00:00Z,50.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0218,Raigad_Mahad_Heavy_non_burst_2011,Maharashtra,Western_Ghats_Foot,18.1674,73.4832,2011-07-11T04:00:00Z,62.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0219,Kishtwar_Paddar_Heavy_non_burst_2023,Jammu & Kashmir,Himalayan_Valley,33.2885,76.1793,2023-08-25T02:00:00Z,34.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0220,Dharamshala_Kangra_Active_monsoon_2023,Himachal Pradesh,Himalayan_Foothills,32.1735,76.3906,2023-08-17T09:00:00Z,19.0,0,Widespread stratiform monsoon rainfall
+NEG_0221,Kishtwar_Paddar_Heavy_non_burst_2021,Jammu & Kashmir,Himalayan_Valley,33.2978,76.1344,2021-09-18T19:00:00Z,35.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0222,Pithoragarh_Dharchula_Heavy_non_burst_2023,Uttarakhand,Himalayan_Valley,29.8528,80.4945,2023-06-18T10:00:00Z,54.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0223,Delhi_NCR_Heavy_non_burst_2015,Delhi,Plains_Urban,28.6379,77.2319,2015-08-24T07:00:00Z,35.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0224,Kishtwar_Paddar_Active_monsoon_2011,Jammu & Kashmir,Himalayan_Valley,33.2486,76.168,2011-07-22T23:00:00Z,11.9,0,Widespread stratiform monsoon rainfall
+NEG_0225,Kedarnath_Valley_Active_monsoon_2013,Uttarakhand,Himalayan_High_Altitude,30.7679,79.0991,2013-08-12T16:00:00Z,26.1,0,Widespread stratiform monsoon rainfall
+NEG_0226,Dharamshala_Kangra_Active_monsoon_2023,Himachal Pradesh,Himalayan_Foothills,32.1657,76.2633,2023-07-24T03:00:00Z,8.6,0,Widespread stratiform monsoon rainfall
+NEG_0227,Guwahati_Kamrup_Active_monsoon_2015,Assam,Northeast_Riverine,26.1287,91.7338,2015-09-21T02:00:00Z,19.2,0,Widespread stratiform monsoon rainfall
+NEG_0228,Chamoli_Joshimath_Dry_convection_2016,Uttarakhand,Himalayan_Valley,30.5559,79.5777,2016-06-09T03:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0229,Idukki_Munnar_Heavy_non_burst_2019,Kerala,Western_Ghats_High,10.1236,77.0155,2019-05-02T00:00:00Z,49.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0230,Amarnath_Baltal_Active_monsoon_2024,Jammu & Kashmir,Himalayan_High_Altitude,34.3172,75.3586,2024-05-18T22:00:00Z,17.2,0,Widespread stratiform monsoon rainfall
+NEG_0231,Leh_Nubra_Active_monsoon_2016,Ladakh,Himalayan_Cold_Desert,34.1123,77.6436,2016-07-27T02:00:00Z,10.6,0,Widespread stratiform monsoon rainfall
+NEG_0232,Idukki_Munnar_Heavy_non_burst_2023,Kerala,Western_Ghats_High,10.1523,77.0077,2023-09-02T12:00:00Z,48.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0233,Kinnaur_Sangla_Heavy_non_burst_2012,Himachal Pradesh,Himalayan_Glacial,31.4668,78.2257,2012-09-15T00:00:00Z,42.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0234,Guwahati_Kamrup_Dry_convection_2018,Assam,Northeast_Riverine,26.1086,91.7496,2018-07-19T15:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0235,Mawsynram_Khasi_Dry_convection_2023,Meghalaya,Northeast_Orographic,25.2513,91.6441,2023-06-05T00:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0236,Kedarnath_Valley_Active_monsoon_2024,Uttarakhand,Himalayan_High_Altitude,30.6919,79.0423,2024-05-11T00:00:00Z,16.3,0,Widespread stratiform monsoon rainfall
+NEG_0237,Cherrapunji_Sohra_Dry_convection_2019,Meghalaya,Northeast_Orographic,25.3064,91.6666,2019-06-14T15:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0238,Dehradun_Rishikesh_Dry_convection_2014,Uttarakhand,Himalayan_Foothills,30.1539,78.2249,2014-09-14T22:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0239,Srinagar_Ganderbal_Dry_convection_2012,Jammu & Kashmir,Himalayan_Valley,34.2959,74.7136,2012-09-05T20:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0240,Pithoragarh_Dharchula_Heavy_non_burst_2021,Uttarakhand,Himalayan_Valley,29.8657,80.472,2021-06-08T09:00:00Z,43.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0241,Guwahati_Kamrup_Heavy_non_burst_2016,Assam,Northeast_Riverine,26.1229,91.7831,2016-07-15T08:00:00Z,66.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0242,Dehradun_Rishikesh_Active_monsoon_2013,Uttarakhand,Himalayan_Foothills,30.1648,78.3036,2013-05-06T14:00:00Z,16.9,0,Widespread stratiform monsoon rainfall
+NEG_0243,Mahabaleshwar_Ghats_Dry_convection_2018,Maharashtra,Western_Ghats_High,17.9003,73.7013,2018-07-15T08:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0244,Pithoragarh_Dharchula_Dry_convection_2024,Uttarakhand,Himalayan_Valley,29.7962,80.5718,2024-09-02T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0245,Leh_Nubra_Active_monsoon_2016,Ladakh,Himalayan_Cold_Desert,34.0963,77.6109,2016-08-17T01:00:00Z,13.7,0,Widespread stratiform monsoon rainfall
+NEG_0246,Kullu_Manali_Heavy_non_burst_2018,Himachal Pradesh,Himalayan_Valley,31.882,77.0937,2018-09-24T17:00:00Z,48.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0247,Guwahati_Kamrup_Dry_convection_2011,Assam,Northeast_Riverine,26.187,91.6694,2011-06-05T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0248,Kargil_Drass_Dry_convection_2012,Ladakh,Himalayan_Cold_Desert,34.4578,75.83,2012-09-19T08:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0249,Pithoragarh_Dharchula_Heavy_non_burst_2021,Uttarakhand,Himalayan_Valley,29.7745,80.4723,2021-08-26T04:00:00Z,62.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0250,Guwahati_Kamrup_Heavy_non_burst_2018,Assam,Northeast_Riverine,26.113,91.6568,2018-05-06T18:00:00Z,58.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0251,Sikkim_Mangan_Heavy_non_burst_2013,Sikkim,Himalayan_Glacial,27.4347,88.5593,2013-07-07T05:00:00Z,48.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0252,Dehradun_Rishikesh_Dry_convection_2014,Uttarakhand,Himalayan_Foothills,30.0455,78.3091,2014-07-16T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0253,Sikkim_Mangan_Dry_convection_2013,Sikkim,Himalayan_Glacial,27.4398,88.4948,2013-08-07T20:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0254,Mumbai_Suburban_Heavy_non_burst_2019,Maharashtra,Western_Ghats_Coast,19.0799,72.9291,2019-05-13T22:00:00Z,51.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0255,Sikkim_Mangan_Heavy_non_burst_2016,Sikkim,Himalayan_Glacial,27.485,88.5405,2016-08-09T05:00:00Z,53.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0256,Kedarnath_Valley_Active_monsoon_2011,Uttarakhand,Himalayan_High_Altitude,30.7979,79.1115,2011-08-17T11:00:00Z,30.0,0,Widespread stratiform monsoon rainfall
+NEG_0257,Kullu_Manali_Heavy_non_burst_2015,Himachal Pradesh,Himalayan_Valley,31.893,77.1341,2015-09-27T23:00:00Z,67.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0258,Shimla_Rampur_Heavy_non_burst_2017,Himachal Pradesh,Himalayan_Foothills,31.4621,77.7072,2017-07-27T05:00:00Z,53.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0259,Guwahati_Kamrup_Heavy_non_burst_2020,Assam,Northeast_Riverine,26.1781,91.7074,2020-05-23T22:00:00Z,52.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0260,Dehradun_Rishikesh_Heavy_non_burst_2023,Uttarakhand,Himalayan_Foothills,30.1301,78.2401,2023-08-18T09:00:00Z,33.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0261,Chamoli_Joshimath_Dry_convection_2019,Uttarakhand,Himalayan_Valley,30.5132,79.522,2019-08-01T10:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0262,Mandi_Aut_Heavy_non_burst_2013,Himachal Pradesh,Himalayan_Valley,31.757,76.9865,2013-07-02T00:00:00Z,57.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0263,Dehradun_Rishikesh_Active_monsoon_2024,Uttarakhand,Himalayan_Foothills,30.1639,78.3454,2024-07-03T11:00:00Z,22.6,0,Widespread stratiform monsoon rainfall
+NEG_0264,Chiplun_Ratnagiri_Active_monsoon_2013,Maharashtra,Western_Ghats_Foot,17.4682,73.4863,2013-06-24T13:00:00Z,29.1,0,Widespread stratiform monsoon rainfall
+NEG_0265,Wayanad_Meppadi_Heavy_non_burst_2019,Kerala,Western_Ghats_High,11.5218,76.1611,2019-09-26T11:00:00Z,53.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0266,Kullu_Manali_Heavy_non_burst_2015,Himachal Pradesh,Himalayan_Valley,31.9375,77.1464,2015-06-06T23:00:00Z,57.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0267,Chiplun_Ratnagiri_Heavy_non_burst_2020,Maharashtra,Western_Ghats_Foot,17.5147,73.5971,2020-05-06T19:00:00Z,61.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0268,Raigad_Mahad_Heavy_non_burst_2018,Maharashtra,Western_Ghats_Foot,18.1913,73.4315,2018-06-11T23:00:00Z,44.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0269,Leh_Nubra_Heavy_non_burst_2012,Ladakh,Himalayan_Cold_Desert,34.0995,77.6388,2012-07-15T00:00:00Z,41.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0270,Pithoragarh_Dharchula_Heavy_non_burst_2022,Uttarakhand,Himalayan_Valley,29.8271,80.5879,2022-05-02T12:00:00Z,47.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0271,Kullu_Manali_Heavy_non_burst_2017,Himachal Pradesh,Himalayan_Valley,32.0185,77.1079,2017-07-18T12:00:00Z,49.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0272,Chandigarh_Foothills_Active_monsoon_2014,Punjab,Plains_Foothills,30.7458,76.8207,2014-06-15T02:00:00Z,8.7,0,Widespread stratiform monsoon rainfall
+NEG_0273,Kedarnath_Valley_Heavy_non_burst_2012,Uttarakhand,Himalayan_High_Altitude,30.7056,79.1392,2012-07-06T12:00:00Z,34.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0274,Pithoragarh_Dharchula_Heavy_non_burst_2018,Uttarakhand,Himalayan_Valley,29.8251,80.6196,2018-05-14T20:00:00Z,64.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0275,Kullu_Manali_Active_monsoon_2014,Himachal Pradesh,Himalayan_Valley,31.8856,77.082,2014-08-23T17:00:00Z,24.1,0,Widespread stratiform monsoon rainfall
+NEG_0276,Dharamshala_Kangra_Active_monsoon_2012,Himachal Pradesh,Himalayan_Foothills,32.2447,76.2906,2012-05-13T18:00:00Z,18.8,0,Widespread stratiform monsoon rainfall
+NEG_0277,Chamoli_Joshimath_Heavy_non_burst_2015,Uttarakhand,Himalayan_Valley,30.5337,79.5554,2015-09-16T06:00:00Z,39.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0278,Wayanad_Meppadi_Active_monsoon_2024,Kerala,Western_Ghats_High,11.5177,76.0611,2024-05-10T12:00:00Z,27.7,0,Widespread stratiform monsoon rainfall
+NEG_0279,Dharamshala_Kangra_Heavy_non_burst_2013,Himachal Pradesh,Himalayan_Foothills,32.1536,76.3301,2013-07-13T11:00:00Z,33.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0280,Srinagar_Ganderbal_Active_monsoon_2015,Jammu & Kashmir,Himalayan_Valley,34.2144,74.7362,2015-09-02T04:00:00Z,22.7,0,Widespread stratiform monsoon rainfall
+NEG_0281,Pithoragarh_Dharchula_Heavy_non_burst_2017,Uttarakhand,Himalayan_Valley,29.8779,80.5913,2017-09-08T17:00:00Z,45.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0282,Mumbai_Suburban_Active_monsoon_2024,Maharashtra,Western_Ghats_Coast,19.107,72.8557,2024-08-19T07:00:00Z,9.7,0,Widespread stratiform monsoon rainfall
+NEG_0283,Chandigarh_Foothills_Heavy_non_burst_2019,Punjab,Plains_Foothills,30.7676,76.7797,2019-09-22T19:00:00Z,66.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0284,Srinagar_Ganderbal_Heavy_non_burst_2014,Jammu & Kashmir,Himalayan_Valley,34.1677,74.8575,2014-06-05T01:00:00Z,67.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0285,Kishtwar_Paddar_Dry_convection_2013,Jammu & Kashmir,Himalayan_Valley,33.2623,76.2016,2013-09-09T10:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0286,Guwahati_Kamrup_Active_monsoon_2017,Assam,Northeast_Riverine,26.0707,91.7121,2017-09-11T08:00:00Z,28.2,0,Widespread stratiform monsoon rainfall
+NEG_0287,Kedarnath_Valley_Heavy_non_burst_2019,Uttarakhand,Himalayan_High_Altitude,30.7804,79.0866,2019-08-04T13:00:00Z,52.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0288,Chiplun_Ratnagiri_Active_monsoon_2012,Maharashtra,Western_Ghats_Foot,17.5733,73.5883,2012-09-25T03:00:00Z,27.1,0,Widespread stratiform monsoon rainfall
+NEG_0289,Kargil_Drass_Active_monsoon_2021,Ladakh,Himalayan_Cold_Desert,34.4885,75.7223,2021-08-19T19:00:00Z,11.8,0,Widespread stratiform monsoon rainfall
+NEG_0290,Amarnath_Baltal_Dry_convection_2022,Jammu & Kashmir,Himalayan_High_Altitude,34.193,75.4274,2022-08-02T12:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0291,Leh_Nubra_Heavy_non_burst_2018,Ladakh,Himalayan_Cold_Desert,34.1831,77.505,2018-07-12T00:00:00Z,60.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0292,Kinnaur_Sangla_Heavy_non_burst_2022,Himachal Pradesh,Himalayan_Glacial,31.3879,78.2547,2022-05-28T07:00:00Z,67.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0293,Srinagar_Ganderbal_Heavy_non_burst_2022,Jammu & Kashmir,Himalayan_Valley,34.2638,74.7513,2022-08-20T20:00:00Z,47.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0294,Delhi_NCR_Active_monsoon_2019,Delhi,Plains_Urban,28.599,77.2065,2019-07-27T01:00:00Z,11.5,0,Widespread stratiform monsoon rainfall
+NEG_0295,Kinnaur_Sangla_Heavy_non_burst_2023,Himachal Pradesh,Himalayan_Glacial,31.4565,78.2405,2023-09-19T00:00:00Z,63.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0296,Mandi_Aut_Heavy_non_burst_2018,Himachal Pradesh,Himalayan_Valley,31.7619,76.9719,2018-05-12T22:00:00Z,45.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0297,Srinagar_Ganderbal_Active_monsoon_2012,Jammu & Kashmir,Himalayan_Valley,34.2208,74.8017,2012-05-08T11:00:00Z,17.8,0,Widespread stratiform monsoon rainfall
+NEG_0298,Chandigarh_Foothills_Active_monsoon_2016,Punjab,Plains_Foothills,30.7292,76.7876,2016-06-27T08:00:00Z,23.2,0,Widespread stratiform monsoon rainfall
+NEG_0299,Kinnaur_Sangla_Dry_convection_2024,Himachal Pradesh,Himalayan_Glacial,31.3474,78.1839,2024-09-25T06:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0300,Wayanad_Meppadi_Dry_convection_2021,Kerala,Western_Ghats_High,11.507,76.0811,2021-08-17T00:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0301,Mawsynram_Khasi_Heavy_non_burst_2013,Meghalaya,Northeast_Orographic,25.3292,91.5759,2013-06-20T00:00:00Z,53.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0302,Kinnaur_Sangla_Active_monsoon_2015,Himachal Pradesh,Himalayan_Glacial,31.457,78.2895,2015-08-13T11:00:00Z,12.8,0,Widespread stratiform monsoon rainfall
+NEG_0303,Kinnaur_Sangla_Active_monsoon_2017,Himachal Pradesh,Himalayan_Glacial,31.4514,78.3079,2017-09-04T00:00:00Z,22.6,0,Widespread stratiform monsoon rainfall
+NEG_0304,Delhi_NCR_Active_monsoon_2020,Delhi,Plains_Urban,28.6682,77.2188,2020-09-10T09:00:00Z,18.6,0,Widespread stratiform monsoon rainfall
+NEG_0305,Leh_Nubra_Active_monsoon_2024,Ladakh,Himalayan_Cold_Desert,34.2307,77.5996,2024-07-09T20:00:00Z,27.6,0,Widespread stratiform monsoon rainfall
+NEG_0306,Kinnaur_Sangla_Heavy_non_burst_2014,Himachal Pradesh,Himalayan_Glacial,31.3731,78.2588,2014-05-26T19:00:00Z,43.5,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0307,Dehradun_Rishikesh_Heavy_non_burst_2015,Uttarakhand,Himalayan_Foothills,30.1554,78.3149,2015-07-14T12:00:00Z,33.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0308,Agumbe_Shimoga_Active_monsoon_2016,Karnataka,Western_Ghats_High,13.5792,75.1406,2016-06-22T17:00:00Z,18.5,0,Widespread stratiform monsoon rainfall
+NEG_0309,Idukki_Munnar_Heavy_non_burst_2013,Kerala,Western_Ghats_High,10.0654,77.027,2013-09-06T09:00:00Z,36.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0310,Dharamshala_Kangra_Heavy_non_burst_2013,Himachal Pradesh,Himalayan_Foothills,32.255,76.3324,2013-07-21T02:00:00Z,40.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0311,Chandigarh_Foothills_Heavy_non_burst_2016,Punjab,Plains_Foothills,30.7024,76.8255,2016-07-09T18:00:00Z,62.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0312,Sikkim_Mangan_Dry_convection_2020,Sikkim,Himalayan_Glacial,27.4386,88.5515,2020-09-03T15:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0313,Mumbai_Suburban_Dry_convection_2019,Maharashtra,Western_Ghats_Coast,19.0592,72.8789,2019-07-14T01:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0314,Dehradun_Rishikesh_Heavy_non_burst_2017,Uttarakhand,Himalayan_Foothills,30.062,78.242,2017-09-15T04:00:00Z,57.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0315,Mawsynram_Khasi_Heavy_non_burst_2013,Meghalaya,Northeast_Orographic,25.2329,91.5532,2013-07-21T01:00:00Z,41.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0316,Mawsynram_Khasi_Heavy_non_burst_2013,Meghalaya,Northeast_Orographic,25.3438,91.5922,2013-08-26T02:00:00Z,47.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0317,Kishtwar_Paddar_Heavy_non_burst_2017,Jammu & Kashmir,Himalayan_Valley,33.2945,76.2245,2017-05-02T17:00:00Z,45.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0318,Kedarnath_Valley_Heavy_non_burst_2019,Uttarakhand,Himalayan_High_Altitude,30.7973,79.108,2019-06-01T21:00:00Z,58.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0319,Shimla_Rampur_Active_monsoon_2013,Himachal Pradesh,Himalayan_Foothills,31.481,77.6051,2013-05-13T16:00:00Z,11.7,0,Widespread stratiform monsoon rainfall
+NEG_0320,Delhi_NCR_Heavy_non_burst_2018,Delhi,Plains_Urban,28.5412,77.2808,2018-09-20T16:00:00Z,64.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0321,Dehradun_Rishikesh_Heavy_non_burst_2016,Uttarakhand,Himalayan_Foothills,30.0948,78.3542,2016-06-06T12:00:00Z,40.1,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0322,Dehradun_Rishikesh_Active_monsoon_2019,Uttarakhand,Himalayan_Foothills,30.0738,78.2135,2019-06-04T11:00:00Z,25.4,0,Widespread stratiform monsoon rainfall
+NEG_0323,Amarnath_Baltal_Dry_convection_2019,Jammu & Kashmir,Himalayan_High_Altitude,34.3102,75.3709,2019-09-02T19:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0324,Idukki_Munnar_Heavy_non_burst_2011,Kerala,Western_Ghats_High,10.0253,77.1128,2011-05-14T14:00:00Z,51.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0325,Sikkim_Mangan_Active_monsoon_2021,Sikkim,Himalayan_Glacial,27.5423,88.4829,2021-05-10T13:00:00Z,22.6,0,Widespread stratiform monsoon rainfall
+NEG_0326,Dharamshala_Kangra_Active_monsoon_2017,Himachal Pradesh,Himalayan_Foothills,32.2386,76.3551,2017-05-17T23:00:00Z,14.2,0,Widespread stratiform monsoon rainfall
+NEG_0327,Guwahati_Kamrup_Dry_convection_2014,Assam,Northeast_Riverine,26.077,91.6818,2014-07-27T16:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0328,Kargil_Drass_Active_monsoon_2011,Ladakh,Himalayan_Cold_Desert,34.4605,75.7273,2011-09-16T06:00:00Z,18.6,0,Widespread stratiform monsoon rainfall
+NEG_0329,Shimla_Rampur_Heavy_non_burst_2012,Himachal Pradesh,Himalayan_Foothills,31.3704,77.6575,2012-09-22T15:00:00Z,35.2,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0330,Mumbai_Suburban_Heavy_non_burst_2015,Maharashtra,Western_Ghats_Coast,19.052,72.8858,2015-06-15T09:00:00Z,33.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0331,Delhi_NCR_Heavy_non_burst_2015,Delhi,Plains_Urban,28.5619,77.1353,2015-07-26T21:00:00Z,58.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0332,Uttarkashi_Barkot_Heavy_non_burst_2011,Uttarakhand,Himalayan_Valley,30.8682,78.2704,2011-06-22T20:00:00Z,44.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0333,Srinagar_Ganderbal_Heavy_non_burst_2022,Jammu & Kashmir,Himalayan_Valley,34.2928,74.7429,2022-05-12T10:00:00Z,46.4,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0334,Srinagar_Ganderbal_Active_monsoon_2024,Jammu & Kashmir,Himalayan_Valley,34.1835,74.7617,2024-08-26T13:00:00Z,25.5,0,Widespread stratiform monsoon rainfall
+NEG_0335,Uttarkashi_Barkot_Dry_convection_2024,Uttarakhand,Himalayan_Valley,30.7532,78.2442,2024-06-04T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0336,Sikkim_Mangan_Active_monsoon_2013,Sikkim,Himalayan_Glacial,27.5584,88.5585,2013-09-13T11:00:00Z,27.0,0,Widespread stratiform monsoon rainfall
+NEG_0337,Delhi_NCR_Heavy_non_burst_2018,Delhi,Plains_Urban,28.6503,77.2717,2018-08-04T13:00:00Z,34.3,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0338,Wayanad_Meppadi_Active_monsoon_2021,Kerala,Western_Ghats_High,11.5213,76.1607,2021-09-25T23:00:00Z,20.4,0,Widespread stratiform monsoon rainfall
+NEG_0339,Idukki_Munnar_Active_monsoon_2022,Kerala,Western_Ghats_High,10.1477,77.0621,2022-09-04T13:00:00Z,13.5,0,Widespread stratiform monsoon rainfall
+NEG_0340,Kargil_Drass_Heavy_non_burst_2013,Ladakh,Himalayan_Cold_Desert,34.4542,75.7826,2013-09-20T01:00:00Z,65.6,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0341,Mumbai_Suburban_Heavy_non_burst_2024,Maharashtra,Western_Ghats_Coast,19.1758,72.9063,2024-06-03T15:00:00Z,43.9,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0342,Dharamshala_Kangra_Heavy_non_burst_2021,Himachal Pradesh,Himalayan_Foothills,32.1471,76.2786,2021-08-13T07:00:00Z,48.0,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0343,Chiplun_Ratnagiri_Active_monsoon_2018,Maharashtra,Western_Ghats_Foot,17.5237,73.5751,2018-07-04T15:00:00Z,8.4,0,Widespread stratiform monsoon rainfall
+NEG_0344,Amarnath_Baltal_Dry_convection_2011,Jammu & Kashmir,Himalayan_High_Altitude,34.236,75.4191,2011-05-26T19:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0345,Wayanad_Meppadi_Dry_convection_2014,Kerala,Western_Ghats_High,11.5197,76.1293,2014-08-11T11:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0346,Delhi_NCR_Active_monsoon_2019,Delhi,Plains_Urban,28.5696,77.2017,2019-09-20T15:00:00Z,16.0,0,Widespread stratiform monsoon rainfall
+NEG_0347,Srinagar_Ganderbal_Dry_convection_2014,Jammu & Kashmir,Himalayan_Valley,34.1582,74.8215,2014-05-11T11:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0348,Guwahati_Kamrup_Active_monsoon_2022,Assam,Northeast_Riverine,26.1067,91.7335,2022-05-02T05:00:00Z,26.1,0,Widespread stratiform monsoon rainfall
+NEG_0349,Cherrapunji_Sohra_Dry_convection_2020,Meghalaya,Northeast_Orographic,25.3054,91.6671,2020-06-07T03:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0350,Amarnath_Baltal_Heavy_non_burst_2014,Jammu & Kashmir,Himalayan_High_Altitude,34.2045,75.4619,2014-07-04T13:00:00Z,54.8,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0351,Idukki_Munnar_Dry_convection_2018,Kerala,Western_Ghats_High,10.1022,77.1025,2018-08-22T18:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0352,Dehradun_Rishikesh_Dry_convection_2022,Uttarakhand,Himalayan_Foothills,30.1942,78.2107,2022-05-18T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0353,Sikkim_Mangan_Dry_convection_2013,Sikkim,Himalayan_Glacial,27.5779,88.575,2013-09-06T23:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0354,Uttarkashi_Barkot_Dry_convection_2016,Uttarakhand,Himalayan_Valley,30.794,78.2241,2016-09-13T13:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0355,Agumbe_Shimoga_Heavy_non_burst_2016,Karnataka,Western_Ghats_High,13.542,75.0538,2016-07-15T04:00:00Z,53.7,0,Heavy orographic monsoon rain without cloudburst threshold breach
+NEG_0356,Cherrapunji_Sohra_Dry_convection_2019,Meghalaya,Northeast_Orographic,25.272,91.7849,2019-07-23T23:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0357,Wayanad_Meppadi_Dry_convection_2022,Kerala,Western_Ghats_High,11.5058,76.0816,2022-07-22T11:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0358,Dehradun_Rishikesh_Active_monsoon_2013,Uttarakhand,Himalayan_Foothills,30.197,78.314,2013-09-18T22:00:00Z,23.6,0,Widespread stratiform monsoon rainfall
+NEG_0359,Mawsynram_Khasi_Dry_convection_2020,Meghalaya,Northeast_Orographic,25.2764,91.5769,2020-08-22T23:00:00Z,0.0,0,High surface instability and heat but moisture starvation (False Alarm test)
+NEG_0360,Mahabaleshwar_Ghats_Heavy_non_burst_2023,Maharashtra,Western_Ghats_High,17.8887,73.7136,2023-05-17T03:00:00Z,37.2,0,Heavy orographic monsoon rain without cloudburst threshold breach

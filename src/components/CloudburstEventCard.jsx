@@ -34,18 +34,17 @@ export default function CloudburstEventCard({
   return (
     <aside 
       className={`select-none pointer-events-auto transition-all duration-300 z-30 ${className}`}
-      aria-label="Cloudburst Event Monitoring Alert"
+      aria-label="Illustrative Cloudburst Scenario"
     >
-      <div className="w-[330px] sm:w-[370px] bg-[#0c1524]/92 backdrop-blur-xl border border-red-500/40 rounded-2xl shadow-[0_8px_32px_rgba(239,68,68,0.35)] overflow-hidden">
-        {/* Top Emergency Status Bar */}
-        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 px-3.5 py-1.5 flex items-center justify-between text-white">
+      <div className="w-[330px] sm:w-[370px] bg-[#0c1524]/92 backdrop-blur-xl border border-amber-400/40 rounded-2xl shadow-[0_8px_32px_rgba(245,158,11,0.2)] overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 px-3.5 py-1.5 flex items-center justify-between text-white">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+            <span className="w-2.5 h-2.5 rounded-full bg-white" />
             <span className="text-[11px] font-mono font-black tracking-wider uppercase">
-              {isCritical ? 'CRITICAL CLOUDBURST ALERT' : 'HIGH CLOUDBURST RISK'}
+              {isCritical ? 'CRITICAL MODEL SCENARIO' : 'HIGH-RISK MODEL SCENARIO'}
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-black/40 text-amber-300 font-mono text-[10px] font-black border border-white/20">
-              {displayRisk}% RISK
+            <span className="px-2 py-0.5 rounded-full bg-black/40 text-amber-200 font-mono text-[10px] font-black border border-white/20">
+              {displayRisk}% MODEL RISK
             </span>
           </div>
 
@@ -79,9 +78,9 @@ export default function CloudburstEventCard({
                 <MapPin className="w-3 h-3 text-red-400" />
                 {event.locationName}
               </span>
-              <span className="text-[10px] font-mono text-red-300">
-                <span className="font-bold text-amber-300 bg-red-950/80 px-1.5 py-0.2 rounded border border-red-500/30 mr-1.5">{displayRisk}% Risk</span>
-                {event.metrics?.predictedRainRateMmh} mm/h • {event.leadTimeMinutes}m Lead Time
+              <span className="text-[10px] font-mono text-amber-200">
+              <span className="font-bold text-amber-200 bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-500/30 mr-1.5">{displayRisk}% Model Risk</span>
+              Scenario {event.metrics?.predictedRainRateMmh} mm/h • {event.leadTimeMinutes}m illustrative lead
               </span>
             </div>
             <button
@@ -98,6 +97,10 @@ export default function CloudburstEventCard({
         {/* Expanded Full Mission Control Telemetry */}
         {isExpanded && (
           <div className="p-3.5 flex flex-col gap-3">
+            <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-2 text-[10px] font-semibold leading-snug text-amber-100">
+              Preset scenario only — not live monitoring, an official forecast, or a public warning.
+            </div>
+
             {/* Location & Time Header */}
             <div className="flex items-start justify-between">
               <div>
@@ -115,10 +118,10 @@ export default function CloudburstEventCard({
                   <span className="text-xs font-mono font-black text-white">{displayRisk}% RISK</span>
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1">
-                  {event.mlModel?.confidencePercent || 96}% ML Confidence
+                  {event.mlModel?.confidencePercent || 96}% illustrative model score
                 </span>
                 <span className="text-[9px] text-slate-400 mt-0.5">
-                  Detected {event.detectedAt}
+                  Scenario time {event.detectedAt}
                 </span>
               </div>
             </div>
@@ -129,7 +132,7 @@ export default function CloudburstEventCard({
               <div className="flex flex-col bg-white/5 p-2 rounded-lg border border-white/5">
                 <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
                   <CloudRain className="w-3 h-3 text-cyan-400" />
-                  Peak Rain Rate
+                  Scenario rain rate
                 </span>
                 <div className="flex items-baseline gap-1 mt-0.5">
                   <span className="text-xl font-mono font-black text-white">
@@ -138,7 +141,7 @@ export default function CloudburstEventCard({
                   <span className="text-[10px] font-mono text-cyan-300">mm/h</span>
                 </div>
                 <span className="text-[9px] text-rose-400 font-semibold mt-0.5">
-                  &gt;100 mm/h Threshold Met
+                  Example threshold exceeded
                 </span>
               </div>
 
@@ -146,7 +149,7 @@ export default function CloudburstEventCard({
               <div className="flex flex-col bg-white/5 p-2 rounded-lg border border-white/5">
                 <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
                   <Clock className="w-3 h-3 text-amber-400" />
-                  Early Warning
+                  Scenario lead time
                 </span>
                 <div className="flex items-baseline gap-1 mt-0.5">
                   <span className="text-xl font-mono font-black text-amber-300">
@@ -155,7 +158,7 @@ export default function CloudburstEventCard({
                   <span className="text-[10px] font-mono text-slate-300">mins</span>
                 </div>
                 <span className="text-[9px] text-amber-400/90 font-semibold mt-0.5">
-                  Window for Evacuation
+                  Illustrative only; not an evacuation notice
                 </span>
               </div>
 
@@ -192,7 +195,7 @@ export default function CloudburstEventCard({
             {/* Affected River Drainage Corridors */}
             <div className="flex flex-col gap-1 text-[11px]">
               <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">
-                Vulnerable Drainage Basins ({event.hazardRadiusKm} km radius):
+                Example drainage basins ({event.hazardRadiusKm} km radius):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {event.affectedBasins.map((basin) => (
@@ -206,9 +209,8 @@ export default function CloudburstEventCard({
               </div>
             </div>
 
-            {/* Evacuation Advisory Banner */}
-            <div className="bg-red-500/15 border border-red-500/30 rounded-xl p-2.5 text-[11px] text-red-100 flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-2.5 text-[11px] text-amber-100 flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
               <p className="leading-tight font-medium">
                 {event.advisory}
               </p>
@@ -219,7 +221,7 @@ export default function CloudburstEventCard({
               <button
                 type="button"
                 onClick={onFocusEpicenter}
-                className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/30 cursor-pointer active:scale-95 transition-all"
+                className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-600/20 cursor-pointer active:scale-95 transition-all"
               >
                 <Crosshair className="w-3.5 h-3.5" />
                 Focus Epicenter

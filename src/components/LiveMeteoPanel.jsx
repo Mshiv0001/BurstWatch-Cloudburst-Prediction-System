@@ -122,8 +122,8 @@ export default function LiveMeteoPanel({
   const rainRate = data.precipitation ?? data.rainRate ?? station?.rainfallRate ?? 0;
   const cloudCover = data.cloudCover ?? 60;
   const condition = data.condition || station?.condition || 'Convective Air Mass';
-  const isLive = data.isLive ?? true;
-  const source = data.source || 'Open-Meteo Real-Time (ECMWF/GFS)';
+  const isLive = data.isLive === true;
+  const source = data.source || (liveData ? 'Unknown data source' : 'Station network estimate (not live)');
 
   const threat = data.threat || null;
   const isIndia = data.isIndia ?? (station ? isIndiaSector(station.lon ?? station.lng, station.lat) : true);
@@ -168,7 +168,7 @@ export default function LiveMeteoPanel({
               onClick={onRefresh}
               disabled={isLoading}
               className="apple-liquid-glass-pill p-1.5 rounded-full text-slate-300 hover:text-white transition-all cursor-pointer"
-              title="Refresh Live Data from WeatherAPI"
+              title="Refresh current weather data"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
@@ -234,10 +234,10 @@ export default function LiveMeteoPanel({
                   </div>
                   <div>
                     <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">
-                      Live Convective Hazard (🇮🇳 India)
+                      {isLive ? 'Current conditions · calculated risk' : 'Baseline estimate · not live'}
                     </div>
                     <div className="text-xs font-bold leading-tight">
-                      {threat.severity} CLOUDBURST RISK
+                      {threat.severity} MODEL RISK INDEX
                     </div>
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export default function LiveMeteoPanel({
                       🌐 Global Synoptic Monitoring
                     </div>
                     <div className="text-xs font-semibold leading-tight text-slate-200">
-                      Real-time WeatherAPI.com observations active
+                      {isLive ? 'Current weather observations available' : 'Estimated baseline data · not a current observation'}
                     </div>
                   </div>
                 </div>
@@ -320,7 +320,7 @@ export default function LiveMeteoPanel({
               <div className="apple-liquid-glass-well p-2.5 rounded-2xl flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase">
                   <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Live Precip Rate</span>
+                  <span>{isLive ? 'Precipitation rate' : 'Estimated rain rate'}</span>
                 </div>
                 <div className="flex items-baseline justify-between mt-0.5">
                   <span className="text-base font-black text-white font-mono">{rainRate.toFixed(1)}</span>
@@ -386,7 +386,7 @@ export default function LiveMeteoPanel({
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <span className="flex items-center gap-1">
                     <Radio className="w-3 h-3 text-cyan-400" />
-                    <span>Live 8-Hour Meteo Outlook</span>
+                    <span>{isLive ? '8-Hour Weather Forecast' : 'Simulated Hourly Baseline'}</span>
                   </span>
                   <span className="text-cyan-400 font-mono">Hourly</span>
                 </div>
@@ -438,11 +438,13 @@ export default function LiveMeteoPanel({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-sans block">Model Engine</span>
-                    <span className="font-bold text-slate-200">ECMWF IFS / GFS</span>
+                    <span className="font-bold text-slate-200">{source}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-sans block">Telemetry Sync</span>
-                    <span className="font-bold text-emerald-400">Active Live</span>
+                    <span className={`font-bold ${isLive ? 'text-emerald-400' : 'text-amber-300'}`}>
+                      {isLive ? 'Current data' : 'Estimated data'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -461,7 +463,11 @@ export default function LiveMeteoPanel({
 
             {/* Provider attribution footer */}
             <div className="text-[9px] font-mono text-slate-500 text-center pt-0.5">
-              Live Weather Feed: <span className="text-slate-400">{source}</span>
+              Data source: <span className="text-slate-400">{source}</span>
+              {' · '}
+              <span className={`ml-2 ${isLive ? 'text-emerald-400' : 'text-amber-300'}`}>
+                {isLive ? 'Live' : 'Estimate'}
+              </span>
             </div>
           </>
         )}

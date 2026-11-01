@@ -14,7 +14,7 @@ import CinematicIntroSplash from './components/CinematicIntroSplash';
 import CloudburstEventCard from './components/CloudburstEventCard';
 import { CLOUDBURST_PRESET_EVENTS } from './services/cloudburstEventModel';
 
-import { fetchWeatherApiLiveData as fetchOpenMeteoLiveData } from './services/weatherApiService';
+import { fetchWeatherApiLiveData } from './services/weatherApiService';
 import { sendBrowserNotification } from './utils/notifications';
 import { 
   STATIONS_NETWORK, 
@@ -71,7 +71,7 @@ export default function App() {
   const [currentTimeIndex, setCurrentTimeIndex] = useState(1);
   const [selectedEventId, setSelectedEventId] = useState('kedarnath');
 
-  // Live Open-Meteo Integration State
+  // Live weather integration state
   const [isLiveMode, setIsLiveMode] = useState(true);
   const [liveMeteoData, setLiveMeteoData] = useState(null);
   const [isMeteoLoading, setIsMeteoLoading] = useState(false);
@@ -79,12 +79,12 @@ export default function App() {
   // Active navigation tab
   const [activeNav, setActiveNav] = useState('dashboard');
 
-  // Live Meteorological Sync Engine via Open-Meteo API
+  // Sync current weather data for the selected station
   const loadLiveMeteo = useCallback(async (lat, lon, stationName) => {
     if (lat == null || lon == null) return;
     setIsMeteoLoading(true);
     try {
-      const data = await fetchOpenMeteoLiveData(lat, lon, stationName);
+      const data = await fetchWeatherApiLiveData(lat, lon, stationName);
       setLiveMeteoData(data);
       if (isLiveMode) {
         if (data.humidity !== undefined) setHumidity(data.humidity);
@@ -102,20 +102,20 @@ export default function App() {
         setTcwv(vapor);
       }
     } catch (e) {
-      console.warn("Open-Meteo sync error:", e);
+      console.warn("Weather data sync error:", e);
     } finally {
       setIsMeteoLoading(false);
     }
   }, [isLiveMode]);
 
-  // Sync live Open-Meteo telemetry on station selection
+  // Refresh weather data when the selected station changes
   useEffect(() => {
     if (selectedStation) {
       loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName);
     }
   }, [selectedStation, loadLiveMeteo]);
 
-  // Handler to toggle Live Open-Meteo vs What-If Simulator Mode
+  // Handler to toggle weather data vs What-If Simulator Mode
   const handleToggleLiveMode = useCallback((val) => {
     setIsLiveMode(val);
     if (val) {
@@ -184,7 +184,7 @@ export default function App() {
       detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       leadTimeMinutes: preset?.leadTimeMinutes || Math.max(15, Math.min(60, Math.round(90 - currentRiskPercent * 0.6))),
       mlModel: {
-        name: "ConvLSTM + LightGBM Cloudburst Ensemble v2.4",
+        name: "Illustrative preset scoring model",
         confidencePercent: preset?.mlModel?.confidencePercent || Math.min(99.4, Math.max(78, currentRiskPercent * 1.04)).toFixed(1),
         riskLevel: currentRiskPercent >= 85 ? "EXTREME_HAZARD" : "HIGH_HAZARD"
       },
@@ -202,9 +202,7 @@ export default function App() {
         `${regionName} Runoff Drainage`
       ],
       hazardRadiusKm: preset?.hazardRadiusKm || (currentRiskPercent >= 85 ? 18 : 14),
-      advisory: preset?.advisory || (currentRiskPercent >= 85
-        ? "CRITICAL EVACUATION WARNING: Extreme convective downpour imminent. Evacuate lower drainage zones."
-        : "HIGH RISK ADVISORY: Rapid convective plume development. Avoid low-lying river channels.")
+      advisory: "Illustrative scenario text only — not a live forecast or official advisory. Check authorized local sources for current warnings."
     };
   }, [selectedStation, isHighRiskDetected, currentRiskPercent, cloudburstPresetKey, pressureDrop, tcwv, windSpeed]);
 
@@ -694,7 +692,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Floating Left Panel: Live Open-Meteo Telemetry vs What-If Simulator */}
+        {/* Floating Left Panel: Current Weather Data vs What-If Simulator */}
         {!isHomeView && (
           isLiveMode ? (
             isMeteoPanelOpen && (
@@ -776,6 +774,7 @@ export default function App() {
                 features={threatData.features}
                 currentTimeStr={currentTimePoint.label}
                 station={selectedStation}
+                liveData={liveMeteoData}
                 onSelectIndiaHotspot={() => {
                   if (STATIONS_NETWORK && STATIONS_NETWORK.length > 0) {
                     const hotspot = STATIONS_NETWORK[0];
@@ -802,7 +801,7 @@ export default function App() {
         {!isHomeView && (
           <div className={`absolute z-30 transition-all duration-300 pointer-events-auto ${
             (isLiveMode ? isMeteoPanelOpen : isSimulatorOpen) ? 'left-[400px]' : 'left-4'
-          } ${activeLayer !== 'none' && mapView !== 'satellite' ? 'bottom-28' : 'bottom-8'}`}>
+          } bottom-20`}>
             <WindParticleDropdown
               mode={windParticleMode}
               onChangeMode={(newMode) => {
@@ -818,11 +817,11 @@ export default function App() {
         )}
 
         {/* Floating Multi-Variable Weather Color Scale Legend Bar */}
-        {activeLayer !== 'none' && mapView !== 'satellite' && !isHomeView && (
-          <div className={`absolute z-30 transition-all duration-300 pointer-events-none ${
-            activeLayer === 'precip'
-              ? 'right-2.5 top-1/2 -translate-y-1/2'
-              : `bottom-16 ${(isLiveMode ? isMeteoPanelOpen : isSimulatorOpen) ? 'left-[400px]' : 'left-4'}`
+        {activeLayer !== 'none' && !isHomeView && (
+          <div className={`absolute z-30 transition-all duration-300 pointer-events-auto bottom-8 ${
+            (isLiveMode ? isMeteoPanelOpen : isSimulatorOpen)
+              ? 'left-[calc(50%+190px)] -translate-x-1/2'
+              : 'left-1/2 -translate-x-1/2'
           }`}>
             <TemperatureLegendBar
               activeLayer={activeLayer}

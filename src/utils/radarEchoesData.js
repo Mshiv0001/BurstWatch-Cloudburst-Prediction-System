@@ -192,7 +192,7 @@ export const RADAR_REFLECTIVITY_ECHOES_GEOJSON = {
   ]
 };
 
-// Real-Time Electrical Thunderstorm Lightning Discharges (Blitzortung Network)
+// Illustrative sample lightning points; these are not live strike observations.
 export const LIGHTNING_STRIKES = [
   { lon: 87.2, lat: 17.6, intensity: 'extreme' },
   { lon: 87.8, lat: 18.2, intensity: 'extreme' },

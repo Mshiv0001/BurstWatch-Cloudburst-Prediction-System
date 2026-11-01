@@ -422,51 +422,50 @@ export default function CloudburstHeader({
         </AnimatePresence>
       </div>
 
-      {/* 2. Right: Real-time FPS Monitor, Cloudburst Alert Button & LIVE Status Button */}
+      {/* 2. Right: FPS Monitor, Model Scenario Button & Weather Mode Button */}
       <div className="pointer-events-auto hidden sm:flex items-center gap-2.5 ml-auto">
         {/* Real-time Fluidity FPS Monitor */}
         <FpsCounter />
 
-        {/* Cloudburst Emergency Warning Button */}
+        {/* Illustrative Cloudburst Scenario Button */}
         {cloudburstEvent && (
           <button
             type="button"
             onClick={onToggleCloudburstAlert}
-            title={`${cloudburstEvent.title}: ${cloudburstEvent.metrics?.predictedRainRateMmh} mm/h — Click to toggle HUD Card`}
+            title={`Illustrative scenario, not an official alert. ${cloudburstEvent.title} — ${cloudburstEvent.metrics?.predictedRainRateMmh} mm/h model estimate`}
             className={`relative h-10 flex items-center justify-center gap-2 px-3.5 rounded-full transition-all cursor-pointer select-none box-border border ${
               isCloudburstCardOpen
-                ? 'bg-gradient-to-r from-red-600/90 to-rose-600/90 border-red-400/80 shadow-[0_0_18px_rgba(239,68,68,0.45)] text-white'
-                : 'apple-liquid-glass-pill text-red-300 border-red-500/40 hover:bg-red-500/20'
+                ? 'bg-gradient-to-r from-amber-600/90 to-orange-600/90 border-amber-400/80 shadow-[0_0_18px_rgba(245,158,11,0.35)] text-white'
+                : 'apple-liquid-glass-pill text-amber-200 border-amber-400/40 hover:bg-amber-500/20'
             }`}
           >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-90" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_8px_#ef4444]" />
-            </span>
+            <span className="inline-flex h-2 w-2 rounded-full bg-amber-300" />
             <div className="flex items-center gap-1.5 font-bold text-xs tracking-tight">
-              <span>⚡ Cloudburst Alert</span>
+              <span>Model Scenario</span>
               <span className="font-mono text-[10px] bg-black/40 px-1.5 py-0.5 rounded text-amber-300 border border-white/10">
-                {cloudburstEvent.metrics?.predictedRainRateMmh} mm/h
+                {cloudburstEvent.metrics?.predictedRainRateMmh} mm/h est.
               </span>
             </div>
           </button>
         )}
 
-        {/* LIVE Status Button */}
+        {/* Weather Data / Simulator Mode Button */}
         <button
           type="button"
           onClick={() => onToggleLiveMode && onToggleLiveMode(!isLiveMode)}
-          title={isLiveMode ? "Data is streaming live in real-time — Click to pause" : "Live data sync is paused — Click to resume live feed"}
+          title={isLiveMode
+            ? 'Weather observations are used when available; otherwise the dashboard shows labeled estimates. Click for simulator mode.'
+            : 'Simulator mode is active. Click to return to weather data.'}
           className={`relative h-10 flex items-center justify-center gap-2 px-4 rounded-full transition-all cursor-pointer select-none box-border ${
             isLiveMode
-              ? 'apple-liquid-glass-crimson border-red-500/50 shadow-red-500/20'
+              ? 'apple-liquid-glass-cyan border-cyan-500/50 shadow-cyan-500/20'
               : 'apple-liquid-glass-pill text-slate-400'
           }`}
         >
           {isLiveMode ? (
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-80" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 shadow-[0_0_10px_#ef4444]" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400 shadow-[0_0_10px_#22d3ee]" />
             </span>
           ) : (
             <span className="relative flex h-2 w-2">
@@ -475,11 +474,11 @@ export default function CloudburstHeader({
           )}
 
           <span className={`text-xs font-extrabold tracking-wider ${isLiveMode ? 'text-white' : 'text-slate-400'}`}>
-            {isLiveMode ? 'LIVE' : 'PAUSED'}
+            {isLiveMode ? 'WEATHER' : 'SIMULATOR'}
           </span>
 
           {isLiveMode && isMeteoLoading && (
-            <Loader2 className="w-3 h-3 animate-spin text-red-400 shrink-0" />
+            <Loader2 className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />
           )}
         </button>
       </div>

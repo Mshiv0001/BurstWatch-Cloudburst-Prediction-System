@@ -1,0 +1,13 @@
+{
+  "30.7346_79.0669": {
+    "timestamp_utc": "2026-10-31T21:45Z",
+    "temperature_c": -5.0,
+    "dew_point_c": -20.5,
+    "dew_point_depression_c": 15.5,
+    "relative_humidity_pct": 29,
+    "surface_pressure_hpa": 662.1,
+    "wind_speed_kmh": 5.6,
+    "current_precipitation_mm": 0.0,
+    "is_cached": false
+  }
+}

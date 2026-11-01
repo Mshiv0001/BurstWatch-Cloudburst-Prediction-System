@@ -1,0 +1,24 @@
+event_id,event_name,state,region_type,latitude,longitude,elevation_m,slope_deg,pressure_drop_6h_hpa,max_rh_6h_pct,min_dew_depression_6h_c,max_wind_6h_kmh,rain_sum_preceding_6h_mm,target_rainfall_rate_mm_hr,label
+EVT_001,Leh_Cloudburst,Ladakh,Himalayan_Cold_Desert,34.1526,77.5771,3414.0,3.44,0.0,91,1.5,2.1,2.3,130.0,1
+EVT_002,Kedarnath_Valley,Uttarakhand,Himalayan_High_Altitude,30.7346,79.0669,3549.0,6.37,-0.1,97,0.5,4.0,33.3,120.0,1
+EVT_003,Pithoragarh_Bastari,Uttarakhand,Himalayan_Valley,29.742,80.258,1749.0,13.22,1.0,100,0.0,4.8,28.7,105.0,1
+EVT_004,Dharamshala_Bhagsunag,Himachal Pradesh,Himalayan_Foothills,32.2471,76.3533,2557.0,18.59,0.6,99,0.1,11.0,55.3,115.0,1
+EVT_005,Chamoli_Tharali,Uttarakhand,Himalayan_Valley,30.0531,79.5089,1614.0,23.16,0.6,96,0.6,4.3,0.0,100.0,1
+EVT_006,Amarnath_HolyCave,Jammu & Kashmir,Himalayan_High_Altitude,34.2157,75.5036,3894.0,10.03,-1.9,94,0.9,6.1,0.1,110.0,1
+EVT_007,Dehradun_Maldeota,Uttarakhand,Himalayan_Foothills,30.3472,78.1418,861.0,15.74,0.0,99,0.1,4.8,2.2,115.0,1
+EVT_008,Mandi_Thunag,Himachal Pradesh,Himalayan_Valley,31.554,77.164,1894.0,2.75,1.6,90,1.6,6.6,23.9,108.0,1
+EVT_009,Shimla_Summerhill,Himachal Pradesh,Himalayan_Foothills,31.109,77.135,1930.0,19.8,2.4,97,0.6,7.0,14.3,125.0,1
+EVT_010,Sikkim_SouthLhonak,Sikkim,Himalayan_Glacial,27.915,88.204,5222.0,9.31,0.0,100,0.0,10.2,2.5,100.0,1
+EVT_011,Kullu_Samej,Himachal Pradesh,Himalayan_Valley,31.428,77.615,1253.0,27.93,0.0,97,0.5,4.7,15.9,130.0,1
+EVT_012,Mumbai_Metropolis,Maharashtra,Western_Ghats_Coast,19.076,72.8777,6.0,0.49,-0.7,93,1.2,27.8,25.8,190.0,1
+EVT_013,Chiplun_Konkan,Maharashtra,Western_Ghats_Foot,17.5323,73.5186,8.0,0.31,2.9,96,0.6,14.4,12.6,110.0,1
+EVT_014,Wayanad_Meppadi,Kerala,Western_Ghats_High,11.551,76.128,892.0,4.17,0.0,100,0.0,10.3,7.9,140.0,1
+EVT_015,Delhi_Safdarjung,Delhi,Plains_Urban,28.584,77.206,213.0,0.23,0.0,95,0.8,8.6,0.3,102.0,1
+NEG_001,Kedarnath_NormalMonsoon,Uttarakhand,Himalayan_High_Altitude,30.7346,79.0669,3549.0,6.37,-1.1,87,2.1,5.2,0.0,22.0,0
+NEG_002,Shimla_HeavyRain_NonBurst,Himachal Pradesh,Himalayan_Foothills,31.109,77.135,1930.0,19.8,-2.5,78,3.9,10.5,0.7,42.0,0
+NEG_003,Leh_ClearSummer_Instability,Ladakh,Himalayan_Cold_Desert,34.1526,77.5771,3414.0,3.44,-1.1,47,11.1,4.6,0.0,0.0,0
+NEG_004,Dehradun_ModerateShower,Uttarakhand,Himalayan_Foothills,30.3472,78.1418,861.0,15.74,-0.2,92,1.4,5.8,2.8,35.0,0
+NEG_005,Mumbai_StandardMonsoon,Maharashtra,Western_Ghats_Coast,19.076,72.8777,6.0,0.49,-1.7,81,3.5,22.7,0.9,45.0,0
+NEG_006,Wayanad_MonsoonSurge,Kerala,Western_Ghats_High,11.551,76.128,892.0,4.17,2.4,100,0.0,11.9,3.0,38.0,0
+NEG_007,Mandi_OvercastDrizzle,Himachal Pradesh,Himalayan_Valley,31.554,77.164,1894.0,2.75,-0.8,99,0.1,3.9,0.0,12.0,0
+NEG_008,Delhi_PreMonsoonThunderstorm,Delhi,Plains_Urban,28.584,77.206,213.0,0.23,0.0,64,7.6,8.7,0.0,28.0,0

@@ -1,0 +1,15 @@
+# --- model runtime: Dual-Engine Ensemble & dependencies ---
+scikit-learn>=1.4.2
+lightgbm>=4.0.0
+xgboost>=2.0.0
+numpy>=1.26.0
+pandas>=2.0.0
+joblib>=1.4.0
+
+# --- web / infra ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0.0
+requests>=2.31.0
+APScheduler>=3.10.0
+tzdata>=2024.1

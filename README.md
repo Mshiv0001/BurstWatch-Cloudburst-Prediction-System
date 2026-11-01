@@ -7,7 +7,8 @@ weather visualization.
 
 - Node.js
 - npm
-- A WeatherAPI.com API key for live weather observations
+- A WeatherAPI.com API key for live weather observations (optional; without it,
+  the dashboard displays clearly labeled baseline estimates)
 
 ## Setup
 
@@ -33,8 +34,20 @@ weather visualization.
    npm run dev
    ```
 
-Without a configured key, the dashboard uses baseline weather data for this
-feed.
+Without a configured key, the dashboard uses geographic baseline estimates
+instead of live observations. These estimates and the illustrative cloudburst
+risk overlay are not current measurements, official forecasts, or warnings.
+
+## Data notes
+
+- Weather observations require a configured WeatherAPI.com key. Without one,
+  the dashboard clearly labels its geographic baseline estimates.
+- Wind streamlines are a separate illustrative visualization. They are not a
+  live wind observation layer.
+- Rain radar frames use RainViewer reflectivity values (dBZ) and its Universal
+  Blue palette. Lightning markers and the
+  cloudburst-risk heatmap are illustrative model data, not live detections or
+  official alerts.
 
 ## Other commands
 

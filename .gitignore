@@ -25,3 +25,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Confidential / Internal Architecture Research
+*WINDY_ARCHITECTURE_REVERSE_ENGINEERING*
+
+# Temporary test tiles
+osm_*.png
+wapi_*.png
+temp_*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+.venv/
+venv/
+
+
+

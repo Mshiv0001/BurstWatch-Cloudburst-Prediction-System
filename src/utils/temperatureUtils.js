@@ -8,21 +8,22 @@
  */
 
 export const TEMPERATURE_STOPS = [
-  { c: 50, color: '#7f0000', rgb: [127, 0, 0], isDarkText: false },
-  { c: 40, color: '#d32f2f', rgb: [211, 47, 47], isDarkText: false },
-  { c: 30, color: '#ff7700', rgb: [255, 119, 0], isDarkText: true },
-  { c: 25, color: '#ffb300', rgb: [255, 179, 0], isDarkText: true },
-  { c: 20, color: '#ffee00', rgb: [255, 238, 0], isDarkText: true },
-  { c: 15, color: '#a6e22e', rgb: [166, 226, 46], isDarkText: true },
-  { c: 10, color: '#55efc4', rgb: [85, 239, 196], isDarkText: true },
-  { c: 5,  color: '#89ffc1', rgb: [137, 255, 193], isDarkText: true },
-  { c: 0,  color: '#80ebff', rgb: [128, 235, 255], isDarkText: true },
-  { c: -5, color: '#38aaff', rgb: [56, 170, 255], isDarkText: false },
-  { c: -10, color: '#007bff', rgb: [0, 123, 255], isDarkText: false },
-  { c: -15, color: '#005de3', rgb: [0, 93, 227], isDarkText: false },
-  { c: -20, color: '#002bae', rgb: [0, 43, 174], isDarkText: false },
-  { c: -30, color: '#001598', rgb: [0, 21, 152], isDarkText: false },
-  { c: -40, color: '#000082', rgb: [0, 0, 130], isDarkText: false }
+  { c: 50, color: '#5a1008', rgb: [90, 16, 8], isDarkText: false },
+  { c: 40, color: '#8c2014', rgb: [140, 32, 20], isDarkText: false },
+  { c: 35, color: '#c24b10', rgb: [194, 75, 16], isDarkText: false },
+  { c: 30, color: '#e67812', rgb: [230, 120, 18], isDarkText: false },
+  { c: 25, color: '#d39a1d', rgb: [211, 154, 29], isDarkText: false },
+  { c: 20, color: '#b8ba28', rgb: [184, 186, 40], isDarkText: false },
+  { c: 15, color: '#7ea735', rgb: [126, 167, 53], isDarkText: false },
+  { c: 10, color: '#4ca043', rgb: [76, 160, 67], isDarkText: false },
+  { c: 5,  color: '#328a6f', rgb: [50, 138, 111], isDarkText: false },
+  { c: 0,  color: '#1e7a96', rgb: [30, 122, 150], isDarkText: false },
+  { c: -5, color: '#3fa3b9', rgb: [63, 163, 185], isDarkText: false },
+  { c: -10, color: '#56b5cb', rgb: [86, 181, 203], isDarkText: false },
+  { c: -15, color: '#7badd0', rgb: [123, 173, 208], isDarkText: false },
+  { c: -20, color: '#9b99cc', rgb: [155, 153, 204], isDarkText: false },
+  { c: -30, color: '#7875b2', rgb: [120, 117, 178], isDarkText: false },
+  { c: -40, color: '#535099', rgb: [83, 80, 153], isDarkText: false }
 ];
 
 export function celsiusToFahrenheit(c) {
@@ -279,57 +280,16 @@ export function computeGlobalThermodynamicTemp(lon, lat) {
   const turb = atmosphericTurbulence(nLon * 0.065 + 12.3, lat * 0.065 + 45.6);
   t += (turb - 0.5) * 6.5;
 
-  // 6. Active Cyclonic Vortex Thermal Signatures (Vance & Infa from Ventusky)
-  // Cyclone Vance: ~15.2°N, -105.4°W (off Mexico)
-  const distVance = Math.hypot((lat - 15.2), (nLon - (-105.4)));
-  if (distVance < 8.0) {
-    const angle = Math.atan2(lat - 15.2, nLon - (-105.4));
-    const spiral = Math.sin(distVance * 1.5 - angle * 2.0);
-    if (distVance < 1.8) {
-      t += (1.8 - distVance) * 2.5; // Warm eye
-    } else {
-      t += spiral * 1.8; // Convective spiral bands
-    }
-  }
-
-  // Cyclone Infa: ~15.5°N, 162.0°E (Western Pacific)
-  const distInfa = Math.hypot((lat - 15.5), (nLon - 162.0));
-  if (distInfa < 8.0) {
-    const angle = Math.atan2(lat - 15.5, nLon - 162.0);
-    const spiral = Math.sin(distInfa * 1.5 - angle * 2.0);
-    if (distInfa < 1.8) {
-      t += (1.8 - distInfa) * 2.5;
-    } else {
-      t += spiral * 1.8;
-    }
+  // 6. Active Cyclonic Vortex Thermal Signatures (Dynamic Global Cyclones)
+  const currentCyclones = getActiveCyclones();
+  for (let i = 0; i < currentCyclones.length; i++) {
+    t += computeCycloneThermalAnomaly(nLon, lat, currentCyclones[i]);
   }
 
   return Math.round(t * 10) / 10;
 }
 
-/**
- * Pre-calibrated Active Tropical Cyclones for real-time map tracking
- * Directly matching the active storm systems in the user's reference map (Ventusky)
- */
-export const ACTIVE_CYCLONES = [
-  {
-    id: 'cyclone-vance',
-    name: 'Vance',
-    status: 'Tropical Storm',
-    category: 'Cat 2',
-    windKmh: 145,
-    pressureHpa: 968,
-    lat: 15.2,
-    lon: -105.4
-  },
-  {
-    id: 'cyclone-infa',
-    name: 'Infa',
-    status: 'Super Typhoon',
-    category: 'Cat 4',
-    windKmh: 195,
-    pressureHpa: 935,
-    lat: 15.5,
-    lon: 162.0
-  }
-];
+import { getActiveCyclones, computeCycloneThermalAnomaly, DEFAULT_ACTIVE_CYCLONES } from '../services/cycloneService.js';
+
+export { DEFAULT_ACTIVE_CYCLONES, getActiveCyclones };
+export const ACTIVE_CYCLONES = DEFAULT_ACTIVE_CYCLONES;
