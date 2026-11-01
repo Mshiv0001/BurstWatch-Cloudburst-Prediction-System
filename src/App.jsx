@@ -159,8 +159,8 @@ export default function App() {
         status: 'OFFLINE',
         error: err.message || 'Cannot reach prediction engine at http://localhost:8000',
         title: 'Cloudburst Prediction Engine Offline',
-        locationName: stn?.name || selectedStation?.name || 'Local Network',
-        coordinates: stn ? [stn.lon, stn.lat] : (selectedStation ? [selectedStation.lon, selectedStation.lat] : [78.0322, 30.3165]),
+        locationName: stn?.name || selectedStation?.name || 'Kedarnath Temple Valley',
+        coordinates: stn ? [stn.lon, stn.lat] : (selectedStation ? [selectedStation.lon, selectedStation.lat] : [79.0669, 30.7346]),
         elevationMeters: stn?.elevation || selectedStation?.elevation || 600,
         detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         metrics: {

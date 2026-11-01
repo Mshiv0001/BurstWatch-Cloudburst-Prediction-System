@@ -145,11 +145,11 @@ export async function getCloudburstEventData(station = null) {
       title: data.risk_label || (isCritical ? 'High Convective Cloudburst Warning' : isWarning ? 'Elevated Convective Alert' : 'Normal / Low Convective Risk'),
       status: isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'NORMAL',
       isAlertActive,
-      locationName: station?.name || data.location || 'Himalayan Foothills Corridor',
-      state: station?.state || data.state || 'Uttarakhand / Himachal Pradesh',
+      locationName: station?.name || data.location || 'Kedarnath Valley',
+      state: station?.state || data.state || 'Uttarakhand',
       coordinates: [
-        station?.lon ?? data.coordinates?.[1] ?? 78.0322,
-        station?.lat ?? data.coordinates?.[0] ?? 30.3165
+        station?.lon ?? data.coordinates?.[1] ?? 79.0669,
+        station?.lat ?? data.coordinates?.[0] ?? 30.7346
       ],
       elevationMeters: elev,
       detectedAt: data.target_date || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -194,8 +194,8 @@ export async function getCloudburstEventData(station = null) {
       status: 'OFFLINE',
       error: err.message || 'Cannot reach prediction engine at http://localhost:8000',
       title: 'Cloudburst Prediction Engine Offline',
-      locationName: station?.name || 'Local Network',
-      coordinates: station ? [station.lon, station.lat] : [78.0322, 30.3165],
+      locationName: station?.name || 'Kedarnath Temple Valley',
+      coordinates: station ? [station.lon, station.lat] : [79.0669, 30.7346],
       elevationMeters: station?.elevation || 600,
       detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       metrics: {

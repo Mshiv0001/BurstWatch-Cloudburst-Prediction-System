@@ -103,7 +103,11 @@ def create_app(settings: Optional[Settings] = None,
         rec = svc.store.latest_prediction()
         if rec is None:
             raise HTTPException(404, "No prediction yet. The first scheduled run has not completed.")
-        return {**rec, **age_info(rec)}
+        return {
+            **rec,
+            "coordinates": [settings.latitude, settings.longitude],
+            **age_info(rec)
+        }
 
     @app.get("/predictions", tags=["predictions"])
     def prediction_history(limit: int = Query(30, ge=1, le=366),
