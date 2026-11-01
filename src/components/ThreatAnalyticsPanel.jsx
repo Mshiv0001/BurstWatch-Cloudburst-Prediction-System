@@ -12,10 +12,10 @@ import { MODEL_METADATA } from '../data/cloudburstData';
 import { isIndiaSector } from '../utils/geoUtils';
 
 export default function ThreatAnalyticsPanel({
-  riskPercent = 92,
-  severity = "SEVERE THREAT",
+  riskPercent = 0,
+  severity = "LOW RISK",
   features = [],
-  currentTimeStr = "14:00",
+  currentTimeStr = "",
   station = null,
   liveData = null,
   onSelectIndiaHotspot,
@@ -64,11 +64,11 @@ export default function ThreatAnalyticsPanel({
       });
     }
 
-    // Dynamic physics-informed curve tailored to location & risk probability
+    // Dynamic physics-informed curve tailored to location & real risk probability
     const nowHour = new Date().getHours();
-    const peakRate = isIndia 
-      ? Math.max(12, Math.round((riskPercent / 100) * 105)) 
-      : Math.max(4, Math.round((riskPercent / 100) * 35));
+    const peakRate = riskPercent >= 25 
+      ? Math.round((riskPercent / 100) * 90) 
+      : Number(liveData?.rainRate ?? 0);
     
     const count = 14;
     const peakIndex = 5;

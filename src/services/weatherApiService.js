@@ -45,33 +45,38 @@ export function computeLiveCloudburstThreat(liveData) {
     windSpeed = 15,
     windGusts = 20,
     precipitation = 0,
-    cloudCover = 50
+    cloudCover = 50,
+    elevation = 0
   } = liveData;
 
-  // 1. Humidity Convective Saturation Factor (weight: 0.30)
-  const normHumidity = Math.max(0, Math.min(1, (humidity - 50) / 50));
+  // 1. Humidity Convective Saturation Factor (weight: 0.35)
+  // Convective cloudbursts require extreme RH >= 75%
+  const normHumidity = Math.max(0, Math.min(1, (humidity - 65) / 30));
   
-  // 2. Barometric Depression Factor (weight: 0.25)
-  const normPressure = Math.max(0, Math.min(1, (1015 - Math.min(1015, pressure)) / 100));
+  // 2. Barometric Depression Factor (weight: 0.30)
+  // Calculate pressure deficit relative to standard atmospheric pressure at this elevation
+  const standardP = 1013.25 * Math.pow(1 - (0.0065 * (elevation || 0)) / 288.15, 5.255);
+  const pressureDeficit = Math.max(0, standardP - pressure);
+  const normPressure = Math.max(0, Math.min(1, (pressureDeficit - 6) / 25));
 
-  // 3. Orographic Wind Shear & Gust Intensity (weight: 0.20)
-  const normWind = Math.max(0, Math.min(1, windGusts / 65));
+  // 3. Orographic Wind Shear & Gust Intensity (weight: 0.15)
+  const normWind = Math.max(0, Math.min(1, (windGusts - 25) / 45));
 
-  // 4. Instantaneous Precipitation Surge (weight: 0.25)
+  // 4. Instantaneous Precipitation Surge (weight: 0.20)
   const normPrecip = Math.max(0, Math.min(1, precipitation / 25));
 
   // Convective Cloudburst Index (0 - 100)
   let threatScore = (
-    normHumidity * 30 +
-    normPressure * 25 +
-    normWind * 20 +
-    normPrecip * 25
+    normHumidity * 35 +
+    normPressure * 30 +
+    normWind * 15 +
+    normPrecip * 20
   );
 
-  // Severe threshold boosts for heavy convective indicators
-  if (humidity > 85 && precipitation > 8) threatScore += 12;
-  if (windGusts > 45 && pressure < 995) threatScore += 10;
-  threatScore = Math.max(8, Math.min(99, Math.round(threatScore)));
+  // Severe threshold boosts only for heavy convective indicators
+  if (humidity > 85 && precipitation > 15) threatScore += 12;
+  if (windGusts > 50 && pressureDeficit > 20) threatScore += 10;
+  threatScore = Math.max(3, Math.min(99, Math.round(threatScore)));
 
   let severity = 'LOW';
   let alertText = 'Atmospheric columns stable. Low convective cloudburst probability.';
@@ -233,19 +238,22 @@ export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected 
   }
 }
 
-// Generate fallback hourly series if forecast array is sparse
-function generateSyntheticHourlySeries(baseTemp = 24, baseHumidity = 70, basePressure = 1010) {
-  const hours = ['12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM', '8 PM'];
-  return hours.map((hour, idx) => ({
-    time: hour,
-    label: hour,
-    pressure: Math.round(basePressure - (idx > 2 ? 6 : 0)),
-    rainRate: idx === 3 ? 14.5 : (idx === 4 ? 8.2 : 0),
-    cape: Math.round(800 + idx * 120),
-    temp: Math.round(baseTemp - idx * 0.4),
-    humidity: Math.min(98, Math.round(baseHumidity + idx * 3)),
-    windSpeed: Math.round(15 + idx * 2)
-  }));
+// Generate clean fallback hourly series if forecast array is sparse
+function generateSyntheticHourlySeries(baseTemp = 20, baseHumidity = 50, basePressure = 1013) {
+  const currentHour = new Date().getHours();
+  return Array.from({ length: 12 }, (_, i) => {
+    const h = (currentHour + i) % 24;
+    const hourLabel = `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`;
+    return {
+      time: hourLabel,
+      label: hourLabel,
+      pressure: Math.round(basePressure),
+      rainRate: 0.0,
+      temp: Math.round(baseTemp),
+      humidity: Math.round(baseHumidity),
+      windSpeed: 10
+    };
+  });
 }
 
 // Live Open-Meteo fallback when WeatherAPI key is not set
@@ -259,6 +267,28 @@ async function fetchOpenMeteoCurrent(lat, lon, stationName) {
     const standardP = 1013.25 * Math.pow(1 - (0.0065 * elev) / 288.15, 5.255);
     const surfaceP = curr.surface_pressure ?? standardP;
     const pDrop = Math.max(0, Math.round(standardP - surfaceP));
+
+    const hourlyTimes = d.hourly?.time || [];
+    const hourlyPrecip = d.hourly?.precipitation || [];
+    const hourlyTemp = d.hourly?.temperature_2m || [];
+    const hourlyRh = d.hourly?.relative_humidity_2m || [];
+    const hourlyP = d.hourly?.surface_pressure || [];
+
+    const realHourlySeries = hourlyTimes.length >= 6
+      ? hourlyTimes.slice(0, 12).map((isoTime, i) => {
+          const date = new Date(isoTime);
+          const hourStr = date.toLocaleTimeString([], { hour: 'numeric' });
+          return {
+            time: hourStr,
+            label: hourStr,
+            pressure: Math.round(hourlyP[i] ?? surfaceP),
+            rainRate: Number(hourlyPrecip[i] ?? 0),
+            temp: Math.round(hourlyTemp[i] ?? 20),
+            humidity: Math.round(hourlyRh[i] ?? 50),
+            windSpeed: Math.round(curr.wind_speed_10m ?? 10)
+          };
+        })
+      : generateSyntheticHourlySeries(curr.temperature_2m ?? 20, curr.relative_humidity_2m ?? 50, surfaceP);
 
     const isIndia = (lat >= 6.0 && lat <= 38.0 && lon >= 67.0 && lon <= 98.0);
     const liveData = {
@@ -286,7 +316,7 @@ async function fetchOpenMeteoCurrent(lat, lon, stationName) {
       condition: curr.precipitation > 0 ? 'Light Rain' : 'Normal Conditions',
       icon: curr.precipitation > 0 ? 'CloudRain' : 'CloudSun',
       isIndia,
-      hourlySeries: generateSyntheticHourlySeries(curr.temperature_2m ?? 20, curr.relative_humidity_2m ?? 50, surfaceP)
+      hourlySeries: realHourlySeries
     };
     liveData.threat = isIndia ? computeLiveCloudburstThreat(liveData) : null;
     return liveData;

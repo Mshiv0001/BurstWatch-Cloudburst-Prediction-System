@@ -55,53 +55,8 @@ export function getSurfaceFrictionMultiplier(lon, lat) {
   return 0.60;
 }
 
-// Initial active global storms (GDACS / NOAA global tracking)
-export const DEFAULT_ACTIVE_CYCLONES = [
-  {
-    id: 'cyclone-arnab-26',
-    name: 'Arnab',
-    status: 'Severe Cyclonic Storm',
-    category: 'Category 1',
-    windKmh: 120,
-    pressureHpa: 968,
-    lat: 16.8,
-    lon: 86.4,
-    basin: 'Bay of Bengal'
-  },
-  {
-    id: 'cyclone-infa-26',
-    name: 'In-Fa',
-    status: 'Super Typhoon',
-    category: 'Category 4',
-    windKmh: 195,
-    pressureHpa: 930,
-    lat: 18.5,
-    lon: 148.0,
-    basin: 'Western Pacific'
-  },
-  {
-    id: 'cyclone-vance-26',
-    name: 'Vance',
-    status: 'Hurricane',
-    category: 'Category 2',
-    windKmh: 155,
-    pressureHpa: 965,
-    lat: 18.2,
-    lon: -108.4,
-    basin: 'Eastern Pacific'
-  },
-  {
-    id: 'cyclone-three-c-26',
-    name: 'Three-C',
-    status: 'Tropical Storm',
-    category: 'Tropical Storm',
-    windKmh: 75,
-    pressureHpa: 995,
-    lat: 13.5,
-    lon: -174.5,
-    basin: 'Central Pacific'
-  }
-];
+// Initial active global storms (dynamically populated from GDACS / NOAA live feed)
+export const DEFAULT_ACTIVE_CYCLONES = [];
 
 let activeCyclones = [...DEFAULT_ACTIVE_CYCLONES];
 const listeners = new Set();

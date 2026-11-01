@@ -440,26 +440,38 @@ export default function CloudburstHeader({
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
           Top Watchlist:
         </span>
-        {TOP_WATCHLIST_STATIONS.map((stn, idx) => (
-          <button
-            key={stn.id}
-            type="button"
-            onClick={() => {
-              const fullStn = stations.find(s => s.id === stn.id) || stn;
-              if (onSelectStation) {
-                onSelectStation(fullStn);
-              }
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 hover:bg-cyan-500/20 hover:border-cyan-400/50 border border-white/10 text-slate-200 transition-all cursor-pointer text-[11px] group"
-            title={`Fly to ${stn.name} and execute live ML cloudburst inference`}
-          >
-            <span className="text-cyan-400 font-mono text-[10px] font-bold">#{idx + 1}</span>
-            <span className="font-medium group-hover:text-cyan-200 transition-colors">{stn.name}</span>
-            <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-500/30">
-              {stn.risk}%
-            </span>
-          </button>
-        ))}
+        {TOP_WATCHLIST_STATIONS.map((stn, idx) => {
+          const cached = getCachedMLRisk(stn.lat, stn.lon);
+          const liveRisk = cached?.riskPercent;
+          return (
+            <button
+              key={stn.id}
+              type="button"
+              onClick={() => {
+                const fullStn = stations.find(s => s.id === stn.id) || stn;
+                if (onSelectStation) {
+                  onSelectStation(fullStn);
+                }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 hover:bg-cyan-500/20 hover:border-cyan-400/50 border border-white/10 text-slate-200 transition-all cursor-pointer text-[11px] group"
+              title={`Fly to ${stn.name} and execute live ML cloudburst inference`}
+            >
+              <span className="text-cyan-400 font-mono text-[10px] font-bold">#{idx + 1}</span>
+              <span className="font-medium group-hover:text-cyan-200 transition-colors">{stn.name}</span>
+              {liveRisk != null ? (
+                <span className={`font-mono font-bold text-[10px] px-1 py-0.2 rounded border ${
+                  liveRisk >= 25 
+                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/30' 
+                    : 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
+                }`}>
+                  {liveRisk}%
+                </span>
+              ) : (
+                <span className="text-cyan-400 font-mono text-[9px] opacity-75">Inspect &rarr;</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* 3. Right: FPS Monitor, Model Scenario Button & Weather Mode Button */}

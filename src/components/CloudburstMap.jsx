@@ -35,7 +35,6 @@ import {
 import { generateCloudburstHeatmapGeoJSON } from '../utils/heatmapGeoJson';
 import { WEATHER_LAYERS, getWeatherApiTileUrl, getWeatherApiTimestamp } from '../utils/weatherTiles';
 import {
-  LIGHTNING_STRIKES_GEOJSON,
   getLocalRadarDbz
 } from '../utils/radarEchoesData';
 import {
@@ -944,7 +943,7 @@ export default function CloudburstMap({
     const t = getLocalTemperature(lng, lat);
     const w = getLocalWindSpeed(lng, lat);
     const precip = getLocalPrecipitation(lng, lat, stations);
-    const dbz = getLocalRadarDbz(lng, lat);
+    const dbz = getLocalRadarDbz(lng, lat, precip);
     const pressure = getLocalPressure(lng, lat);
     const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
     const name = getSectorName(lng, lat);
@@ -975,8 +974,7 @@ export default function CloudburstMap({
   const [radarTimestampPath, setRadarTimestampPath] = useState(null);
   const [radarTimestampTime, setRadarTimestampTime] = useState(null);
   const [radarStatus, setRadarStatus] = useState('loading');
-  // Default pin centered on Bay of Bengal storm eye matching user screenshot (17°03'N 88°20'E)
-  const [pinnedCoords, setPinnedCoords] = useState([88.33, 17.05]);
+  const [pinnedCoords, setPinnedCoords] = useState(null);
   const [pinnedScreenPos, setPinnedScreenPos] = useState({ x: 0, y: 0 });
 
   // Fetch the latest available RainViewer radar frame and refresh every 10 minutes
@@ -1323,7 +1321,7 @@ export default function CloudburstMap({
         const t = getLocalTemperature(lng, lat);
         const w = getLocalWindSpeed(lng, lat);
         const precip = getLocalPrecipitation(lng, lat, stations);
-        const dbz = getLocalRadarDbz(lng, lat);
+        const dbz = getLocalRadarDbz(lng, lat, precip);
         const pressure = getLocalPressure(lng, lat);
         const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
         const name = getSectorName(lng, lat);
@@ -1824,7 +1822,7 @@ export default function CloudburstMap({
       const t = getLocalTemperature(lng, lat);
       const w = getLocalWindSpeed(lng, lat);
       const precip = getLocalPrecipitation(lng, lat, stations);
-      const dbz = getLocalRadarDbz(lng, lat);
+      const dbz = getLocalRadarDbz(lng, lat, precip);
       const pressure = getLocalPressure(lng, lat);
       const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
       const name = getSectorName(lng, lat);
@@ -2154,8 +2152,8 @@ export default function CloudburstMap({
 
 
 
-      {/* 3.9 Pinned Tooltip at 17°03'N 88°20'E (0 mi) matching user screenshot */}
-      {selectedWeatherLayer === 'precip' && pinnedScreenPos.x > 0 && (
+      {/* Pinned user-selected location tooltip */}
+      {selectedWeatherLayer === 'precip' && pinnedCoords && pinnedScreenPos.x > 0 && (
         <div 
           id="radar-pin-badge"
           className="absolute z-25 pointer-events-none select-none transition-transform duration-75"

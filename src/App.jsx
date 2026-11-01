@@ -17,7 +17,6 @@ import { fetchWeatherApiLiveData } from './services/weatherApiService';
 import { sendBrowserNotification } from './utils/notifications';
 import { 
   STATIONS_NETWORK, 
-  TIMELINE_POINTS, 
   calculateCloudburstThreat,
   getHighestRiskStation,
   MODEL_METADATA 
@@ -66,10 +65,6 @@ export default function App() {
   // Active Selected Station (defaults to primary monitoring station across the network)
   const [selectedStation, setSelectedStation] = useState(() => getHighestRiskStation(STATIONS_NETWORK));
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Timeline Scrubber & Replay State
-  const [currentTimeIndex, setCurrentTimeIndex] = useState(1);
-  const [selectedEventId, setSelectedEventId] = useState('kedarnath');
 
   // Live weather integration state
   const [liveMeteoData, setLiveMeteoData] = useState(null);
@@ -246,7 +241,7 @@ export default function App() {
           elevation: 450,
           status: threatData.riskPercent > 80 ? 'critical' : threatData.riskPercent > 50 ? 'high' : 'moderate',
           riskScore: threatData.riskPercent,
-          rainfallRate: 35.0,
+          rainfallRate: liveMeteoData?.rainRate ?? 0.0,
           humidity,
           pressureDrop,
           temp: temperature,
@@ -329,7 +324,7 @@ export default function App() {
           elevation: 450,
           status: threatData.riskPercent > 80 ? 'critical' : threatData.riskPercent > 50 ? 'high' : 'moderate',
           riskScore: threatData.riskPercent,
-          rainfallRate: 35.0,
+          rainfallRate: liveMeteoData?.rainRate ?? 0.0,
           humidity,
           pressureDrop,
           temp: temperature,
@@ -357,8 +352,6 @@ export default function App() {
     );
   }, [fetchIpFallbackLocation, threatData.riskPercent, humidity, pressureDrop, temperature, windSpeed]);
 
-  const currentTimePoint = TIMELINE_POINTS[currentTimeIndex] || TIMELINE_POINTS[1];
-
   // Synthesize gentle radar/alert audio tone via Web Audio API
   const playAlertSiren = useCallback(() => {
     if (isMuted) return;
@@ -383,92 +376,6 @@ export default function App() {
       // AudioContext policy fallback
     }
   }, [isMuted]);
-
-  // Handlers for Preset Scenarios
-  const handleApplyPreset = (presetKey) => {
-    playAlertSiren();
-    if (presetKey === 'kedarnath') {
-      setHumidity(94);
-      setPressureDrop(34);
-      setTemperature(14);
-      setWindSpeed(52);
-      setTcwv(62);
-      const stn = STATIONS_NETWORK.find(s => s.id === 'kedarnath');
-      if (stn) setSelectedStation(stn);
-      sendBrowserNotification("⚠️ Critical Cloudburst Alert: Kedarnath", {
-        body: "Severe convective surge: 94% humidity & 34 hPa pressure drop detected! Model τ >= 0.875.",
-        tag: "cloudburst-preset"
-      });
-    } else if (presetKey === 'squall') {
-      setHumidity(91);
-      setPressureDrop(29);
-      setTemperature(17);
-      setWindSpeed(46);
-      setTcwv(54);
-      const stn = STATIONS_NETWORK.find(s => s.id === 'chamoli' || s.id === 'dehradun');
-      if (stn) setSelectedStation(stn);
-      sendBrowserNotification("⚠️ Severe Squall Warning", {
-        body: "Himachal '23 scenario: Orographic convective uplift active. High rainfall intensity predicted.",
-        tag: "cloudburst-preset"
-      });
-    } else if (presetKey === 'mumbai') {
-      setHumidity(98);
-      setPressureDrop(32);
-      setTemperature(26);
-      setWindSpeed(58);
-      setTcwv(65);
-      const stn = STATIONS_NETWORK.find(s => s.id === 'mumbai');
-      if (stn) setSelectedStation(stn);
-      sendBrowserNotification("⚠️ Catastrophic Deluge: Mumbai 2005", {
-        body: "Extreme convective burst: 98% humidity & 32 hPa pressure drop (944mm/24h). Model τ >= 0.875.",
-        tag: "cloudburst-preset"
-      });
-    } else if (presetKey === 'wayanad') {
-      setHumidity(97);
-      setPressureDrop(35);
-      setTemperature(22);
-      setWindSpeed(54);
-      setTcwv(60);
-      const stn = STATIONS_NETWORK.find(s => s.id === 'wayanad');
-      if (stn) setSelectedStation(stn);
-      sendBrowserNotification("⚠️ Western Ghats Alert: Wayanad 2024", {
-        body: "Orographic convective cloudburst over Kerala Ghats: 97% humidity & 35 hPa drop.",
-        tag: "cloudburst-preset"
-      });
-    } else if (presetKey === 'barmer') {
-      setHumidity(92);
-      setPressureDrop(28);
-      setTemperature(31);
-      setWindSpeed(48);
-      setTcwv(52);
-      const stn = STATIONS_NETWORK.find(s => s.id === 'barmer');
-      if (stn) setSelectedStation(stn);
-      sendBrowserNotification("⚠️ Desert Cloudburst: Barmer 2006", {
-        body: "Thar Desert anomaly: 92% humidity surge & 28 hPa drop over arid basin.",
-        tag: "cloudburst-preset"
-      });
-    } else if (presetKey === 'clear') {
-      setHumidity(52);
-      setPressureDrop(8);
-      setTemperature(22);
-      setWindSpeed(16);
-      setTcwv(28);
-      sendBrowserNotification("☀️ Convective System Cleared", {
-        body: "Atmospheric parameters stabilized. Low cloudburst risk.",
-        tag: "cloudburst-preset"
-      });
-    }
-  };
-
-  // Handler for Milestone Replay Click
-  const handleSelectEvent = (event) => {
-    setSelectedEventId(event.id);
-    setHumidity(event.humidity);
-    setPressureDrop(event.pressureDrop);
-    setTemperature(event.temp);
-    setWindSpeed(event.windSpeed);
-    playAlertSiren();
-  };
 
   // NavRail click handler
   const handleSelectNav = (navId) => {
@@ -670,7 +577,7 @@ export default function App() {
                 riskPercent={threatData.riskPercent}
                 severity={threatData.severity}
                 features={threatData.features}
-                currentTimeStr={currentTimePoint.label}
+                currentTimeStr={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 station={selectedStation}
                 liveData={liveMeteoData}
                 onSelectIndiaHotspot={() => {

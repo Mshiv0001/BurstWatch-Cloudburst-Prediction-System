@@ -136,8 +136,8 @@ export function getCachedMLRisk(lat, lon) {
 }
 
 export const TOP_WATCHLIST_STATIONS = [
-  { id: 'kedarnath', name: 'Kedarnath', state: 'Uttarakhand', risk: 3.6, lat: 30.7346, lon: 79.0669, elevation: 3583 },
-  { id: 'dharamshala', name: 'Dharamshala', state: 'Himachal Pradesh', risk: 3.4, lat: 32.2190, lon: 76.3234, elevation: 1457 },
-  { id: 'wayanad', name: 'Wayanad', state: 'Kerala', risk: 3.2, lat: 11.6854, lon: 76.1320, elevation: 780 }
+  { id: 'kedarnath', name: 'Kedarnath', state: 'Uttarakhand', lat: 30.7346, lon: 79.0669, elevation: 3583 },
+  { id: 'dharamshala', name: 'Dharamshala', state: 'Himachal Pradesh', lat: 32.2190, lon: 76.3234, elevation: 1457 },
+  { id: 'wayanad', name: 'Wayanad', state: 'Kerala', lat: 11.6854, lon: 76.1320, elevation: 780 }
 ];
 
