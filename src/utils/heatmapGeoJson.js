@@ -1,46 +1,68 @@
 /**
  * Authentic Convective Cloudburst Plume Generator for MapLibre GL JS Heatmap
- * Generates an organic, continuous convective stream along the Himalayan mountain front
- * and active network stations, eliminating artificial grid polka-dots and clipping blobs.
+ * Generates an organic, continuous convective stream centered directly on the active high-risk epicenter,
+ * ensuring the danger pin and the storm gradient are 100% geographically unified.
  */
 
 import { STATIONS_NETWORK } from '../data/cloudburstData';
 
-// Continuous Himalayan Convective Cloudburst Corridor (Natural valley funnel chain)
-// Running along the Himalayan front range where moist monsoonal air funnels into steep gorges
-const HIMALAYAN_CORRIDOR_NODES = [
-  // Jammu & Kashmir Front & Valleys
-  { lon: 74.80, lat: 34.08, baseWeight: 0.42, name: "Srinagar Basin" },
-  { lon: 75.18, lat: 33.95, baseWeight: 0.48, name: "Anantnag Corridor" },
-  { lon: 75.52, lat: 34.22, baseWeight: 0.58, name: "Amarnath Baltal Valley" },
-  { lon: 75.76, lat: 33.32, baseWeight: 0.52, name: "Kishtwar Gorge" },
-  { lon: 76.10, lat: 33.05, baseWeight: 0.48, name: "Padder Valley" },
+/**
+ * Generates an organic, multi-node convective storm cluster centered directly on [centerLon, centerLat]
+ */
+function generateEpicenterPlumeNodes(centerLon, centerLat, convectiveIntensity, baseWeight = 0.95) {
+  const nodes = [];
 
-  // Himachal Pradesh Convective Stream
-  { lon: 76.32, lat: 32.22, baseWeight: 0.60, name: "Dharamshala Uplift" },
-  { lon: 76.75, lat: 32.10, baseWeight: 0.56, name: "Palampur Slopes" },
-  { lon: 76.95, lat: 31.72, baseWeight: 0.54, name: "Mandi Beas Basin" },
-  { lon: 77.12, lat: 31.96, baseWeight: 0.64, name: "Kullu Valley" },
-  { lon: 77.20, lat: 32.25, baseWeight: 0.68, name: "Manali Convergence" },
-  { lon: 77.40, lat: 31.55, baseWeight: 0.58, name: "Rampur Bushahr" },
-  { lon: 77.70, lat: 31.35, baseWeight: 0.60, name: "Rohru Valley" },
+  // Core eye / peak updraft at exact epicenter
+  nodes.push({
+    lon: centerLon,
+    lat: centerLat,
+    weight: Math.min(0.98, baseWeight * convectiveIntensity),
+    name: "Convective Updraft Core"
+  });
 
-  // Uttarakhand Convective Ground-Zero Plume (Kedarnath - Chamoli - Dehradun Corridor)
-  { lon: 78.05, lat: 30.32, baseWeight: 0.65, name: "Dehradun Foothills" },
-  { lon: 78.18, lat: 30.46, baseWeight: 0.68, name: "Mussoorie Ridge" },
-  { lon: 78.44, lat: 30.73, baseWeight: 0.70, name: "Uttarkashi Bhagirathi Valley" },
-  { lon: 78.75, lat: 30.45, baseWeight: 0.72, name: "Tehri Catchment" },
-  { lon: 78.98, lat: 30.28, baseWeight: 0.74, name: "Rudraprayag Confluence" },
-  { lon: 79.07, lat: 30.73, baseWeight: 0.82, name: "Kedarnath Temple Basin" },
-  { lon: 79.25, lat: 30.60, baseWeight: 0.76, name: "Tungnath Ridge" },
-  { lon: 79.57, lat: 30.56, baseWeight: 0.78, name: "Chamoli Joshimath Funnel" },
-  { lon: 79.50, lat: 30.74, baseWeight: 0.75, name: "Badrinath Pass" },
-  { lon: 79.75, lat: 30.30, baseWeight: 0.70, name: "Karanprayag Valley" },
-  { lon: 79.45, lat: 29.39, baseWeight: 0.58, name: "Nainital Kumaon Lakes" },
-  { lon: 79.95, lat: 29.85, baseWeight: 0.62, name: "Bageshwar Valley" },
-  { lon: 80.22, lat: 29.58, baseWeight: 0.60, name: "Pithoragarh Kali Gorge" },
-  { lon: 80.55, lat: 29.90, baseWeight: 0.64, name: "Dharchula Trans-Himalayan Gate" }
-];
+  const cosLat = Math.cos((centerLat * Math.PI) / 180.0) || 1.0;
+
+  // Inner ring: 6 dense convective cells (radius ~7-10 km)
+  const innerR = 0.075;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + 0.35;
+    const r = innerR * (0.85 + 0.3 * Math.sin(i * 2.2));
+    nodes.push({
+      lon: centerLon + (r / cosLat) * Math.cos(angle),
+      lat: centerLat + r * Math.sin(angle),
+      weight: Math.min(0.90, baseWeight * 0.82 * convectiveIntensity),
+      name: `Core Updraft ${i + 1}`
+    });
+  }
+
+  // Mid ring: 8 convective outflow cells (radius ~16-22 km)
+  const midR = 0.17;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + 0.6;
+    const r = midR * (0.80 + 0.35 * Math.cos(i * 2.7));
+    nodes.push({
+      lon: centerLon + (r / cosLat) * Math.cos(angle),
+      lat: centerLat + r * Math.sin(angle),
+      weight: Math.min(0.75, baseWeight * 0.58 * convectiveIntensity),
+      name: `Outflow Feeder ${i + 1}`
+    });
+  }
+
+  // Outer ring: 8 anvil dissipation cells (radius ~28-36 km)
+  const outerR = 0.28;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + 0.15;
+    const r = outerR * (0.85 + 0.3 * Math.sin(i * 1.8));
+    nodes.push({
+      lon: centerLon + (r / cosLat) * Math.cos(angle),
+      lat: centerLat + r * Math.sin(angle),
+      weight: Math.min(0.50, baseWeight * 0.35 * convectiveIntensity),
+      name: `Anvil Boundary ${i + 1}`
+    });
+  }
+
+  return nodes;
+}
 
 /**
  * Builds streamlined GeoJSON FeatureCollection for MapLibre GL built-in heatmap layer
@@ -48,66 +70,58 @@ const HIMALAYAN_CORRIDOR_NODES = [
 export function generateCloudburstHeatmapGeoJSON({
   stations = STATIONS_NETWORK,
   selectedStation = null,
+  cloudburstEvent = null,
   threatData = null,
-  humidity = 90,
-  pressureDrop = 30
+  humidity = 55,
+  pressureDrop = 6
 }) {
   const features = [];
 
-  // Realistic atmospheric convective scaling with guaranteed visible baseline
-  const rawRisk = threatData?.riskPercent ? threatData.riskPercent / 100 : 0.75;
-  const simRisk = Math.max(0.60, rawRisk);
-  const humidityRatio = Math.max(0.5, Math.min(1.25, humidity / 85));
-  const pressureRatio = Math.max(0.5, Math.min(1.25, pressureDrop / 28));
-  const convectiveIntensity = Math.min(1.15, (humidityRatio * 0.55 + pressureRatio * 0.45) * simRisk);
+  // Determine active epicenter coordinates [lon, lat]
+  const epicenterCoords = cloudburstEvent?.coordinates || 
+    (selectedStation?.lon != null && selectedStation?.lat != null ? [selectedStation.lon, selectedStation.lat] : null);
 
-  // 1. Himalayan Convective Corridor (Organic, continuous cloudburst plume along mountain arc)
-  HIMALAYAN_CORRIDOR_NODES.forEach((node, i) => {
-    const weight = Math.max(0.20, Math.min(0.85, node.baseWeight * convectiveIntensity));
+  // CRITICAL: Live ML Backend Prediction Risk ALWAYS takes priority over simulator threatData!
+  const rawRisk = (cloudburstEvent?.isLive && cloudburstEvent?.metrics?.riskPercent != null)
+    ? cloudburstEvent.metrics.riskPercent / 100
+    : (threatData?.riskPercent != null ? threatData.riskPercent / 100 : 0.04);
 
-    features.push({
-      type: "Feature",
-      geometry: {
-        type: "Point",
-        coordinates: [node.lon, node.lat]
-      },
-      properties: {
-        id: `himalaya-corridor-${i}`,
-        name: node.name,
-        weight,
-        isPlume: true
-      }
-    });
-  });
+  // If convective cloudburst risk is below 25% (normal/low risk), no hazard plume is drawn
+  if (rawRisk < 0.25) {
+    return {
+      type: "FeatureCollection",
+      features: []
+    };
+  }
 
-  // 2. Monitored Network Stations (Elevated threat stations or explicitly selected station)
-  stations.forEach((stn) => {
-    const isSelected = selectedStation?.id === stn.id;
-    const baseRisk = (stn.riskScore || 40) / 100;
+  // Active Convective Storm Scaling (scales smoothly from 25% to 100% risk)
+  const severityScale = Math.min(1.0, (rawRisk - 0.25) / 0.65);
+  const humidityRatio = Math.max(0.5, Math.min(1.35, humidity / 85));
+  const pressureRatio = Math.max(0.5, Math.min(1.35, pressureDrop / 28));
+  const convectiveIntensity = severityScale * (humidityRatio * 0.5 + pressureRatio * 0.5);
 
-    // Include stations that have elevated convective threat (>45) or are explicitly selected
-    if (baseRisk > 0.45 || isSelected) {
-      let weight = Math.max(0.20, Math.min(0.80, baseRisk * convectiveIntensity * 0.9));
-      if (isSelected) {
-        weight = Math.min(0.90, weight * 1.3);
-      }
-
+  // 1. DYNAMIC EPICENTER CONVECTIVE PLUME:
+  // Directly centers the 23-node storm cloud around the active warning pin!
+  if (epicenterCoords) {
+    const [centerLon, centerLat] = epicenterCoords;
+    const plumeNodes = generateEpicenterPlumeNodes(centerLon, centerLat, convectiveIntensity, 0.95);
+    
+    plumeNodes.forEach((node, i) => {
       features.push({
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [stn.lon, stn.lat]
+          coordinates: [node.lon, node.lat]
         },
         properties: {
-          id: `station-node-${stn.id}`,
-          name: stn.name,
-          weight,
-          isStation: true,
-          isSelected
+          id: `epicenter-plume-${i}`,
+          name: node.name,
+          weight: node.weight,
+          isEpicenterPlume: true
         }
       });
-    }
-  });
+    });
+  }
 
   return {
     type: "FeatureCollection",

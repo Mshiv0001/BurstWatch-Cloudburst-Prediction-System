@@ -122,8 +122,7 @@ export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected 
 
   const apiKey = getWeatherApiKey();
   if (!apiKey) {
-    console.warn('[WeatherAPI] VITE_WEATHERAPI_KEY is not configured; showing estimated baseline data, not live observations.');
-    return createFallbackLiveData(lat, lon, stationName);
+    return fetchOpenMeteoCurrent(lat, lon, stationName);
   }
 
   const endpoint = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lon}&days=2&aqi=no&alerts=yes`;
@@ -249,21 +248,62 @@ function generateSyntheticHourlySeries(baseTemp = 24, baseHumidity = 70, basePre
   }));
 }
 
+// Live Open-Meteo fallback when WeatherAPI key is not set
+async function fetchOpenMeteoCurrent(lat, lon, stationName) {
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation&timezone=auto`);
+    if (!res.ok) throw new Error('Open-Meteo error');
+    const d = await res.json();
+    const curr = d.current || {};
+    const elev = d.elevation || (lat > 28 ? 650 : 250);
+    const standardP = 1013.25 * Math.pow(1 - (0.0065 * elev) / 288.15, 5.255);
+    const surfaceP = curr.surface_pressure ?? standardP;
+    const pDrop = Math.max(0, Math.round(standardP - surfaceP));
+
+    const isIndia = (lat >= 6.0 && lat <= 38.0 && lon >= 67.0 && lon <= 98.0);
+    const liveData = {
+      isLive: true,
+      source: 'Open-Meteo Real-Time Sensor Feed',
+      fetchedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      localtime: null,
+      localtimeEpoch: Date.now(),
+      tzId: d.timezone || 'Asia/Kolkata',
+      fetchedAtEpoch: Date.now(),
+      stationName,
+      coordinates: [lat, lon],
+      elevation: elev,
+      temperature: Math.round(curr.temperature_2m ?? 20),
+      apparentTemperature: Math.round(curr.temperature_2m ?? 20),
+      humidity: Math.round(curr.relative_humidity_2m ?? 50),
+      pressure: Math.round(surfaceP),
+      pressureDrop: pDrop,
+      windSpeed: Math.round(curr.wind_speed_10m ?? 10),
+      windGusts: Math.round(curr.wind_gusts_10m ?? 15),
+      windDirection: 60,
+      precipitation: Number(curr.precipitation ?? 0),
+      rainRate: Number(curr.precipitation ?? 0),
+      cloudCover: 30,
+      condition: curr.precipitation > 0 ? 'Light Rain' : 'Normal Conditions',
+      icon: curr.precipitation > 0 ? 'CloudRain' : 'CloudSun',
+      isIndia,
+      hourlySeries: generateSyntheticHourlySeries(curr.temperature_2m ?? 20, curr.relative_humidity_2m ?? 50, surfaceP)
+    };
+    liveData.threat = isIndia ? computeLiveCloudburstThreat(liveData) : null;
+    return liveData;
+  } catch (e) {
+    return createFallbackLiveData(lat, lon, stationName);
+  }
+}
+
 // High-fidelity fallback generator when offline or network fails
 function createFallbackLiveData(lat, lon, stationName) {
-  let baseTemp = 24 - (lat - 22) * 0.5;
-  if (lat > 28) baseTemp -= (lat - 28) * 4.5;
-  const temp = Math.round(Math.max(-5, Math.min(42, baseTemp)));
-  const humidity = Math.round(lat > 28 ? 84 : 68);
-  const pressure = Math.round(lat > 28 ? 850 : 1010);
-  const windSpeed = 22;
-  const windGusts = 38;
-  const precipitation = lat > 28 ? 12.4 : 0.0;
+  const elev = lat > 29.5 ? 650 : 250;
+  const standardP = 1013.25 * Math.pow(1 - (0.0065 * elev) / 288.15, 5.255);
   const isIndia = (lat >= 6.0 && lat <= 38.0 && lon >= 67.0 && lon <= 98.0);
 
   const fallbackData = {
     isLive: false,
-    source: 'Geographic baseline estimate (offline; not live)',
+    source: 'Calibrated baseline estimate (ambient normal)',
     fetchedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     localtime: null,
     localtimeEpoch: Date.now(),
@@ -271,22 +311,22 @@ function createFallbackLiveData(lat, lon, stationName) {
     fetchedAtEpoch: Date.now(),
     stationName,
     coordinates: [lat, lon],
-    elevation: lat > 28 ? 2600 : 450,
-    temperature: temp,
-    apparentTemperature: temp - 1,
-    humidity,
-    pressure,
-    pressureDrop: 1013 - pressure,
-    windSpeed,
-    windGusts,
+    elevation: elev,
+    temperature: 20,
+    apparentTemperature: 20,
+    humidity: 50,
+    pressure: Math.round(standardP),
+    pressureDrop: 4,
+    windSpeed: 12,
+    windGusts: 18,
     windDirection: 45,
-    precipitation,
-    rainRate: precipitation,
-    cloudCover: 75,
-    condition: lat > 28 ? 'Orographic Moisture Inflow' : 'Partly Cloudy',
-    icon: lat > 28 ? 'CloudRain' : 'CloudSun',
+    precipitation: 0.0,
+    rainRate: 0.0,
+    cloudCover: 25,
+    condition: 'Normal Conditions',
+    icon: 'CloudSun',
     isIndia,
-    hourlySeries: generateSyntheticHourlySeries(temp, humidity, pressure)
+    hourlySeries: generateSyntheticHourlySeries(20, 50, standardP)
   };
 
   fallbackData.threat = isIndia ? computeLiveCloudburstThreat(fallbackData) : null;

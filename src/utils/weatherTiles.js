@@ -47,7 +47,7 @@ export const WEATHER_LAYERS = {
 };
 
 const tileCache = new Map();
-const MAX_CACHE_SIZE = 512;
+const MAX_CACHE_SIZE = 1024;
 let isProtocolRegistered = false;
 
 /**
@@ -61,7 +61,7 @@ async function generateThermodynamicTile(z, x, y) {
   }
 
   const n = 1 << z;
-  const GRID_SIZE = 64; // Sample a 64x64 grid, bilinear upscale to 256x256
+  const GRID_SIZE = 64; // 64x64 grid with bilinear scaling to 256x256
   const TILE_SIZE = 256;
 
   let smallCanvas, smallCtx, bigCanvas, bigCtx;
@@ -85,11 +85,13 @@ async function generateThermodynamicTile(z, x, y) {
   const data = imgData.data;
 
   for (let gy = 0; gy < GRID_SIZE; gy++) {
+    // py normalized between y and y+1
     const py = y + (gy + 0.5) / GRID_SIZE;
     const mercY = Math.PI * (1 - (2 * py) / n);
     const lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(mercY)) - Math.PI / 2);
 
     for (let gx = 0; gx < GRID_SIZE; gx++) {
+      // px normalized between x and x+1
       const px = x + (gx + 0.5) / GRID_SIZE;
       const lon = (px / n) * 360 - 180;
 
@@ -131,6 +133,7 @@ async function generateThermodynamicTile(z, x, y) {
 
 /**
  * Registers custom 'thermo-temp' protocol with MapLibre GL JS
+ * Robustly normalizes wrapping and negative coordinates to prevent missing tile blanks
  */
 export function registerWeatherApiProtocol() {
   if (isProtocolRegistered || typeof window === 'undefined') return;
@@ -140,14 +143,21 @@ export function registerWeatherApiProtocol() {
   } catch (e) {}
 
   maplibregl.addProtocol('thermo-temp', async (requestParameters) => {
-    const match = requestParameters.url.match(/thermo-temp:\/\/tile\/(\d+)\/(\d+)\/(\d+)/);
+    // Support negative coordinates (e.g. -1) and wrapped coordinates from MapLibre
+    const match = requestParameters.url.match(/thermo-temp:\/\/tile\/(-?\d+)\/(-?\d+)\/(-?\d+)/);
     if (!match) {
       throw new Error(`Invalid thermodynamic tile request: ${requestParameters.url}`);
     }
 
     const z = parseInt(match[1], 10);
-    const x = parseInt(match[2], 10);
-    const y = parseInt(match[3], 10);
+    const rawX = parseInt(match[2], 10);
+    const rawY = parseInt(match[3], 10);
+
+    const n = 1 << z;
+    // Perfectly wrap longitude across world copies (-180° / +180°)
+    const x = ((rawX % n) + n) % n;
+    // Clamp latitude within valid Web Mercator limits
+    const y = Math.max(0, Math.min(n - 1, rawY));
 
     const buffer = await generateThermodynamicTile(z, x, y);
     return { data: buffer };

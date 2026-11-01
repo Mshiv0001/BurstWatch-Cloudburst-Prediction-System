@@ -8,7 +8,27 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     watch: {
-      ignored: ['**/model_metadata.json', '**/*.log', '**/scratch/**']
+      ignored: [
+        '**/backend/**',
+        '**/backend/data/**',
+        '**/data/**',
+        '**/dist/**',
+        '**/*.db',
+        '**/*.db-journal',
+        '**/*.sqlite*',
+        '**/*.log',
+        '**/scratch/**',
+        '**/.venv/**',
+        '**/__pycache__/**',
+        '**/terrain_cache.json'
+      ]
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
     }
   },
   optimizeDeps: {

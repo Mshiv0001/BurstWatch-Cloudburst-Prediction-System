@@ -14,6 +14,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import { STATIONS_NETWORK } from '../data/cloudburstData';
+import { getCachedMLRisk } from '../services/mlPredictionService';
 import { isIndiaSector } from '../utils/geoUtils';
 import { 
   celsiusToFahrenheit,
@@ -229,25 +230,33 @@ function getLocalPressure(lon, lat) {
   return Math.round(p);
 }
 
-function getLocalConvectiveRisk(lon, lat, stations = STATIONS_NETWORK, threatData = null) {
-  let risk = 15;
-  if (stations && stations.length > 0) {
-    for (let i = 0; i < stations.length; i++) {
-      const s = stations[i];
-      const dLat = lat - s.lat;
-      const dLon = (lon - s.lon) * Math.cos((lat * Math.PI) / 180);
-      const distSq = dLat * dLat + dLon * dLon;
-      if (distSq < 1.8) {
-        const factor = Math.exp(-distSq / 0.35);
-        const stnRisk = threatData?.riskPercent ?? 88;
-        risk = Math.max(risk, Math.round(stnRisk * factor));
-      }
+function getLocalConvectiveRisk(lon, lat, stations = STATIONS_NETWORK, threatData = null, cloudburstEvent = null) {
+  // Check live client-side ML prediction cache first
+  const mlData = getCachedMLRisk(lat, lon);
+  if (mlData?.riskPercent != null) {
+    return mlData.riskPercent;
+  }
+
+  // 1. If active cloudburst hazard epicenter passes >= 25%, calculate convective plume influence from that epicenter
+  if (cloudburstEvent?.coordinates && (cloudburstEvent?.isAlertActive || (cloudburstEvent.metrics?.riskPercent ?? 0) >= 25)) {
+    const [eLon, eLat] = cloudburstEvent.coordinates;
+    const dLat = lat - eLat;
+    const dLon = (lon - eLon) * Math.cos((lat * Math.PI) / 180);
+    const distSq = dLat * dLat + dLon * dLon;
+    const radiusKm = cloudburstEvent.hazardRadiusKm || 30;
+    const radiusDeg = radiusKm / 111.0;
+    const maxDistSq = radiusDeg * radiusDeg * 3.5;
+
+    if (distSq < maxDistSq) {
+      const factor = Math.exp(-distSq / (radiusDeg * radiusDeg * 0.9));
+      const peakRisk = cloudburstEvent.metrics?.riskPercent ?? 75;
+      return Math.min(99, Math.max(4, Math.round(peakRisk * factor)));
     }
   }
-  if (lat >= 29.5 && lat <= 33.5 && lon >= 76.5 && lon <= 81.5) {
-    risk = Math.max(risk, 78);
-  }
-  return Math.min(99, Math.round(risk));
+
+  // 2. Normal ambient ML baseline (~3% - 4% for plains and mountains in current weather)
+  const isMountain = lat >= 29.5 && lat <= 35.5 && lon >= 74.0 && lon <= 81.0;
+  return isMountain ? 4 : 3;
 }
 
 function getSectorName(lon, lat) {
@@ -572,39 +581,39 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           'interpolate',
           ['linear'],
           ['zoom'],
-          0, 0.65,
-          3, 1.00,
-          6, 1.55,
-          9, 2.10,
-          12, 2.80
+          0, 0.50,
+          3, 0.75,
+          6, 1.10,
+          9, 1.60,
+          12, 2.20
         ],
         // Authentic atmospheric convective cloudburst color spectrum:
-        // Soft, smooth transitions without clipping to solid opaque white!
+        // Deep, rich progression from indigo -> cyan -> green -> yellow -> orange -> crimson -> deep maroon core
         'heatmap-color': [
           'interpolate',
           ['linear'],
           ['heatmap-density'],
           0.00, 'rgba(0, 0, 0, 0)',
           0.10, 'rgba(49, 46, 129, 0.28)',   // Translucent deep convective indigo
-          0.22, 'rgba(14, 165, 233, 0.58)',  // Active cyan flux
-          0.40, 'rgba(34, 197, 94, 0.72)',   // Green unstable atmospheric boundary
-          0.58, 'rgba(234, 179, 8, 0.84)',   // Warm amber squall front
-          0.75, 'rgba(249, 115, 22, 0.92)',  // Vibrant orange convective updraft
-          0.88, 'rgba(225, 29, 72, 0.96)',   // Crimson severe cloudburst zone
-          1.00, 'rgba(254, 215, 215, 0.98)'  // Radiant soft warm rose-coral pinnacle
+          0.25, 'rgba(14, 165, 233, 0.58)',  // Active cyan flux
+          0.42, 'rgba(34, 197, 94, 0.72)',   // Green unstable atmospheric boundary
+          0.60, 'rgba(234, 179, 8, 0.84)',   // Warm amber squall front
+          0.76, 'rgba(249, 115, 22, 0.92)',  // Vibrant orange convective updraft
+          0.88, 'rgba(220, 38, 38, 0.96)',   // Crimson severe cloudburst zone
+          1.00, 'rgba(136, 19, 55, 0.98)'   // Deep maroon-magenta cloudburst core (no hollow whiteout)
         ],
-        // Broad radius so adjacent valley nodes seamlessly coalesce into a fluid plume
+        // Smooth radius so adjacent valley nodes coalesce into a fluid, natural plume
         'heatmap-radius': [
           'interpolate',
           ['linear'],
           ['zoom'],
-          0, 24,
-          2, 36,
-          4, 55,
-          6, 80,
-          8, 115,
-          10, 150,
-          12, 190
+          0, 18,
+          2, 28,
+          4, 42,
+          6, 62,
+          8, 90,
+          10, 125,
+          12, 160
         ],
         'heatmap-opacity': activeLayer === 'convective' ? 0.78 : 0.45
       }
@@ -937,7 +946,7 @@ export default function CloudburstMap({
     const precip = getLocalPrecipitation(lng, lat, stations);
     const dbz = getLocalRadarDbz(lng, lat);
     const pressure = getLocalPressure(lng, lat);
-    const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData);
+    const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
     const name = getSectorName(lng, lat);
 
     setProbe({
@@ -1041,11 +1050,12 @@ export default function CloudburstMap({
     return generateCloudburstHeatmapGeoJSON({
       stations,
       selectedStation,
+      cloudburstEvent,
       threatData,
       humidity,
       pressureDrop
     });
-  }, [stations, selectedStation, threatData, humidity, pressureDrop]);
+  }, [stations, selectedStation, cloudburstEvent, threatData, humidity, pressureDrop]);
 
   // Flat 2D Mercator Projection (Globe and 3D tilt completely removed)
   const apply3DState = useCallback(() => {
@@ -1103,28 +1113,49 @@ export default function CloudburstMap({
       markersRef.current.push(userMarker);
     }
 
-    // Epicenter Pulsing Hazard Beacon
+    // Convective Hazard Epicenter / Active Monitored Station Pin
     if (cloudburstEvent?.coordinates) {
       const [lon, lat] = cloudburstEvent.coordinates;
+      const displayRisk = cloudburstEvent.metrics?.riskPercent ?? cloudburstEvent.mlModel?.confidencePercent ?? 4;
+      const locName = cloudburstEvent.locationName || 'Monitored Sector';
+      const rainRate = cloudburstEvent.metrics?.predictedRainRateMmh || 0;
+      const isHighAlert = displayRisk >= 25 || cloudburstEvent.isAlertActive;
+
       const epicenterEl = document.createElement('div');
       epicenterEl.className = 'custom-cloudburst-epicenter relative flex items-center justify-center cursor-pointer select-none group pointer-events-auto';
-      epicenterEl.title = `Illustrative scenario, not an official forecast or warning. ${cloudburstEvent.title} — Modelled rain rate: ${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h (Click to focus)`;
 
-      epicenterEl.innerHTML = `
-        <div class="relative flex items-center justify-center pointer-events-auto">
-          <!-- Outer Pulsating Shockwave 1 -->
-          <span class="absolute w-20 h-20 rounded-full bg-red-600/35 animate-ping pointer-events-none" style="animation-duration: 2.2s;"></span>
-          <!-- Outer Pulsating Shockwave 2 -->
-          <span class="absolute w-36 h-36 rounded-full border border-red-500/40 animate-ping pointer-events-none" style="animation-duration: 3.5s;"></span>
-          <!-- Reticle boundary ring -->
-          <span class="absolute w-12 h-12 rounded-full border-2 border-dashed border-rose-400 animate-spin pointer-events-none" style="animation-duration: 12s;"></span>
-          <!-- Core Mission Control Badge -->
-          <div class="relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white font-mono text-[11px] font-black shadow-[0_0_24px_rgba(239,68,68,0.9)] border-2 border-white scale-100 group-hover:scale-110 transition-transform">
-            <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
-            <span class="tracking-wide uppercase">⚡ SCENARIO • ${cloudburstEvent.metrics?.riskPercent ? `${cloudburstEvent.metrics.riskPercent}% MODEL RISK • ` : ''}${cloudburstEvent.metrics?.predictedRainRateMmh || 128.5} mm/h</span>
+      if (isHighAlert) {
+        epicenterEl.title = `Convective Alert: ${locName} (${displayRisk}% Risk) — Predicted Rain: ${rainRate} mm/h (Click to focus)`;
+        epicenterEl.innerHTML = `
+          <div class="relative flex items-center justify-center pointer-events-auto">
+            <!-- Outer Pulsating Shockwave 1 -->
+            <span class="absolute w-20 h-20 rounded-full bg-rose-600/35 animate-ping pointer-events-none" style="animation-duration: 2.2s;"></span>
+            <!-- Outer Pulsating Shockwave 2 -->
+            <span class="absolute w-36 h-36 rounded-full border border-rose-500/40 animate-ping pointer-events-none" style="animation-duration: 3.5s;"></span>
+            <!-- Reticle boundary ring -->
+            <span class="absolute w-12 h-12 rounded-full border-2 border-dashed border-rose-400 animate-spin pointer-events-none" style="animation-duration: 12s;"></span>
+            <!-- Core Mission Control Badge -->
+            <div class="relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white font-mono text-[11px] font-black shadow-[0_0_24px_rgba(244,63,94,0.9)] border-2 border-white scale-100 group-hover:scale-110 transition-transform whitespace-nowrap">
+              <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+              <span class="tracking-wide uppercase">⚡ ${locName} • <span class="text-amber-200 font-bold">${displayRisk}% RISK</span> ${rainRate > 0 ? `• ${rainRate} mm/h` : ''}</span>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        epicenterEl.title = `Peak Monitored Hotspot: ${locName} (ML Risk: ${displayRisk}% — Normal / All Clear) (Click to focus)`;
+        epicenterEl.innerHTML = `
+          <div class="relative flex items-center justify-center pointer-events-auto">
+            <!-- Subtle calm emerald ping -->
+            <span class="absolute w-10 h-10 rounded-full bg-emerald-500/25 animate-ping pointer-events-none" style="animation-duration: 3.5s;"></span>
+            <!-- Calm Watch Point Tag -->
+            <div class="relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-950/90 backdrop-blur-md text-emerald-400 font-mono text-[11px] font-bold shadow-[0_0_16px_rgba(16,185,129,0.3)] border border-emerald-500/50 scale-100 group-hover:scale-105 transition-transform whitespace-nowrap">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-slate-100 font-sans font-semibold">📍 Peak Monitored Cell: ${locName}</span>
+              <span class="text-emerald-400 font-mono font-bold">— ${displayRisk}% (All Clear)</span>
+            </div>
+          </div>
+        `;
+      }
 
       epicenterEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1147,7 +1178,54 @@ export default function CloudburstMap({
 
       cloudburstMarkerRef.current = cbMarker;
     }
-  }, [userLocation, cloudburstEvent, updateProbeAtCoords, onFocusEpicenter]);
+
+    // Render interactive station dots for major IMD stations across India
+    const keyStationIds = new Set([
+      'kedarnath', 'dehradun', 'chamoli', 'uttarkashi', 'nainital',
+      'shimla', 'dharamshala', 'manali', 'kullu', 'leh', 'srinagar',
+      'delhi', 'jaipur', 'mumbai', 'pune', 'bengaluru', 'chennai',
+      'kolkata', 'wayanad', 'cherrapunji', 'shillong', 'darjeeling', 'gangtok',
+      'bhopal', 'hyderabad', 'guwahati', 'ahmedabad', 'patna', 'lucknow',
+      'munnar', 'ooty', 'mahabaleshwar'
+    ]);
+
+    const activeStnLon = cloudburstEvent?.coordinates ? cloudburstEvent.coordinates[0] : null;
+    const activeStnLat = cloudburstEvent?.coordinates ? cloudburstEvent.coordinates[1] : null;
+
+    stations.forEach(stn => {
+      // Don't draw a small dot if it coincides with the primary active hotspot pin
+      if (activeStnLon != null && activeStnLat != null) {
+        if (Math.abs(stn.lon - activeStnLon) < 0.05 && Math.abs(stn.lat - activeStnLat) < 0.05) {
+          return;
+        }
+      }
+      if (!keyStationIds.has(stn.id)) return;
+
+      const dotEl = document.createElement('div');
+      dotEl.className = 'group relative flex items-center justify-center cursor-pointer select-none';
+      dotEl.title = `${stn.name} (${stn.state || stn.region}) — Click to run on-demand ML prediction`;
+      dotEl.innerHTML = `
+        <div class="relative flex items-center justify-center pointer-events-auto">
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-900/90 border border-cyan-400/80 shadow-sm group-hover:scale-150 group-hover:bg-cyan-400 group-hover:border-white group-hover:shadow-[0_0_12px_#22d3ee] transition-all duration-200"></span>
+          <span class="absolute -bottom-6 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950/95 text-slate-200 text-[10px] font-sans font-medium px-2 py-0.5 rounded-md border border-cyan-500/30 whitespace-nowrap pointer-events-none z-30 shadow-lg">
+            ${stn.name} <span class="text-cyan-400 font-mono text-[9px] ml-1">⚡ Run ML</span>
+          </span>
+        </div>
+      `;
+
+      dotEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (onSelectStation) {
+          onSelectStation(stn);
+        }
+      });
+
+      const stnMarker = new maplibregl.Marker({ element: dotEl })
+        .setLngLat([stn.lon, stn.lat])
+        .addTo(map);
+      markersRef.current.push(stnMarker);
+    });
+  }, [userLocation, cloudburstEvent, stations, onSelectStation, updateProbeAtCoords, onFocusEpicenter]);
 
   // Initialize MapLibre GL JS with a raster basemap
   useEffect(() => {
@@ -1247,7 +1325,7 @@ export default function CloudburstMap({
         const precip = getLocalPrecipitation(lng, lat, stations);
         const dbz = getLocalRadarDbz(lng, lat);
         const pressure = getLocalPressure(lng, lat);
-        const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData);
+        const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
         const name = getSectorName(lng, lat);
 
         probeScreenPosRef.current = { x, y };
@@ -1285,7 +1363,7 @@ export default function CloudburstMap({
           precip: getLocalPrecipitation(center.lng, center.lat, stations),
           dbz: getLocalRadarDbz(center.lng, center.lat),
           pressure: getLocalPressure(center.lng, center.lat),
-          convectiveRisk: getLocalConvectiveRisk(center.lng, center.lat, stations, threatData),
+          convectiveRisk: getLocalConvectiveRisk(center.lng, center.lat, stations, threatData, cloudburstEvent),
           name: getSectorName(center.lng, center.lat)
         });
         setProbeScreenPos({ x: centerPt.x, y: centerPt.y });
@@ -1748,7 +1826,7 @@ export default function CloudburstMap({
       const precip = getLocalPrecipitation(lng, lat, stations);
       const dbz = getLocalRadarDbz(lng, lat);
       const pressure = getLocalPressure(lng, lat);
-      const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData);
+      const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
       const name = getSectorName(lng, lat);
 
       probeScreenPosRef.current = { x, y };
@@ -1795,7 +1873,7 @@ export default function CloudburstMap({
           precip: getLocalPrecipitation(lngLat.lng, lngLat.lat, stations),
           dbz: getLocalRadarDbz(lngLat.lng, lngLat.lat),
           pressure: getLocalPressure(lngLat.lng, lngLat.lat),
-          convectiveRisk: getLocalConvectiveRisk(lngLat.lng, lngLat.lat, stations, threatData),
+          convectiveRisk: getLocalConvectiveRisk(lngLat.lng, lngLat.lat, stations, threatData, cloudburstEvent),
           name: getSectorName(lngLat.lng, lngLat.lat)
         });
       } catch (err) {}
@@ -1923,11 +2001,8 @@ export default function CloudburstMap({
           elevation: isIndia && lat > 28 ? 1800 : 250,
           isIndia,
           isGlobal: !isIndia,
-          humidity: Math.round(Math.max(30, Math.min(95, 75 + Math.sin(lat * 0.1) * 15))),
-          pressureDrop: isIndia ? 28 : 12,
           temp: getLocalTemperature(lng, lat),
-          windSpeed: getLocalWindSpeed(lng, lat),
-          rainfallRate: 15.0
+          windSpeed: getLocalWindSpeed(lng, lat)
         });
       }
     };
@@ -2128,13 +2203,17 @@ export default function CloudburstMap({
             id="cursor-temp-pill"
             className="bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-lg border border-black/15 flex flex-col items-center justify-center select-none"
           >
-            <span className="text-[8px] font-bold uppercase tracking-wide text-slate-500">
+            <span className={`text-[8px] font-bold uppercase tracking-wide ${
+              selectedWeatherLayer === 'convective' && (probe.convectiveRisk ?? 3) >= 25 
+                ? 'text-rose-600' 
+                : 'text-slate-500'
+            }`}>
               {selectedWeatherLayer === 'temp'
                 ? 'Model estimate'
                 : selectedWeatherLayer === 'precip'
                   ? 'Radar Reflectivity'
                   : selectedWeatherLayer === 'convective'
-                    ? 'Cloudburst Threat'
+                    ? ((probe.convectiveRisk ?? 3) >= 25 ? 'Cloudburst Threat' : 'Convective Risk (ML)')
                     : selectedWeatherLayer === 'wind'
                       ? 'Wind Speed'
                       : 'Model estimate'}
@@ -2145,7 +2224,8 @@ export default function CloudburstMap({
                   return `${probe.dbz ?? 0} dBZ`;
                 }
                 if (selectedWeatherLayer === 'convective') {
-                  return `${probe.convectiveRisk ?? 85}% Risk`;
+                  const risk = probe.convectiveRisk ?? 3;
+                  return risk >= 25 ? `${risk}% Alert` : `${risk}% (Normal)`;
                 }
                 if (selectedWeatherLayer === 'wind') {
                   return `${Math.round(probe.wind ?? 25)} km/h`;

@@ -10,14 +10,7 @@ export const STATIONS_NETWORK = [
     state: "Delhi",
     lat: 28.5846,
     lon: 77.2066,
-    elevation: 216,
-    status: "moderate",
-    riskScore: 64,
-    rainfallRate: 36.0,
-    humidity: 78,
-    pressureDrop: 16,
-    temp: 29.5,
-    windSpeed: 24
+    elevation: 216
   },
   {
     id: "dehradun",
@@ -26,15 +19,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 30.3165,
     lon: 78.0322,
-    elevation: 435,
-    status: "critical",
-    riskScore: 92,
-    rainfallRate: 86.0,
-    humidity: 91,
-    pressureDrop: 31,
-    temp: 21.5,
-    windSpeed: 38,
-    isCore: true
+    elevation: 435
   },
   {
     id: "kedarnath",
@@ -43,15 +28,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 30.7346,
     lon: 79.0669,
-    elevation: 3583,
-    status: "critical",
-    riskScore: 95,
-    rainfallRate: 98.4,
-    humidity: 94,
-    pressureDrop: 34,
-    temp: 13.2,
-    windSpeed: 52,
-    isCore: true
+    elevation: 3583
   },
   {
     id: "chamoli",
@@ -60,15 +37,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 30.5583,
     lon: 79.5667,
-    elevation: 1890,
-    status: "critical",
-    riskScore: 91,
-    rainfallRate: 88.0,
-    humidity: 90,
-    pressureDrop: 29,
-    temp: 16.5,
-    windSpeed: 44,
-    isCore: true
+    elevation: 1890
   },
   {
     id: "uttarkashi",
@@ -77,15 +46,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 30.7268,
     lon: 78.4354,
-    elevation: 1158,
-    status: "critical",
-    riskScore: 89,
-    rainfallRate: 82.5,
-    humidity: 88,
-    pressureDrop: 27,
-    temp: 18.0,
-    windSpeed: 42,
-    isCore: true
+    elevation: 1158
   },
   {
     id: "nainital",
@@ -94,14 +55,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 29.3919,
     lon: 79.4542,
-    elevation: 2084,
-    status: "high",
-    riskScore: 78,
-    rainfallRate: 52.0,
-    humidity: 84,
-    pressureDrop: 22,
-    temp: 19.2,
-    windSpeed: 36
+    elevation: 2084
   },
   {
     id: "mussoorie",
@@ -110,14 +64,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 30.4598,
     lon: 78.0644,
-    elevation: 2005,
-    status: "high",
-    riskScore: 82,
-    rainfallRate: 60.0,
-    humidity: 86,
-    pressureDrop: 24,
-    temp: 18.0,
-    windSpeed: 38
+    elevation: 2005
   },
   {
     id: "haridwar",
@@ -126,14 +73,7 @@ export const STATIONS_NETWORK = [
     state: "Uttarakhand",
     lat: 29.9457,
     lon: 78.1642,
-    elevation: 314,
-    status: "moderate",
-    riskScore: 68,
-    rainfallRate: 42.0,
-    humidity: 80,
-    pressureDrop: 18,
-    temp: 27.0,
-    windSpeed: 26
+    elevation: 314
   },
   {
     id: "shimla",
@@ -142,14 +82,7 @@ export const STATIONS_NETWORK = [
     state: "Himachal Pradesh",
     lat: 31.1048,
     lon: 77.1734,
-    elevation: 2276,
-    status: "high",
-    riskScore: 74,
-    rainfallRate: 48.0,
-    humidity: 82,
-    pressureDrop: 21,
-    temp: 18.8,
-    windSpeed: 28
+    elevation: 2276
   },
   {
     id: "dharamshala",
@@ -158,15 +91,7 @@ export const STATIONS_NETWORK = [
     state: "Himachal Pradesh",
     lat: 32.2190,
     lon: 76.3234,
-    elevation: 1457,
-    status: "critical",
-    riskScore: 92,
-    rainfallRate: 94.0,
-    humidity: 91,
-    pressureDrop: 31,
-    temp: 17.5,
-    windSpeed: 46,
-    isCore: true
+    elevation: 1457
   },
   {
     id: "manali",
@@ -175,14 +100,7 @@ export const STATIONS_NETWORK = [
     state: "Himachal Pradesh",
     lat: 32.2396,
     lon: 77.1887,
-    elevation: 2050,
-    status: "critical",
-    riskScore: 88,
-    rainfallRate: 78.0,
-    humidity: 87,
-    pressureDrop: 26,
-    temp: 15.0,
-    windSpeed: 40
+    elevation: 2050
   },
   {
     id: "kullu",
@@ -191,14 +109,7 @@ export const STATIONS_NETWORK = [
     state: "Himachal Pradesh",
     lat: 31.9579,
     lon: 77.1095,
-    elevation: 1278,
-    status: "high",
-    riskScore: 84,
-    rainfallRate: 64.0,
-    humidity: 86,
-    pressureDrop: 25,
-    temp: 16.0,
-    windSpeed: 38
+    elevation: 1278
   },
   {
     id: "mandi",
@@ -207,14 +118,7 @@ export const STATIONS_NETWORK = [
     state: "Himachal Pradesh",
     lat: 31.7087,
     lon: 76.9320,
-    elevation: 760,
-    status: "moderate",
-    riskScore: 68,
-    rainfallRate: 38.0,
-    humidity: 78,
-    pressureDrop: 18,
-    temp: 21.0,
-    windSpeed: 28
+    elevation: 760
   },
   {
     id: "srinagar",
@@ -223,14 +127,7 @@ export const STATIONS_NETWORK = [
     state: "Jammu & Kashmir",
     lat: 34.0837,
     lon: 74.7973,
-    elevation: 1585,
-    status: "moderate",
-    riskScore: 55,
-    rainfallRate: 24.0,
-    humidity: 72,
-    pressureDrop: 14,
-    temp: 20.0,
-    windSpeed: 20
+    elevation: 1585
   },
   {
     id: "amarnath",
@@ -239,15 +136,7 @@ export const STATIONS_NETWORK = [
     state: "Jammu & Kashmir",
     lat: 34.2157,
     lon: 75.5022,
-    elevation: 3888,
-    status: "critical",
-    riskScore: 90,
-    rainfallRate: 86.0,
-    humidity: 89,
-    pressureDrop: 30,
-    temp: 8.5,
-    windSpeed: 50,
-    isCore: true
+    elevation: 3888
   },
   {
     id: "pahalgam",
@@ -256,14 +145,7 @@ export const STATIONS_NETWORK = [
     state: "Jammu & Kashmir",
     lat: 34.0167,
     lon: 75.3167,
-    elevation: 2130,
-    status: "high",
-    riskScore: 76,
-    rainfallRate: 46.0,
-    humidity: 82,
-    pressureDrop: 20,
-    temp: 15.0,
-    windSpeed: 32
+    elevation: 2130
   },
   {
     id: "jammu",
@@ -272,14 +154,7 @@ export const STATIONS_NETWORK = [
     state: "Jammu & Kashmir",
     lat: 32.7266,
     lon: 74.8570,
-    elevation: 327,
-    status: "moderate",
-    riskScore: 52,
-    rainfallRate: 22.0,
-    humidity: 70,
-    pressureDrop: 12,
-    temp: 31.0,
-    windSpeed: 18
+    elevation: 327
   },
   {
     id: "leh",
@@ -288,14 +163,7 @@ export const STATIONS_NETWORK = [
     state: "Ladakh",
     lat: 34.1526,
     lon: 77.5771,
-    elevation: 3524,
-    status: "safe",
-    riskScore: 24,
-    rainfallRate: 4.0,
-    humidity: 38,
-    pressureDrop: 8,
-    temp: 12.0,
-    windSpeed: 22
+    elevation: 3524
   },
   {
     id: "chandigarh",
@@ -304,14 +172,7 @@ export const STATIONS_NETWORK = [
     state: "Chandigarh",
     lat: 30.7333,
     lon: 76.7794,
-    elevation: 321,
-    status: "moderate",
-    riskScore: 58,
-    rainfallRate: 30.0,
-    humidity: 74,
-    pressureDrop: 15,
-    temp: 30.0,
-    windSpeed: 22
+    elevation: 321
   },
   {
     id: "amritsar",
@@ -320,14 +181,7 @@ export const STATIONS_NETWORK = [
     state: "Punjab",
     lat: 31.6340,
     lon: 74.8723,
-    elevation: 234,
-    status: "safe",
-    riskScore: 42,
-    rainfallRate: 16.0,
-    humidity: 68,
-    pressureDrop: 11,
-    temp: 31.5,
-    windSpeed: 18
+    elevation: 234
   },
   {
     id: "jaipur",
@@ -336,14 +190,7 @@ export const STATIONS_NETWORK = [
     state: "Rajasthan",
     lat: 26.9124,
     lon: 75.7873,
-    elevation: 431,
-    status: "safe",
-    riskScore: 38,
-    rainfallRate: 14.0,
-    humidity: 55,
-    pressureDrop: 9,
-    temp: 34.0,
-    windSpeed: 20
+    elevation: 431
   },
   {
     id: "udaipur",
@@ -352,14 +199,7 @@ export const STATIONS_NETWORK = [
     state: "Rajasthan",
     lat: 24.5854,
     lon: 73.7125,
-    elevation: 598,
-    status: "safe",
-    riskScore: 44,
-    rainfallRate: 18.0,
-    humidity: 62,
-    pressureDrop: 12,
-    temp: 32.0,
-    windSpeed: 18
+    elevation: 598
   },
   {
     id: "mountabu",
@@ -368,14 +208,7 @@ export const STATIONS_NETWORK = [
     state: "Rajasthan",
     lat: 24.5926,
     lon: 72.7156,
-    elevation: 1220,
-    status: "moderate",
-    riskScore: 66,
-    rainfallRate: 44.0,
-    humidity: 80,
-    pressureDrop: 18,
-    temp: 22.0,
-    windSpeed: 28
+    elevation: 1220
   },
   {
     id: "lucknow",
@@ -384,14 +217,7 @@ export const STATIONS_NETWORK = [
     state: "Uttar Pradesh",
     lat: 26.8467,
     lon: 80.9462,
-    elevation: 123,
-    status: "moderate",
-    riskScore: 54,
-    rainfallRate: 28.0,
-    humidity: 76,
-    pressureDrop: 14,
-    temp: 32.0,
-    windSpeed: 18
+    elevation: 123
   },
   {
     id: "varanasi",
@@ -400,14 +226,7 @@ export const STATIONS_NETWORK = [
     state: "Uttar Pradesh",
     lat: 25.3176,
     lon: 82.9739,
-    elevation: 81,
-    status: "moderate",
-    riskScore: 56,
-    rainfallRate: 32.0,
-    humidity: 78,
-    pressureDrop: 15,
-    temp: 33.0,
-    windSpeed: 19
+    elevation: 81
   },
 
   // --- WESTERN INDIA (Konkan Coast, Western Ghats & Gujarat) ---
@@ -418,15 +237,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 19.0760,
     lon: 72.8777,
-    elevation: 14,
-    status: "critical",
-    riskScore: 92,
-    rainfallRate: 92.0,
-    humidity: 93,
-    pressureDrop: 28,
-    temp: 28.5,
-    windSpeed: 45,
-    isCore: true
+    elevation: 14
   },
   {
     id: "pune",
@@ -435,14 +246,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 18.5204,
     lon: 73.8567,
-    elevation: 560,
-    status: "high",
-    riskScore: 72,
-    rainfallRate: 46.0,
-    humidity: 82,
-    pressureDrop: 19,
-    temp: 26.5,
-    windSpeed: 28
+    elevation: 560
   },
   {
     id: "mahabaleshwar",
@@ -451,15 +255,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 17.9307,
     lon: 73.6477,
-    elevation: 1353,
-    status: "critical",
-    riskScore: 96,
-    rainfallRate: 110.0,
-    humidity: 98,
-    pressureDrop: 32,
-    temp: 18.5,
-    windSpeed: 52,
-    isCore: true
+    elevation: 1353
   },
   {
     id: "lonavala",
@@ -468,14 +264,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 18.7557,
     lon: 73.4091,
-    elevation: 624,
-    status: "critical",
-    riskScore: 88,
-    rainfallRate: 78.0,
-    humidity: 92,
-    pressureDrop: 25,
-    temp: 23.0,
-    windSpeed: 38
+    elevation: 624
   },
   {
     id: "nagpur",
@@ -484,14 +273,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 21.1458,
     lon: 79.0882,
-    elevation: 310,
-    status: "safe",
-    riskScore: 46,
-    rainfallRate: 18.0,
-    humidity: 68,
-    pressureDrop: 12,
-    temp: 33.0,
-    windSpeed: 20
+    elevation: 310
   },
   {
     id: "goa",
@@ -500,14 +282,7 @@ export const STATIONS_NETWORK = [
     state: "Goa",
     lat: 15.4909,
     lon: 73.8278,
-    elevation: 12,
-    status: "high",
-    riskScore: 84,
-    rainfallRate: 68.0,
-    humidity: 90,
-    pressureDrop: 22,
-    temp: 28.0,
-    windSpeed: 36
+    elevation: 12
   },
   {
     id: "ahmedabad",
@@ -516,14 +291,7 @@ export const STATIONS_NETWORK = [
     state: "Gujarat",
     lat: 23.0225,
     lon: 72.5714,
-    elevation: 53,
-    status: "safe",
-    riskScore: 42,
-    rainfallRate: 16.0,
-    humidity: 64,
-    pressureDrop: 10,
-    temp: 34.5,
-    windSpeed: 22
+    elevation: 53
   },
   {
     id: "surat",
@@ -532,14 +300,7 @@ export const STATIONS_NETWORK = [
     state: "Gujarat",
     lat: 21.1702,
     lon: 72.8311,
-    elevation: 13,
-    status: "moderate",
-    riskScore: 62,
-    rainfallRate: 34.0,
-    humidity: 82,
-    pressureDrop: 16,
-    temp: 30.5,
-    windSpeed: 26
+    elevation: 13
   },
 
   // --- SOUTH INDIA (Western Ghats, Coastal Plains & Deccan) ---
@@ -550,14 +311,7 @@ export const STATIONS_NETWORK = [
     state: "Karnataka",
     lat: 12.9716,
     lon: 77.5946,
-    elevation: 920,
-    status: "high",
-    riskScore: 75,
-    rainfallRate: 54.0,
-    humidity: 84,
-    pressureDrop: 19,
-    temp: 25.0,
-    windSpeed: 26
+    elevation: 920
   },
   {
     id: "chennai",
@@ -566,14 +320,7 @@ export const STATIONS_NETWORK = [
     state: "Tamil Nadu",
     lat: 13.0827,
     lon: 80.2707,
-    elevation: 6,
-    status: "high",
-    riskScore: 82,
-    rainfallRate: 72.0,
-    humidity: 88,
-    pressureDrop: 24,
-    temp: 31.0,
-    windSpeed: 38
+    elevation: 6
   },
   {
     id: "hyderabad",
@@ -582,14 +329,7 @@ export const STATIONS_NETWORK = [
     state: "Telangana",
     lat: 17.3850,
     lon: 78.4867,
-    elevation: 542,
-    status: "moderate",
-    riskScore: 60,
-    rainfallRate: 32.0,
-    humidity: 74,
-    pressureDrop: 15,
-    temp: 30.0,
-    windSpeed: 22
+    elevation: 542
   },
   {
     id: "kochi",
@@ -598,14 +338,7 @@ export const STATIONS_NETWORK = [
     state: "Kerala",
     lat: 9.9312,
     lon: 76.2673,
-    elevation: 3,
-    status: "critical",
-    riskScore: 88,
-    rainfallRate: 80.0,
-    humidity: 92,
-    pressureDrop: 26,
-    temp: 27.5,
-    windSpeed: 34
+    elevation: 3
   },
   {
     id: "thiruvananthapuram",
@@ -614,14 +347,7 @@ export const STATIONS_NETWORK = [
     state: "Kerala",
     lat: 8.5241,
     lon: 76.9366,
-    elevation: 10,
-    status: "high",
-    riskScore: 78,
-    rainfallRate: 58.0,
-    humidity: 88,
-    pressureDrop: 21,
-    temp: 28.0,
-    windSpeed: 30
+    elevation: 10
   },
   {
     id: "wayanad",
@@ -630,15 +356,7 @@ export const STATIONS_NETWORK = [
     state: "Kerala",
     lat: 11.6854,
     lon: 76.1320,
-    elevation: 1100,
-    status: "critical",
-    riskScore: 97,
-    rainfallRate: 118.0,
-    humidity: 98,
-    pressureDrop: 35,
-    temp: 20.0,
-    windSpeed: 48,
-    isCore: true
+    elevation: 1100
   },
   {
     id: "munnar",
@@ -647,15 +365,7 @@ export const STATIONS_NETWORK = [
     state: "Kerala",
     lat: 10.0889,
     lon: 77.0595,
-    elevation: 1532,
-    status: "critical",
-    riskScore: 92,
-    rainfallRate: 94.0,
-    humidity: 96,
-    pressureDrop: 30,
-    temp: 16.5,
-    windSpeed: 44,
-    isCore: true
+    elevation: 1532
   },
   {
     id: "ooty",
@@ -664,14 +374,7 @@ export const STATIONS_NETWORK = [
     state: "Tamil Nadu",
     lat: 11.4102,
     lon: 76.6950,
-    elevation: 2240,
-    status: "high",
-    riskScore: 80,
-    rainfallRate: 58.0,
-    humidity: 89,
-    pressureDrop: 23,
-    temp: 15.0,
-    windSpeed: 32
+    elevation: 2240
   },
   {
     id: "mangalore",
@@ -680,14 +383,7 @@ export const STATIONS_NETWORK = [
     state: "Karnataka",
     lat: 12.9141,
     lon: 74.8560,
-    elevation: 22,
-    status: "critical",
-    riskScore: 89,
-    rainfallRate: 84.0,
-    humidity: 94,
-    pressureDrop: 27,
-    temp: 28.0,
-    windSpeed: 40
+    elevation: 22
   },
   {
     id: "coorg",
@@ -696,14 +392,7 @@ export const STATIONS_NETWORK = [
     state: "Karnataka",
     lat: 12.4244,
     lon: 75.7382,
-    elevation: 1150,
-    status: "critical",
-    riskScore: 91,
-    rainfallRate: 90.0,
-    humidity: 95,
-    pressureDrop: 29,
-    temp: 19.0,
-    windSpeed: 38
+    elevation: 1150
   },
   {
     id: "visakhapatnam",
@@ -712,14 +401,7 @@ export const STATIONS_NETWORK = [
     state: "Andhra Pradesh",
     lat: 17.6868,
     lon: 83.2185,
-    elevation: 45,
-    status: "high",
-    riskScore: 76,
-    rainfallRate: 52.0,
-    humidity: 86,
-    pressureDrop: 20,
-    temp: 31.0,
-    windSpeed: 36
+    elevation: 45
   },
 
   // --- EASTERN & NORTH-EASTERN INDIA (Ganges Delta & Sub-Himalayan Hills) ---
@@ -730,14 +412,7 @@ export const STATIONS_NETWORK = [
     state: "West Bengal",
     lat: 22.5726,
     lon: 88.3639,
-    elevation: 9,
-    status: "high",
-    riskScore: 84,
-    rainfallRate: 70.0,
-    humidity: 90,
-    pressureDrop: 24,
-    temp: 30.5,
-    windSpeed: 36
+    elevation: 9
   },
   {
     id: "darjeeling",
@@ -746,15 +421,7 @@ export const STATIONS_NETWORK = [
     state: "West Bengal",
     lat: 27.0410,
     lon: 88.2663,
-    elevation: 2042,
-    status: "critical",
-    riskScore: 93,
-    rainfallRate: 96.0,
-    humidity: 94,
-    pressureDrop: 31,
-    temp: 15.0,
-    windSpeed: 42,
-    isCore: true
+    elevation: 2042
   },
   {
     id: "gangtok",
@@ -763,15 +430,7 @@ export const STATIONS_NETWORK = [
     state: "Sikkim",
     lat: 27.3389,
     lon: 88.6065,
-    elevation: 1650,
-    status: "critical",
-    riskScore: 94,
-    rainfallRate: 98.0,
-    humidity: 95,
-    pressureDrop: 33,
-    temp: 16.0,
-    windSpeed: 45,
-    isCore: true
+    elevation: 1650
   },
   {
     id: "bhubaneswar",
@@ -780,14 +439,7 @@ export const STATIONS_NETWORK = [
     state: "Odisha",
     lat: 20.2961,
     lon: 85.8245,
-    elevation: 45,
-    status: "moderate",
-    riskScore: 68,
-    rainfallRate: 44.0,
-    humidity: 82,
-    pressureDrop: 18,
-    temp: 32.0,
-    windSpeed: 28
+    elevation: 45
   },
   {
     id: "patna",
@@ -796,14 +448,7 @@ export const STATIONS_NETWORK = [
     state: "Bihar",
     lat: 25.5941,
     lon: 85.1376,
-    elevation: 53,
-    status: "moderate",
-    riskScore: 60,
-    rainfallRate: 34.0,
-    humidity: 78,
-    pressureDrop: 16,
-    temp: 32.5,
-    windSpeed: 20
+    elevation: 53
   },
   {
     id: "ranchi",
@@ -812,14 +457,7 @@ export const STATIONS_NETWORK = [
     state: "Jharkhand",
     lat: 23.3441,
     lon: 85.3096,
-    elevation: 651,
-    status: "moderate",
-    riskScore: 62,
-    rainfallRate: 36.0,
-    humidity: 76,
-    pressureDrop: 16,
-    temp: 29.0,
-    windSpeed: 24
+    elevation: 651
   },
   {
     id: "guwahati",
@@ -828,14 +466,7 @@ export const STATIONS_NETWORK = [
     state: "Assam",
     lat: 26.1445,
     lon: 91.7362,
-    elevation: 55,
-    status: "high",
-    riskScore: 82,
-    rainfallRate: 64.0,
-    humidity: 89,
-    pressureDrop: 22,
-    temp: 29.0,
-    windSpeed: 30
+    elevation: 55
   },
   {
     id: "shillong",
@@ -844,15 +475,7 @@ export const STATIONS_NETWORK = [
     state: "Meghalaya",
     lat: 25.5788,
     lon: 91.8933,
-    elevation: 1525,
-    status: "critical",
-    riskScore: 94,
-    rainfallRate: 104.0,
-    humidity: 96,
-    pressureDrop: 32,
-    temp: 17.0,
-    windSpeed: 42,
-    isCore: true
+    elevation: 1525
   },
   {
     id: "cherrapunji",
@@ -861,15 +484,7 @@ export const STATIONS_NETWORK = [
     state: "Meghalaya",
     lat: 25.2986,
     lon: 91.7183,
-    elevation: 1430,
-    status: "critical",
-    riskScore: 99,
-    rainfallRate: 142.0,
-    humidity: 99,
-    pressureDrop: 38,
-    temp: 18.0,
-    windSpeed: 56,
-    isCore: true
+    elevation: 1430
   },
   {
     id: "itanagar",
@@ -878,14 +493,7 @@ export const STATIONS_NETWORK = [
     state: "Arunachal Pradesh",
     lat: 27.0844,
     lon: 93.6053,
-    elevation: 750,
-    status: "critical",
-    riskScore: 89,
-    rainfallRate: 82.0,
-    humidity: 92,
-    pressureDrop: 27,
-    temp: 22.0,
-    windSpeed: 36
+    elevation: 750
   },
   {
     id: "agartala",
@@ -894,14 +502,7 @@ export const STATIONS_NETWORK = [
     state: "Tripura",
     lat: 23.8315,
     lon: 91.2868,
-    elevation: 15,
-    status: "high",
-    riskScore: 75,
-    rainfallRate: 50.0,
-    humidity: 85,
-    pressureDrop: 20,
-    temp: 29.5,
-    windSpeed: 25
+    elevation: 15
   },
 
   // --- CENTRAL INDIA ---
@@ -912,14 +513,7 @@ export const STATIONS_NETWORK = [
     state: "Madhya Pradesh",
     lat: 23.2599,
     lon: 77.4126,
-    elevation: 527,
-    status: "moderate",
-    riskScore: 56,
-    rainfallRate: 28.0,
-    humidity: 72,
-    pressureDrop: 14,
-    temp: 31.0,
-    windSpeed: 20
+    elevation: 527
   },
   {
     id: "indore",
@@ -928,14 +522,7 @@ export const STATIONS_NETWORK = [
     state: "Madhya Pradesh",
     lat: 22.7196,
     lon: 75.8577,
-    elevation: 553,
-    status: "safe",
-    riskScore: 48,
-    rainfallRate: 20.0,
-    humidity: 66,
-    pressureDrop: 12,
-    temp: 32.0,
-    windSpeed: 18
+    elevation: 553
   },
   {
     id: "raipur",
@@ -944,14 +531,7 @@ export const STATIONS_NETWORK = [
     state: "Chhattisgarh",
     lat: 21.2514,
     lon: 81.6296,
-    elevation: 298,
-    status: "moderate",
-    riskScore: 62,
-    rainfallRate: 36.0,
-    humidity: 78,
-    pressureDrop: 16,
-    temp: 31.5,
-    windSpeed: 22
+    elevation: 298
   },
 
   // --- WESTERN GHATS & NON-HIMALAYAN CLOUDBURST BASINS ---
@@ -962,15 +542,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 19.0760,
     lon: 72.8777,
-    elevation: 14,
-    status: "critical",
-    riskScore: 94,
-    rainfallRate: 110.0,
-    humidity: 96,
-    pressureDrop: 32,
-    temp: 26.5,
-    windSpeed: 56,
-    isCore: true
+    elevation: 14
   },
   {
     id: "wayanad",
@@ -979,15 +551,7 @@ export const STATIONS_NETWORK = [
     state: "Kerala",
     lat: 11.6854,
     lon: 76.1320,
-    elevation: 850,
-    status: "critical",
-    riskScore: 96,
-    rainfallRate: 104.0,
-    humidity: 97,
-    pressureDrop: 35,
-    temp: 22.0,
-    windSpeed: 52,
-    isCore: true
+    elevation: 850
   },
   {
     id: "barmer",
@@ -996,15 +560,7 @@ export const STATIONS_NETWORK = [
     state: "Rajasthan",
     lat: 25.7532,
     lon: 71.3967,
-    elevation: 227,
-    status: "critical",
-    riskScore: 88,
-    rainfallRate: 92.0,
-    humidity: 90,
-    pressureDrop: 28,
-    temp: 31.5,
-    windSpeed: 46,
-    isCore: true
+    elevation: 227
   },
   {
     id: "kodagu",
@@ -1013,15 +569,7 @@ export const STATIONS_NETWORK = [
     state: "Karnataka",
     lat: 12.4244,
     lon: 75.7382,
-    elevation: 1150,
-    status: "high",
-    riskScore: 89,
-    rainfallRate: 94.0,
-    humidity: 94,
-    pressureDrop: 30,
-    temp: 23.5,
-    windSpeed: 44,
-    isCore: true
+    elevation: 1150
   },
   {
     id: "mahabaleshwar",
@@ -1030,15 +578,7 @@ export const STATIONS_NETWORK = [
     state: "Maharashtra",
     lat: 17.9237,
     lon: 73.6586,
-    elevation: 1353,
-    status: "critical",
-    riskScore: 92,
-    rainfallRate: 102.0,
-    humidity: 98,
-    pressureDrop: 33,
-    temp: 19.8,
-    windSpeed: 50,
-    isCore: true
+    elevation: 1353
   }
 ];
 
@@ -1375,89 +915,10 @@ function roundFloat(num, dec = 2) {
   return Math.round(num * Math.pow(10, dec)) / Math.pow(10, dec);
 }
 
-// Contoured Multi-tiered Heatmap Polygons for the Himalayan Region
-// Perfectly matching the organic elongated glowing plume running from J&K through HP to Uttarakhand
-export const CLOUDBURST_HEATMAP_GEOJSON = {
-  type: "FeatureCollection",
-  features: [
-    // 1. Broad Outer Amber/Orange Convective Envelope
-    {
-      type: "Feature",
-      properties: { tier: "outer", color: "#f97316", opacity: 0.42, title: "Outer Convective Plume" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [74.2, 34.8], [75.0, 35.2], [76.5, 34.5], [77.2, 33.5],
-          [77.8, 32.8], [78.6, 31.8], [79.8, 31.2], [80.6, 30.5],
-          [80.8, 29.5], [80.2, 28.8], [79.2, 29.2], [78.2, 29.8],
-          [77.2, 30.8], [76.2, 31.5], [75.4, 32.4], [74.4, 33.6],
-          [74.2, 34.8]
-        ]]
-      }
-    },
-    // 2. Mid Fiery Orange/Red Dense Convective Belt
-    {
-      type: "Feature",
-      properties: { tier: "mid", color: "#ea580c", opacity: 0.65, title: "Mid Convective Stream" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [74.6, 34.5], [75.4, 34.8], [76.6, 33.8], [77.4, 32.6],
-          [78.4, 31.5], [79.6, 31.0], [80.4, 30.2], [80.5, 29.6],
-          [79.8, 29.4], [78.6, 30.0], [77.6, 31.0], [76.5, 31.8],
-          [75.6, 32.8], [74.8, 33.8], [74.6, 34.5]
-        ]]
-      }
-    },
-    // 3. High Convective Uttarakhand Core (Massive Crimson Hotspot)
-    {
-      type: "Feature",
-      properties: { tier: "core-uk", color: "#b91c1c", opacity: 0.88, title: "Uttarakhand Ground Zero Plume" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [78.0, 31.0], [78.8, 31.4], [79.8, 31.2], [80.5, 30.4],
-          [80.6, 29.6], [79.8, 29.3], [78.8, 29.7], [78.0, 30.4],
-          [78.0, 31.0]
-        ]]
-      }
-    },
-    // 4. White-Hot Center (Kedarnath - Chamoli - Pithoragarh)
-    {
-      type: "Feature",
-      properties: { tier: "ultra-uk", color: "#ef4444", opacity: 0.98, title: "Kedarnath-Chamoli Epicenter" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [78.6, 30.9], [79.4, 31.1], [80.2, 30.5], [80.1, 29.8],
-          [79.4, 29.7], [78.8, 30.2], [78.6, 30.9]
-        ]]
-      }
-    },
-    // 5. Himachal Convective Hotspot (Kullu - Kangra - Dharamshala)
-    {
-      type: "Feature",
-      properties: { tier: "core-hp", color: "#dc2626", opacity: 0.85, title: "Himachal Valley Core" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [76.0, 32.5], [77.2, 32.4], [77.5, 31.6], [76.4, 31.5],
-          [75.8, 32.0], [76.0, 32.5]
-        ]]
-      }
-    },
-    // 6. Jammu & Kashmir Convective Hotspot (Amarnath - Baltal)
-    {
-      type: "Feature",
-      properties: { tier: "core-jk", color: "#dc2626", opacity: 0.85, title: "Amarnath Valley Core" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [74.8, 34.5], [75.8, 34.6], [76.0, 33.9], [75.0, 33.8],
-          [74.8, 34.5]
-        ]]
-      }
-    }
-  ]
-};
+export function getHighestRiskStation(stations = STATIONS_NETWORK) {
+  if (!stations || stations.length === 0) return null;
+  // Default to Kedarnath Temple Valley (highest Himalayan convective vulnerability)
+  return stations.find(s => s.id === 'kedarnath') || stations.find(s => s.id === 'dehradun') || stations[0];
+}
+
 

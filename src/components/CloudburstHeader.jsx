@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FpsCounter from './FpsCounter';
+import { getCachedMLRisk, TOP_WATCHLIST_STATIONS } from '../services/mlPredictionService';
 
 export default function CloudburstHeader({
   searchQuery,
@@ -21,8 +22,6 @@ export default function CloudburstHeader({
   userLocation,
   onGoToMyLocation,
   isLocatingUser = false,
-  isLiveMode = true,
-  onToggleLiveMode,
   isMeteoLoading = false,
   onReplayIntro,
   cloudburstEvent = null,
@@ -110,13 +109,6 @@ export default function CloudburstHeader({
               lat,
               lon,
               elevation: isIndia && lat > 28 ? 1800 : 350,
-              status: isIndia ? "moderate" : "global-normal",
-              riskScore: isIndia ? 72 : 35,
-              rainfallRate: isIndia ? 40.0 : 15.0,
-              humidity: 78,
-              pressureDrop: isIndia ? 20 : 10,
-              temp: 22.0,
-              windSpeed: 24,
               isOnlineGeocoded: true
             };
           });
@@ -146,7 +138,17 @@ export default function CloudburstHeader({
     (stn.id && stn.id.toLowerCase().includes(queryTerm))
   ) : [];
 
-  const popularSuggestions = stations.filter(s => s.status === 'critical' || s.riskScore >= 80).slice(0, 6);
+  const primaryMonitoringIds = ['dehradun', 'kedarnath', 'shimla', 'dharamshala', 'delhi', 'cherrapunji'];
+  const popularSuggestions = primaryMonitoringIds
+    .map(id => stations.find(s => s.id === id))
+    .filter(Boolean);
+
+  const getStationRisk = (stn) => {
+    if (!stn) return 3;
+    const cached = getCachedMLRisk(stn.lat, stn.lon);
+    if (cached?.riskPercent != null) return cached.riskPercent;
+    return stn.elevation > 1500 ? 4 : 3;
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -322,15 +324,19 @@ export default function CloudburstHeader({
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          station.status === 'critical' 
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-                            : station.status === 'high' 
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        }`}>
-                          {station.riskScore}%
-                        </span>
+                        {(() => {
+                          const risk = getStationRisk(station);
+                          const isAlert = risk >= 25;
+                          return (
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              isAlert 
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            }`}>
+                              {risk}% {isAlert ? 'Alert' : 'Normal'}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </button>
                   ))}
@@ -382,31 +388,37 @@ export default function CloudburstHeader({
               {!queryTerm && popularSuggestions.length > 0 && (
                 <div className="p-1">
                   <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    High-Risk Stations
+                    Monitored Stations (IMD Model Network)
                   </div>
-                  {popularSuggestions.map(station => (
-                    <button
-                      key={station.id}
-                      type="button"
-                      onClick={() => handleSelectStation(station)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                        <div>
-                          <div className="text-xs font-semibold text-white group-hover:text-rose-200">
-                            {station.name}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {station.region}
+                  {popularSuggestions.map(station => {
+                    const risk = getStationRisk(station);
+                    const isAlert = risk >= 25;
+                    return (
+                      <button
+                        key={station.id}
+                        type="button"
+                        onClick={() => handleSelectStation(station)}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <MapPin className={`w-3.5 h-3.5 ${isAlert ? 'text-rose-400' : 'text-emerald-400'} shrink-0`} />
+                          <div>
+                            <div className="text-xs font-semibold text-white group-hover:text-emerald-200">
+                              {station.name}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {station.region}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-rose-400">
-                        {station.riskScore}%
-                      </span>
-                    </button>
-                  ))}
+                        <span className={`text-[10px] font-bold ${
+                          isAlert ? 'text-rose-400' : 'text-emerald-400'
+                        }`}>
+                          {risk}% {isAlert ? 'Alert' : 'Normal'}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -422,65 +434,89 @@ export default function CloudburstHeader({
         </AnimatePresence>
       </div>
 
-      {/* 2. Right: FPS Monitor, Model Scenario Button & Weather Mode Button */}
+      {/* 2. Center: National Convective Watchlist (Top 3 Hotspots across India) */}
+      <div className="pointer-events-auto hidden md:flex items-center gap-1.5 apple-liquid-glass-pill px-3 py-1.5 rounded-full border border-white/10 text-xs shadow-lg">
+        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          Top Watchlist:
+        </span>
+        {TOP_WATCHLIST_STATIONS.map((stn, idx) => (
+          <button
+            key={stn.id}
+            type="button"
+            onClick={() => {
+              const fullStn = stations.find(s => s.id === stn.id) || stn;
+              if (onSelectStation) {
+                onSelectStation(fullStn);
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 hover:bg-cyan-500/20 hover:border-cyan-400/50 border border-white/10 text-slate-200 transition-all cursor-pointer text-[11px] group"
+            title={`Fly to ${stn.name} and execute live ML cloudburst inference`}
+          >
+            <span className="text-cyan-400 font-mono text-[10px] font-bold">#{idx + 1}</span>
+            <span className="font-medium group-hover:text-cyan-200 transition-colors">{stn.name}</span>
+            <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-500/30">
+              {stn.risk}%
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* 3. Right: FPS Monitor, Model Scenario Button & Weather Mode Button */}
       <div className="pointer-events-auto hidden sm:flex items-center gap-2.5 ml-auto">
         {/* Real-time Fluidity FPS Monitor */}
         <FpsCounter />
 
-        {/* Illustrative Cloudburst Scenario Button */}
-        {cloudburstEvent && (
-          <button
-            type="button"
-            onClick={onToggleCloudburstAlert}
-            title={`Illustrative scenario, not an official alert. ${cloudburstEvent.title} — ${cloudburstEvent.metrics?.predictedRainRateMmh} mm/h model estimate`}
-            className={`relative h-10 flex items-center justify-center gap-2 px-3.5 rounded-full transition-all cursor-pointer select-none box-border border ${
-              isCloudburstCardOpen
-                ? 'bg-gradient-to-r from-amber-600/90 to-orange-600/90 border-amber-400/80 shadow-[0_0_18px_rgba(245,158,11,0.35)] text-white'
-                : 'apple-liquid-glass-pill text-amber-200 border-amber-400/40 hover:bg-amber-500/20'
-            }`}
-          >
-            <span className="inline-flex h-2 w-2 rounded-full bg-amber-300" />
-            <div className="flex items-center gap-1.5 font-bold text-xs tracking-tight">
-              <span>Model Scenario</span>
-              <span className="font-mono text-[10px] bg-black/40 px-1.5 py-0.5 rounded text-amber-300 border border-white/10">
-                {cloudburstEvent.metrics?.predictedRainRateMmh} mm/h est.
-              </span>
-            </div>
-          </button>
-        )}
-
-        {/* Weather Data / Simulator Mode Button */}
-        <button
-          type="button"
-          onClick={() => onToggleLiveMode && onToggleLiveMode(!isLiveMode)}
-          title={isLiveMode
-            ? 'Weather observations are used when available; otherwise the dashboard shows labeled estimates. Click for simulator mode.'
-            : 'Simulator mode is active. Click to return to weather data.'}
-          className={`relative h-10 flex items-center justify-center gap-2 px-4 rounded-full transition-all cursor-pointer select-none box-border ${
-            isLiveMode
-              ? 'apple-liquid-glass-cyan border-cyan-500/50 shadow-cyan-500/20'
-              : 'apple-liquid-glass-pill text-slate-400'
-          }`}
-        >
-          {isLiveMode ? (
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400 shadow-[0_0_10px_#22d3ee]" />
-            </span>
-          ) : (
-            <span className="relative flex h-2 w-2">
-              <span className="inline-flex rounded-full h-2 w-2 bg-slate-500" />
-            </span>
-          )}
-
-          <span className={`text-xs font-extrabold tracking-wider ${isLiveMode ? 'text-white' : 'text-slate-400'}`}>
-            {isLiveMode ? 'WEATHER' : 'SIMULATOR'}
-          </span>
-
-          {isLiveMode && isMeteoLoading && (
-            <Loader2 className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />
-          )}
-        </button>
+        {/* Real-time ML Prediction Alert / Engine Status Button */}
+        {cloudburstEvent && (() => {
+          const isAlert = cloudburstEvent.isLive && (cloudburstEvent.isAlertActive || (cloudburstEvent.metrics?.riskPercent ?? 0) >= 25);
+          const riskVal = cloudburstEvent.metrics?.riskPercent ?? 3;
+          
+          return (
+            <button
+              type="button"
+              onClick={onToggleCloudburstAlert}
+              title={cloudburstEvent.isLive 
+                ? `Live ML Model Status: ${cloudburstEvent.title} (${cloudburstEvent.locationName}) — ${riskVal}% Risk` 
+                : `ML Prediction Engine Offline: ${cloudburstEvent.error || 'Cannot reach http://localhost:8000'}`}
+              className={`relative h-10 flex items-center justify-center gap-2 px-3.5 rounded-full transition-all cursor-pointer select-none box-border border ${
+                !cloudburstEvent.isLive
+                  ? 'bg-rose-950/80 border-rose-500/80 text-rose-200'
+                  : isAlert
+                    ? 'bg-gradient-to-r from-rose-600/90 to-amber-600/90 border-rose-400/80 shadow-[0_0_18px_rgba(244,63,94,0.35)] text-white'
+                    : isCloudburstCardOpen
+                      ? 'bg-emerald-950/80 border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)] text-emerald-200'
+                      : 'apple-liquid-glass-pill text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10'
+              }`}
+            >
+              <span className={`inline-flex h-2 w-2 rounded-full ${
+                !cloudburstEvent.isLive 
+                  ? 'bg-rose-500' 
+                  : isAlert 
+                    ? 'bg-rose-400 animate-ping' 
+                    : 'bg-emerald-400 animate-pulse'
+              }`} />
+              <div className="flex items-center gap-1.5 font-bold text-xs tracking-tight">
+                <span>
+                  {!cloudburstEvent.isLive 
+                    ? 'ML Offline' 
+                    : isAlert 
+                      ? 'Live ML Alert' 
+                      : 'Live ML Normal'}
+                </span>
+                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                  !cloudburstEvent.isLive
+                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/30'
+                    : isAlert
+                      ? 'bg-black/40 text-amber-200 border-amber-400/30 font-bold'
+                      : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
+                }`}>
+                  {!cloudburstEvent.isLive ? 'OFFLINE' : `${riskVal}% Risk`}
+                </span>
+              </div>
+            </button>
+          );
+        })()}
       </div>
     </header>
   );
