@@ -2187,55 +2187,7 @@ export default function CloudburstMap({
         </div>
       )}
 
-      {/* 4. Minimalist Ventusky-Style Floating Weather Badge Just Below Cursor */}
-      {probe && isProbeVisible && probeScreenPos.x > 0 && (
-        <div 
-          className="absolute z-50 pointer-events-none select-none transition-all duration-75 ease-out"
-          style={{
-            left: `${Math.max(45, Math.min((window.innerWidth || 1200) - 45, probeScreenPos.x))}px`,
-            top: `${probeScreenPos.y > (window.innerHeight || 800) - 50 ? probeScreenPos.y - 12 : probeScreenPos.y + 14}px`,
-            transform: probeScreenPos.y > (window.innerHeight || 800) - 50 ? 'translate(-50%, -100%)' : 'translate(-50%, 0)'
-          }}
-        >
-          <div 
-            id="cursor-temp-pill"
-            className="bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-lg border border-black/15 flex flex-col items-center justify-center select-none"
-          >
-            <span className={`text-[8px] font-bold uppercase tracking-wide ${
-              selectedWeatherLayer === 'convective' && (probe.convectiveRisk ?? 3) >= 25 
-                ? 'text-rose-600' 
-                : 'text-slate-500'
-            }`}>
-              {selectedWeatherLayer === 'temp'
-                ? 'Model estimate'
-                : selectedWeatherLayer === 'precip'
-                  ? 'Radar Reflectivity'
-                  : selectedWeatherLayer === 'convective'
-                    ? ((probe.convectiveRisk ?? 3) >= 25 ? 'Cloudburst Threat' : 'Convective Risk (ML)')
-                    : selectedWeatherLayer === 'wind'
-                      ? 'Wind Speed'
-                      : 'Model estimate'}
-            </span>
-            <span className="font-sans font-bold text-[13px] text-slate-900 tracking-tight leading-none whitespace-nowrap">
-              {(() => {
-                if (selectedWeatherLayer === 'precip') {
-                  return `${probe.dbz ?? 0} dBZ`;
-                }
-                if (selectedWeatherLayer === 'convective') {
-                  const risk = probe.convectiveRisk ?? 3;
-                  return risk >= 25 ? `${risk}% Alert` : `${risk}% (Normal)`;
-                }
-                if (selectedWeatherLayer === 'wind') {
-                  return `${Math.round(probe.wind ?? 25)} km/h`;
-                }
-                const val = tempUnit === 'F' ? celsiusToFahrenheit(probe.temp) : probe.temp;
-                const sign = val < 0 ? '\u2212' : '';
-                return `${sign}${Math.abs(val)} °${tempUnit}`;
-              })()}
-            </span>
-          </div>
-        </div>
-      )}
+
 
 
 
