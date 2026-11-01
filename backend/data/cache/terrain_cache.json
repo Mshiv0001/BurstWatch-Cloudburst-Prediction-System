@@ -723,5 +723,10 @@
     "elevation_m": 495.0,
     "slope_deg": 0.88,
     "aspect_deg": 107.0
+  },
+  "22.7179_75.8333": {
+    "elevation_m": 554.0,
+    "slope_deg": 1.42,
+    "aspect_deg": 79.5
   }
 }

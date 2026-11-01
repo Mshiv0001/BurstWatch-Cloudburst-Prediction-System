@@ -185,7 +185,7 @@ def create_app(settings: Optional[Settings] = None,
                             continue
                         wind_match = re.search(r"(\d+)\s*km/h", severity)
                         wind_kmh = int(wind_match.group(1)) if wind_match else 120
-                        clean_name = name.split("-")[0].capitalize()
+                        clean_name = re.sub(r"-\d+$", "", name).title()
                         cyclones.append({
                             "id": f"cyclone-{name.lower()}",
                             "name": clean_name,
@@ -204,12 +204,7 @@ def create_app(settings: Optional[Settings] = None,
         except Exception as exc:
             logger.warning("Could not fetch live cyclones from GDACS: %s", exc)
 
-        return cyclone_cache["data"] or [
-            {"id": "cyclone-arnab", "name": "Arnab", "status": "Severe Cyclonic Storm", "category": "Category 1", "windKmh": 120, "pressureHpa": 968, "lat": 16.8, "lon": 86.4, "country": "India"},
-            {"id": "cyclone-infa", "name": "In-Fa", "status": "Super Typhoon", "category": "Category 4", "windKmh": 195, "pressureHpa": 930, "lat": 18.5, "lon": 148.0, "country": "Western Pacific"},
-            {"id": "cyclone-vance", "name": "Vance", "status": "Hurricane", "category": "Category 2", "windKmh": 155, "pressureHpa": 965, "lat": 18.2, "lon": -108.4, "country": "Eastern Pacific"},
-            {"id": "cyclone-three-c", "name": "Three-C", "status": "Tropical Storm", "category": "Tropical Storm", "windKmh": 75, "pressureHpa": 995, "lat": 13.5, "lon": -174.5, "country": "Central Pacific"},
-        ]
+        return cyclone_cache["data"] or []
 
     # -------------------------------------------------------------- admin
     @app.post("/predictions/run", tags=["admin"], dependencies=[Depends(require_admin)])

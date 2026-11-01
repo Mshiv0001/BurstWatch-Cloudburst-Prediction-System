@@ -261,7 +261,7 @@ export async function fetchLiveCyclones() {
 
             parsed.push({
               id: `cyclone-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-              name: name.split('-')[0].replace(/\b\w/g, l => l.toUpperCase()),
+              name: name.replace(/-\d+$/, '').replace(/\b\w/g, l => l.toUpperCase()),
               status: severity.split('(')[0].trim() || 'Tropical Cyclone',
               category: `${alert} Alert`,
               windKmh,
