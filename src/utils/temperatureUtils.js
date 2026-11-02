@@ -56,6 +56,105 @@ export function getTempColorHex(celsius) {
   return TEMPERATURE_STOPS[TEMPERATURE_STOPS.length - 1].color;
 }
 
+// Shortest delta longitude along spherical surface [-180, +180]
+function deltaLon(lon1, lon2) {
+  return ((((lon1 - lon2 + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Computes continuous atmospheric wind speed magnitude (km/h) for any global coordinate
+ */
+export function computeGlobalWindSpeed(lon, lat) {
+  const latRad = (lat * Math.PI) / 180.0;
+  const lonRad = (lon * Math.PI) / 180.0;
+  const cosLat = Math.cos(latRad);
+  
+  let u = 0.0;
+  let v = 0.0;
+
+  // 1. Zonal Planetary Circulation (Smooth Fourier representation)
+  u += -3.4 * Math.cos(latRad * 3.0) + 1.1 * cosLat;
+  v += -0.85 * Math.sin(latRad * 2.0);
+
+  // 2. Subtropical Anticyclonic Ocean Gyres
+  if (Math.abs(lat) < 80) {
+    const gyreFactor = Math.cos(Math.min(1.0, Math.abs(lat) / 80.0) * (Math.PI / 2.0));
+    const gyre1 = Math.sin(lonRad * 1.0 + 0.8);
+    const gyre2 = Math.sin(lonRad * 2.0 + 2.4);
+    v += (gyre1 + gyre2 * 0.6) * 1.1 * Math.cos(latRad * 1.2) * gyreFactor;
+    u += Math.cos(latRad * 2.0) * 0.8 * gyreFactor;
+  }
+
+  // 3. Planetary Rossby Waves
+  u += -1.4 * 0.08 * Math.sin(lonRad * 3.0) * Math.sin(latRad * 2.0);
+  v += -1.4 * 0.10 * Math.cos(lonRad * 3.0) * Math.cos(latRad * 2.0);
+  u += 0.7 * 0.12 * Math.cos(lonRad * 5.0) * Math.cos(latRad * 3.0);
+  v += 0.7 * 0.14 * Math.sin(lonRad * 5.0) * Math.sin(latRad * 3.0);
+
+  // 4. Arabian Sea & Indian Ocean Monsoon Jet
+  const dLonMon = deltaLon(lon, 70.0);
+  const dLatMon = lat - 9.0;
+  const envMon = Math.exp(-(dLonMon * dLonMon) / (2 * 18 * 18) - (dLatMon * dLatMon) / (2 * 11 * 11));
+  u += envMon * 5.2;
+  v += envMon * (2.1 - 0.05 * dLonMon);
+
+  // 5. Bay of Bengal Cyclonic Depression
+  const dxBoB = deltaLon(lon, 88.33);
+  const dyBoB = lat - 17.05;
+  const rSqBoB = dxBoB * dxBoB + dyBoB * dyBoB;
+  const envBoB = Math.exp(-rSqBoB / (2 * 6.8 * 6.8));
+  const rBoB = Math.sqrt(rSqBoB);
+  const rCoreBoB = 2.4;
+  const vTanBoB = (13.5 * (rBoB / rCoreBoB)) / (1.0 + (rBoB / rCoreBoB) ** 2) * envBoB;
+  const invRBoB = 1.0 / (rBoB + 0.15);
+  u += (-dyBoB * invRBoB) * vTanBoB + (-dxBoB * invRBoB) * (vTanBoB * 0.18);
+  v += (dxBoB * invRBoB) * vTanBoB + (-dyBoB * invRBoB) * (vTanBoB * 0.18);
+
+  const mag = Math.sqrt(u * u + v * v);
+  return Math.round(mag * 13.5);
+}
+
+export const WIND_STOPS = [
+  { kmh: 120, rgb: [192, 132, 252], color: '#c084fc' }, // Violent Storm / Typhoon (Electric Purple)
+  { kmh: 90,  rgb: [244, 63, 94],   color: '#f43f5e' }, // Gale (Crimson Coral)
+  { kmh: 65,  rgb: [251, 146, 60],  color: '#fb923c' }, // Strong Gale (Vivid Orange)
+  { kmh: 45,  rgb: [250, 204, 21],  color: '#facc15' }, // Brisk / Fresh (Amber Yellow)
+  { kmh: 30,  rgb: [163, 230, 53],  color: '#a3e635' }, // Moderate (Lime Green)
+  { kmh: 18,  rgb: [52, 211, 153],  color: '#34d399' }, // Gentle (Mint Green)
+  { kmh: 8,   rgb: [56, 189, 248],  color: '#38bdf8' }, // Light (Sky Cyan)
+  { kmh: 0,   rgb: [30, 58, 138],   color: '#1e3a8a' }  // Calm (Deep Navy Blue)
+];
+
+/**
+ * Returns smoothly interpolated [r, g, b, alpha] for any Wind Speed (km/h)
+ */
+export function getInterpolatedWindColor(kmh, alpha = 0.68) {
+  if (kmh == null || kmh <= 0) {
+    const [r, g, b] = WIND_STOPS[WIND_STOPS.length - 1].rgb;
+    return [r, g, b, Math.round(alpha * 0.45 * 255)];
+  }
+  if (kmh >= WIND_STOPS[0].kmh) {
+    const [r, g, b] = WIND_STOPS[0].rgb;
+    return [r, g, b, Math.round(alpha * 255)];
+  }
+
+  for (let i = 0; i < WIND_STOPS.length - 1; i++) {
+    const high = WIND_STOPS[i];
+    const low = WIND_STOPS[i + 1];
+
+    if (kmh <= high.kmh && kmh >= low.kmh) {
+      const range = high.kmh - low.kmh;
+      const t = range === 0 ? 0 : (kmh - low.kmh) / range;
+      const r = Math.round(low.rgb[0] + (high.rgb[0] - low.rgb[0]) * t);
+      const g = Math.round(low.rgb[1] + (high.rgb[1] - low.rgb[1]) * t);
+      const b = Math.round(low.rgb[2] + (high.rgb[2] - low.rgb[2]) * t);
+      return [r, g, b, Math.round(alpha * 255)];
+    }
+  }
+
+  return [56, 189, 248, Math.round(alpha * 255)];
+}
+
 /**
  * Returns vivid font color corresponding to wind speed (km/h)
  * Beaufort / Ventusky scale classification

@@ -485,8 +485,8 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     map.setPaintProperty('base-satellite', 'raster-opacity', isSatellite ? 1.0 : 0);
   }
 
-  // 3. WeatherAPI Global Continuous Raster Layers
-  const weatherRasterKeys = ['temp', 'precip'];
+  // 3. Continuous Weather Raster Layers (Temperature, Wind Speed, Doppler Radar)
+  const weatherRasterKeys = ['temp', 'wind', 'precip'];
   weatherRasterKeys.forEach((key) => {
     const cfg = WEATHER_LAYERS[key];
     if (!cfg) return;
@@ -497,24 +497,13 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         tiles: [getWeatherApiTileUrl(cfg.layerKey)],
         tileSize: 256,
         minzoom: 0,
-        maxzoom: cfg.layerKey === 'tmp2m' ? 14 : 6, // Thermo-temp procedural generator supports crisp tiles up to zoom 14
-        attribution: '&copy; WeatherAPI.com'
-      });
-
-      ['weatherapi-wind-layer', 'weatherapi-pressure-layer'].forEach((layerId) => {
-        if (map.getLayer(layerId)) {
-          map.removeLayer(layerId);
-        }
-      });
-      ['weatherapi-wind-source', 'weatherapi-pressure-source'].forEach((sourceId) => {
-        if (map.getSource(sourceId)) {
-          map.removeSource(sourceId);
-        }
+        maxzoom: 14, // Seamless procedural thermodynamic generators support crisp tiles across all zoom levels
+        attribution: '&copy; BurstWatch'
       });
     }
 
-    // Rain radar (precip) uses the authentic multi-tier Doppler radar reflectivity & dark relief basemap
-    const isThisRasterVisible = activeLayer === key && key !== 'precip' && (key !== 'temp' || isHeatmapVisible);
+    // Individual raster layers are visible when selected; precip is handled via RainViewer doppler radar
+    const isThisRasterVisible = activeLayer === key && key !== 'precip';
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -613,12 +602,12 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           10, 125,
           12, 160
         ],
-        'heatmap-opacity': activeLayer === 'convective' ? 0.78 : 0.45
+        'heatmap-opacity': isConvectiveVis ? 0.78 : 0.0
       }
     }, beforeId);
   } else {
     map.setLayoutProperty(HEATMAP_LAYER_ID, 'visibility', isConvectiveVis ? 'visible' : 'none');
-    map.setPaintProperty(HEATMAP_LAYER_ID, 'heatmap-opacity', activeLayer === 'convective' ? 0.78 : 0.45);
+    map.setPaintProperty(HEATMAP_LAYER_ID, 'heatmap-opacity', isConvectiveVis ? 0.78 : 0.0);
   }
 
   // 6. Convective Station Hotspot Inner Nodes (Zoom >= 7.5)
@@ -658,6 +647,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     }, beforeId);
   } else {
     map.setLayoutProperty(HEATMAP_POINT_LAYER_ID, 'visibility', isConvectiveVis ? 'visible' : 'none');
+    map.setPaintProperty(HEATMAP_POINT_LAYER_ID, 'circle-opacity', isConvectiveVis ? 0.85 : 0.0);
   }
 
   // 6.2 Cloudburst Evacuation Hazard Radius Zone (14-18 km high-risk polygon boundary)
@@ -748,25 +738,17 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     // RainViewer currently documents Universal Blue as scheme 2; radar values are dBZ.
     const dopplerTileUrl = `https://tilecache.rainviewer.com${radarTimestampPath}/512/{z}/{x}/{y}/2/1_1.png`;
 
-    // Invalidate existing source if missing maxzoom: 7 or using old 256px resolution
-    const existingSource = map.getSource('doppler-radar-source');
-    if (existingSource && (existingSource.maxzoom !== 7 || existingSource.tileSize !== 512 || !existingSource.tiles?.includes(dopplerTileUrl))) {
-      if (map.getLayer('doppler-radar-layer')) {
-        map.removeLayer('doppler-radar-layer');
-      }
-      map.removeSource('doppler-radar-source');
-    }
-
     if (!map.getSource('doppler-radar-source')) {
       map.addSource('doppler-radar-source', {
         type: 'raster',
         tiles: [dopplerTileUrl],
         tileSize: 512,
         minzoom: 0,
-        maxzoom: 7, // RainViewer supports up to zoom 7. Setting maxzoom: 7 causes MapLibre to automatically overzoom smoothly with GPU bilinear filtering
+        maxzoom: 7, // RainViewer supports up to zoom 7; MapLibre overzooms smoothly with GPU bilinear filtering
         attribution: '&copy; RainViewer.com'
       });
     }
+
     if (!map.getLayer('doppler-radar-layer')) {
       map.addLayer({
         id: 'doppler-radar-layer',
@@ -776,7 +758,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         paint: {
           'raster-opacity': 0.88,
           'raster-resampling': 'linear',
-          'raster-fade-duration': 200
+          'raster-fade-duration': 150
         }
       }, beforeId);
     } else {
@@ -897,12 +879,15 @@ export default function CloudburstMap({
   }, [activeLayer]);
 
   const handleSelectWeatherLayer = useCallback((layerKey) => {
-    const next = selectedWeatherLayer === layerKey ? 'none' : layerKey;
-    setSelectedWeatherLayer(next);
+    setSelectedWeatherLayer(layerKey);
     if (onChangeActiveLayer) {
-      onChangeActiveLayer(next);
+      onChangeActiveLayer(layerKey);
     }
-  }, [selectedWeatherLayer, onChangeActiveLayer]);
+    if (layerKey === 'wind') {
+      onToggleParticles?.(true);
+      onWindParticleModeChange?.('strong');
+    }
+  }, [onChangeActiveLayer, onToggleParticles, onWindParticleModeChange]);
 
   // Synchronized ref for 2D vs 3D projection to prevent stale closures in event handlers
   const is3DRef = useRef(is3D);
@@ -1378,7 +1363,7 @@ export default function CloudburstMap({
     const map = mapRef.current;
     if (!canvas || !map) return;
 
-    const isOff = !showParticles || windParticleMode === 'off';
+    const isOff = (!showParticles || windParticleMode === 'off') && activeLayer !== 'wind';
     if (isOff) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -2046,62 +2031,60 @@ export default function CloudburstMap({
       )}
 
       {/* 2.5 Weather Overlay Layer Floating Pill Bar */}
-      {!isHomeView && (
-        <div className={`absolute bottom-20 z-20 flex items-center gap-1 apple-liquid-glass px-2.5 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none transition-all duration-300 max-w-[calc(100vw-32px)] overflow-x-auto scrollbar-none ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
-          <span className="px-1 text-[10px] font-mono font-bold text-amber-300 flex items-center gap-1 select-none shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">Weather:</span>
-          </span>
+      <div className={`absolute bottom-20 z-20 flex items-center gap-1 apple-liquid-glass px-2.5 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none transition-all duration-300 max-w-[calc(100vw-32px)] overflow-x-auto scrollbar-none ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
+        <span className="px-1 text-[10px] font-mono font-bold text-amber-300 flex items-center gap-1 select-none shrink-0">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden md:inline">Weather:</span>
+        </span>
 
-          {[
-            { id: 'temp', label: 'Temperature', icon: Thermometer },
-            { id: 'convective', label: 'Cloudburst', icon: Zap },
-            { id: 'precip', label: 'Rain Radar', icon: CloudRain },
-            { id: 'wind', label: 'Wind Speed', icon: Wind },
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = selectedWeatherLayer === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSelectWeatherLayer(item.id)}
-                title={`Toggle ${item.label} Overlay`}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer shrink-0 ${
-                  isActive
-                    ? 'apple-liquid-glass-amber text-amber-200 border border-amber-400/50 shadow-md scale-105'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-
-          {selectedWeatherLayer !== 'none' && (
+        {[
+          { id: 'temp', label: 'Temperature', icon: Thermometer },
+          { id: 'convective', label: 'Cloudburst', icon: Zap },
+          { id: 'precip', label: 'Rain Radar', icon: CloudRain },
+          { id: 'wind', label: 'Wind Speed', icon: Wind },
+        ].map((item) => {
+          const Icon = item.icon;
+          const isActive = selectedWeatherLayer === item.id;
+          return (
             <button
+              key={item.id}
               type="button"
-              onClick={() => handleSelectWeatherLayer('none')}
-              title="Hide all weather overlay layers"
-              className="px-2 py-0.5 text-slate-400 hover:text-white text-[10px] font-mono transition-colors cursor-pointer shrink-0"
+              onClick={() => handleSelectWeatherLayer(item.id)}
+              title={`Toggle ${item.label} Overlay`}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer shrink-0 ${
+                isActive
+                  ? 'apple-liquid-glass-amber text-amber-200 border border-amber-400/50 shadow-md scale-105'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
             >
-              ✕
+              <Icon className="w-3 h-3" />
+              <span>{item.label}</span>
             </button>
-          )}
-          {selectedWeatherLayer === 'convective' && mapView !== 'satellite' && (
-            <span
-              title="Illustrative model output, not an official forecast or warning"
-              className="shrink-0 rounded-full border border-amber-300/30 px-2 py-1 text-[9px] font-semibold text-amber-100"
-            >
-              Illustrative model · not an official forecast
-            </span>
-          )}
-        </div>
-      )}
+          );
+        })}
+
+        {selectedWeatherLayer !== 'none' && (
+          <button
+            type="button"
+            onClick={() => handleSelectWeatherLayer('none')}
+            title="Hide all weather overlay layers"
+            className="px-2 py-0.5 text-slate-400 hover:text-white text-[10px] font-mono transition-colors cursor-pointer shrink-0"
+          >
+            ✕
+          </button>
+        )}
+        {selectedWeatherLayer === 'convective' && mapView !== 'satellite' && (
+          <span
+            title="Illustrative model output, not an official forecast or warning"
+            className="shrink-0 rounded-full border border-amber-300/30 px-2 py-1 text-[9px] font-semibold text-amber-100"
+          >
+            Illustrative model · not an official forecast
+          </span>
+        )}
+      </div>
 
       {/* 4.8 Radar source and time */}
-      {selectedWeatherLayer === 'precip' && !isHomeView && (
+      {selectedWeatherLayer === 'precip' && (
         <div className="absolute bottom-16 left-4 z-20 apple-liquid-glass-pill px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold text-slate-100 shadow-xl border border-white/20 select-none pointer-events-auto">
           <div>
             RainViewer radar · {radarStatus === 'ready' ? radarTimestampTime || 'time unavailable' : radarStatus === 'loading' ? 'loading' : 'unavailable'}

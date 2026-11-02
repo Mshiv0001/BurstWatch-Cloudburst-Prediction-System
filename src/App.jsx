@@ -625,7 +625,7 @@ export default function App() {
         )}
 
         {/* Floating Multi-Variable Weather Color Scale Legend Bar */}
-        {activeLayer !== 'none' && !isHomeView && (
+        {activeLayer !== 'none' && (
           <div className={`absolute z-30 transition-all duration-300 pointer-events-auto bottom-8 ${
             isMeteoPanelOpen ? 'left-[calc(50%+190px)] -translate-x-1/2' : 'left-1/2 -translate-x-1/2'
           }`}>
