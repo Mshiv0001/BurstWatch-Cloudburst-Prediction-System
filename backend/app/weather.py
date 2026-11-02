@@ -182,7 +182,9 @@ class OpenMeteoClient:
                         return resp.json()
                     except ValueError as exc:
                         raise WeatherError(f"Invalid JSON from Open-Meteo: {exc}") from exc
-                if resp.status_code not in (429, 500, 502, 503, 504):
+                if resp.status_code == 429:
+                    raise WeatherError("Open-Meteo IP quota exceeded (HTTP 429)")
+                if resp.status_code not in (500, 502, 503, 504):
                     reason = ""
                     try:
                         reason = resp.json().get("reason", "")

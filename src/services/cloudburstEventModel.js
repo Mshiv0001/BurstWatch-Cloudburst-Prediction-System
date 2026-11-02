@@ -114,6 +114,30 @@ export async function getCloudburstEventData(station = null) {
       } catch {
         res = await fetch(`${DIRECT_BACKEND_URL}/predictions/latest`, { signal: controller.signal });
       }
+
+      // If no scheduled run stored yet (404), trigger on-demand prediction for default Kedarnath sector
+      if (!res || !res.ok) {
+        const defaultPayload = {
+          latitude: 30.7346,
+          longitude: 79.0669,
+          source: 'auto'
+        };
+        try {
+          res = await fetch(`${API_BASE}/predict/location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultPayload),
+            signal: controller.signal
+          });
+        } catch {
+          res = await fetch(`${DIRECT_BACKEND_URL}/predict/location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultPayload),
+            signal: controller.signal
+          });
+        }
+      }
     }
     clearTimeout(timeoutId);
 
