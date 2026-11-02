@@ -214,7 +214,11 @@ export function computeCyclonePressureDrop(lon, lat, cyclone) {
 export async function fetchLiveCyclones() {
   try {
     // 1. Try backend aggregator endpoint
-    const backendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const backendUrl = (
+      import.meta.env.VITE_BACKEND_URL || 
+      (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
+    ).replace(/\/$/, '');
     const endpoint = backendUrl ? `${backendUrl}/cyclones` : '/api/cyclones';
     const res = await fetch(endpoint, { cache: 'no-store' });
     if (res.ok) {

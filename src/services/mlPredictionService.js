@@ -6,7 +6,11 @@
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache
 const predictionCache = new Map();
-const PROD_BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const PROD_BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || 
+  (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
+).replace(/\/$/, '');
 
 // Helper to round coordinates to ~1 km grid
 function getCoordKey(lat, lon) {

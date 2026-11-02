@@ -4,7 +4,11 @@
  * Strictly zero hardcoded presets. Reports offline / unreachable status explicitly when down.
  */
 
-const PROD_BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const PROD_BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || 
+  (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
+).replace(/\/$/, '');
 const API_BASE = PROD_BACKEND_URL || '/api';
 const DIRECT_BACKEND_URL = PROD_BACKEND_URL || 'http://localhost:8000';
 
