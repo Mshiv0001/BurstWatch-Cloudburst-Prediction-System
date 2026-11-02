@@ -1530,51 +1530,54 @@ export default function CloudburstMap({
         return;
       }
 
-      // Authentic Windy-Style Soothing Wind Particles (Smaller, Slower, Tranquil Flow)
-      // 1. Pic 1 (Normal): Ultra-fine, delicate glowing specks/dashes drifting calmly
-      let activeCount = 2800;
-      let speedMult = 0.14; // Slower, tranquil, silky, soothing drift
-      let fadeRate = 0.26; // High fade rate removes long tails, leaving short discrete dashes (3-6px) matching Windy
-      let strokeFine = 'rgba(235, 245, 255, 0.45)';
-      let widthFine = 0.70;
-      let strokeMid = 'rgba(255, 255, 255, 0.75)';
-      let widthMid = 0.95;
-      let strokeStrong = 'rgba(255, 255, 255, 0.95)';
-      let widthStrong = 1.25;
+      // Authentic Windy-Style Soothing Wind Particles (Enhanced Size & Luminous Intensity)
+      let activeCount = 3400;
+      let speedMult = 0.15;
+      let fadeRate = 0.20; // Lower fade rate leaves longer, more luminous streak trails
+      let strokeFine = 'rgba(240, 248, 255, 0.60)';
+      let widthFine = 0.95;
+      let strokeMid = 'rgba(255, 255, 255, 0.88)';
+      let widthMid = 1.35;
+      let strokeStrong = 'rgba(255, 255, 255, 1.0)';
+      let widthStrong = 1.80;
 
       if (mode === 'strong') {
-        // 2. Pic 2 (Strong): Fine, dense, crisp luminous threads
-        activeCount = 3800;
+        activeCount = 4200;
         speedMult = 0.24;
-        fadeRate = 0.22;
-        strokeFine = 'rgba(245, 250, 255, 0.55)';
-        widthFine = 0.80;
-        strokeMid = 'rgba(255, 255, 255, 0.85)';
-        widthMid = 1.10;
+        fadeRate = 0.18;
+        strokeFine = 'rgba(245, 250, 255, 0.70)';
+        widthFine = 1.15;
+        strokeMid = 'rgba(255, 255, 255, 0.95)';
+        widthMid = 1.55;
         strokeStrong = 'rgba(255, 255, 255, 1.0)';
-        widthStrong = 1.35;
+        widthStrong = 2.05;
       } else if (mode === 'dark') {
-        // 3. Pic 3 (Dark): Discrete charcoal/slate dashes of moderate density
-        activeCount = 2800;
+        activeCount = 3000;
         speedMult = 0.14;
-        fadeRate = 0.25;
-        strokeFine = 'rgba(50, 50, 60, 0.45)';
-        widthFine = 0.75;
-        strokeMid = 'rgba(20, 20, 28, 0.78)';
-        widthMid = 1.05;
-        strokeStrong = 'rgba(5, 5, 12, 0.95)';
-        widthStrong = 1.30;
+        fadeRate = 0.22;
+        strokeFine = 'rgba(50, 50, 60, 0.55)';
+        widthFine = 0.90;
+        strokeMid = 'rgba(20, 20, 28, 0.85)';
+        widthMid = 1.25;
+        strokeStrong = 'rgba(5, 5, 12, 1.0)';
+        widthStrong = 1.65;
       } else if (mode === 'fast') {
-        // 4. Pic 4 (Fast-motion): Smooth velocity ribbons
-        activeCount = 3200;
+        activeCount = 3600;
         speedMult = 0.30;
-        fadeRate = 0.20;
-        strokeFine = 'rgba(50, 50, 60, 0.45)';
-        widthFine = 0.80;
-        strokeMid = 'rgba(22, 22, 30, 0.80)';
-        widthMid = 1.10;
-        strokeStrong = 'rgba(2, 2, 8, 0.95)';
-        widthStrong = 1.35;
+        fadeRate = 0.18;
+        strokeFine = 'rgba(50, 50, 60, 0.55)';
+        widthFine = 0.95;
+        strokeMid = 'rgba(22, 22, 30, 0.88)';
+        widthMid = 1.35;
+        strokeStrong = 'rgba(2, 2, 8, 1.0)';
+        widthStrong = 1.75;
+      }
+
+      // Enhanced intensity and trail persistence for active Wind Speed layer
+      const isWindLayer = selectedWeatherLayer === 'wind';
+      if (isWindLayer) {
+        activeCount = 3800;
+        fadeRate = 0.17;
       }
 
       // Authentic Ventusky/Windy Ghost Trail Persistence
@@ -1588,7 +1591,6 @@ export default function CloudburstMap({
       const width = canvas.width;
       const height = canvas.height;
 
-      const isWindLayer = selectedWeatherLayer === 'wind';
       const tierCalm = [];     // < 22 km/h (Ice-Cyan)
       const tierModerate = []; // 22-48 km/h (Emerald Green)
       const tierBrisk = [];    // 48-78 km/h (Solar Amber)
@@ -1697,12 +1699,12 @@ export default function CloudburstMap({
       }
 
       if (isWindLayer) {
-        // Speed-Coded Streamlines (Ventusky / Beaufort Spectrum)
-        // 1. Calm / Gentle (< 22 km/h) - Translucent Ice-Cyan
+        // Speed-Coded Streamlines (Enhanced Width & Luminous Intensity)
+        // 1. Calm / Gentle (< 22 km/h) - Luminous Ice-Cyan
         if (tierCalm.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 1.0;
-          ctx.strokeStyle = 'rgba(165, 243, 252, 0.75)';
+          ctx.lineWidth = 1.45;
+          ctx.strokeStyle = 'rgba(186, 248, 255, 0.88)';
           for (let j = 0; j < tierCalm.length; j += 4) {
             ctx.moveTo(tierCalm[j], tierCalm[j + 1]);
             ctx.lineTo(tierCalm[j + 2], tierCalm[j + 3]);
@@ -1710,11 +1712,11 @@ export default function CloudburstMap({
           ctx.stroke();
         }
 
-        // 2. Moderate (22-48 km/h) - Electric Mint / Emerald
+        // 2. Moderate (22-48 km/h) - Vivid Mint / Emerald
         if (tierModerate.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 1.30;
-          ctx.strokeStyle = 'rgba(52, 211, 153, 0.90)';
+          ctx.lineWidth = 1.85;
+          ctx.strokeStyle = 'rgba(52, 211, 153, 0.95)';
           for (let j = 0; j < tierModerate.length; j += 4) {
             ctx.moveTo(tierModerate[j], tierModerate[j + 1]);
             ctx.lineTo(tierModerate[j + 2], tierModerate[j + 3]);
@@ -1725,8 +1727,8 @@ export default function CloudburstMap({
         // 3. Fresh / Strong (48-78 km/h) - Glowing Solar Amber
         if (tierBrisk.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 1.60;
-          ctx.strokeStyle = 'rgba(251, 191, 36, 0.98)';
+          ctx.lineWidth = 2.25;
+          ctx.strokeStyle = 'rgba(252, 211, 77, 1.0)';
           for (let j = 0; j < tierBrisk.length; j += 4) {
             ctx.moveTo(tierBrisk[j], tierBrisk[j + 1]);
             ctx.lineTo(tierBrisk[j + 2], tierBrisk[j + 3]);
@@ -1737,7 +1739,7 @@ export default function CloudburstMap({
         // 4. Gale / Storm / Cyclone (>= 78 km/h) - Neon Magenta / Crimson
         if (tierStorm.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 2.10;
+          ctx.lineWidth = 2.80;
           ctx.strokeStyle = 'rgba(244, 63, 94, 1.0)';
           for (let j = 0; j < tierStorm.length; j += 4) {
             ctx.moveTo(tierStorm[j], tierStorm[j + 1]);
