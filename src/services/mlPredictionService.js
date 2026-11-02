@@ -36,7 +36,7 @@ export async function predictLocationML(lat, lon, source = 'auto') {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 18000);
 
     const payload = {
       latitude: Number(lat),

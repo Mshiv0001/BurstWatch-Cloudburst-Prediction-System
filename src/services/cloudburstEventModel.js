@@ -48,7 +48,7 @@ export function generateHazardRadiusGeoJSON(centerLon, centerLat, radiusKm = 18,
 export async function checkBackendHealth() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
     
     // Try vite proxy first, then direct URL
     let res;
@@ -81,7 +81,7 @@ export async function checkBackendHealth() {
 export async function getCloudburstEventData(station = null) {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const timeoutId = setTimeout(() => controller.abort(), 18000);
 
     let res;
     // 1. If a specific station or coordinates are requested, use POST /predict/location
