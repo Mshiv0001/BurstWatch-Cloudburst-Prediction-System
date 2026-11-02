@@ -350,7 +350,7 @@ function calculateMapScale(map, maxWidth = 76, unit = 'metric') {
  * Dynamic Typography Engine for MapLibre Place Labels
  */
 function applyMapLabelsTheme(map, isSatelliteView) {
-  if (!map || !map.isStyleLoaded()) return;
+  if (!map || !map.getStyle()) return;
 
   const layers = map.getStyle()?.layers || [];
 
@@ -443,7 +443,7 @@ function applyMapLabelsTheme(map, isSatelliteView) {
  * Configure MapLibre GL JS Built-in Heatmap Layer, WeatherAPI Raster Tiles & Satellite Source
  */
 function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeatmapVisible = true, heatmapGeoJSON = null, radarTimestampPath = null, cloudburstEvent = null) {
-  if (!map || !map.isStyleLoaded()) return;
+  if (!map || !map.getStyle()) return;
 
   // 1. High-Resolution Global Satellite Raster Source with Google/Esri tiles
   if (!map.getSource('esri-satellite')) {
@@ -1055,7 +1055,7 @@ export default function CloudburstMap({
     const map = mapRef.current;
     if (!map) return;
     try {
-      if (map.isStyleLoaded()) {
+      if (map.getStyle()) {
         map.setProjection({ type: 'mercator' });
       }
     } catch (err) {}
@@ -1266,7 +1266,7 @@ export default function CloudburstMap({
     // 1. Subscribe to strike GeoJSON stream
     const unsubscribeStrikes = subscribeLightningStrikes((strikes, geojson) => {
       const activeMap = mapRef.current;
-      if (activeMap && activeMap.isStyleLoaded() && activeMap.getSource('lightning-strikes-source')) {
+      if (activeMap && activeMap.getStyle() && activeMap.getSource('lightning-strikes-source')) {
         activeMap.getSource('lightning-strikes-source').setData(geojson);
       }
     });
@@ -1312,7 +1312,7 @@ export default function CloudburstMap({
   // Reactively update Built-in Heatmap, WeatherAPI, Cloudburst Hazard & Doppler Radar Layers
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.getStyle()) return;
 
     const isSat = mapView === 'satellite';
     const isHeatmapVis = showTemperature;
@@ -1330,9 +1330,9 @@ export default function CloudburstMap({
       weatherTileTimestampRef.current = timestamp;
 
       const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
+      if (!map?.getStyle()) return;
 
-      ['temp', 'precip'].forEach((key) => {
+      ['temp', 'wind', 'precip'].forEach((key) => {
         const layer = WEATHER_LAYERS[key];
         const source = map.getSource(layer.sourceId);
         if (source && 'setTiles' in source && typeof source.setTiles === 'function') {
