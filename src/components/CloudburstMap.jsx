@@ -34,10 +34,6 @@ import {
 } from '../services/cycloneService';
 import { generateCloudburstHeatmapGeoJSON } from '../utils/heatmapGeoJson';
 import { WEATHER_LAYERS, getWeatherApiTileUrl, getWeatherApiTimestamp } from '../utils/weatherTiles';
-import { 
-  generateIsothermContourGeoJSON, 
-  getActiveCityBadges 
-} from '../utils/isothermContourGenerator';
 import {
   getLocalRadarDbz
 } from '../utils/radarEchoesData';
@@ -506,8 +502,10 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       });
     }
 
-    // Both temp and wind now use transparent vector rendering (isotherm lines & speed-colored particles)
-    const isThisRasterVisible = false;
+    // Windy-Style Temperature Layer: Smooth thermodynamic raster color field (zero baked-in numbers)
+    // Wind Speed uses speed-colored streamline particles (zero raster background)
+    // Precip is handled via RainViewer Doppler radar
+    const isThisRasterVisible = activeLayer === 'temp' && key === 'temp';
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -518,78 +516,26 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           visibility: isThisRasterVisible ? 'visible' : 'none'
         },
         paint: {
-          'raster-opacity': 0.0,
+          'raster-opacity': isThisRasterVisible ? 0.68 : 0.0,
           'raster-fade-duration': 0,
           'raster-resampling': 'linear'
         }
       }, beforeId);
     } else {
-      map.setLayoutProperty(cfg.layerId, 'visibility', 'none');
+      map.setLayoutProperty(cfg.layerId, 'visibility', isThisRasterVisible ? 'visible' : 'none');
       try {
-        map.setPaintProperty(cfg.layerId, 'raster-opacity', 0.0);
+        map.setPaintProperty(cfg.layerId, 'raster-opacity', isThisRasterVisible ? 0.68 : 0.0);
+        map.setPaintProperty(cfg.layerId, 'raster-resampling', 'linear');
       } catch (e) {}
     }
   });
 
-  // 3.5 High-Precision Vector Isotherm Contour Lines (5°C synoptic intervals)
-  const isTempContourVis = activeLayer === 'temp';
-  const isothermData = generateIsothermContourGeoJSON();
-
-  if (!map.getSource('isotherm-contours-source')) {
-    map.addSource('isotherm-contours-source', {
-      type: 'geojson',
-      data: isothermData
-    });
-  } else {
-    map.getSource('isotherm-contours-source').setData(isothermData);
-  }
-
-  // A. Subtle Soft Glow under Contour Lines
-  if (!map.getLayer('isotherm-contours-glow')) {
-    map.addLayer({
-      id: 'isotherm-contours-glow',
-      type: 'line',
-      source: 'isotherm-contours-source',
-      layout: {
-        visibility: isTempContourVis ? 'visible' : 'none',
-        'line-cap': 'round',
-        'line-join': 'round'
-      },
-      paint: {
-        'line-color': ['get', 'color'],
-        'line-width': 3.5,
-        'line-opacity': 0.35,
-        'line-blur': 1.5
-      }
-    }, beforeId);
-  } else {
-    map.setLayoutProperty('isotherm-contours-glow', 'visibility', isTempContourVis ? 'visible' : 'none');
-  }
-
-  // B. Crisp Solid Isotherm Contour Lines
-  if (!map.getLayer('isotherm-contours-line')) {
-    map.addLayer({
-      id: 'isotherm-contours-line',
-      type: 'line',
-      source: 'isotherm-contours-source',
-      layout: {
-        visibility: isTempContourVis ? 'visible' : 'none',
-        'line-cap': 'round',
-        'line-join': 'round'
-      },
-      paint: {
-        'line-color': ['get', 'color'],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          2, 1.2,
-          5, 1.8,
-          9, 2.5
-        ],
-        'line-opacity': 0.90
-      }
-    }, beforeId);
-  } else {
-    map.setLayoutProperty('isotherm-contours-line', 'visibility', isTempContourVis ? 'visible' : 'none');
+  // Clean up any isotherm contour layers to ensure 100% number-free, clean Windy aesthetic
+  ['isotherm-contours-glow', 'isotherm-contours-line'].forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+  if (map.getSource('isotherm-contours-source')) {
+    map.removeSource('isotherm-contours-source');
   }
 
   // 4. Heatmap GeoJSON Source for Convective Cloudburst Hazard Plumes
@@ -1428,7 +1374,8 @@ export default function CloudburstMap({
     const map = mapRef.current;
     if (!canvas || !map) return;
 
-    const isOff = (!showParticles || windParticleMode === 'off') && selectedWeatherLayer !== 'wind';
+    const isVisualWeatherLayer = selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp';
+    const isOff = (!showParticles || windParticleMode === 'off') && !isVisualWeatherLayer;
     if (isOff) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -1525,7 +1472,8 @@ export default function CloudburstMap({
 
     const render = () => {
       const mode = windModeRef.current || 'normal';
-      if (!isRunning || !showParticles || mode === 'off') {
+      const isVisualWeatherLayer = selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp';
+      if (!isRunning || ((!showParticles || mode === 'off') && !isVisualWeatherLayer)) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         return;
       }
@@ -1811,54 +1759,58 @@ export default function CloudburstMap({
   }, [showParticles, windParticleMode, selectedWeatherLayer]);
 
 
-  // Real-time hover cursor coordinate, temperature & windspeed probe tracking
+  // Real-time hover cursor coordinate, temperature & windspeed probe tracking (throttled at 60fps)
   const handleMouseMove = useCallback((e) => {
     const clientX = e.clientX;
     const clientY = e.clientY;
 
-    const map = mapRef.current;
-    if (!map) return;
-    const container = mapContainerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    if (mouseMoveRafRef.current) return;
+    mouseMoveRafRef.current = requestAnimationFrame(() => {
+      mouseMoveRafRef.current = null;
+      const map = mapRef.current;
+      if (!map) return;
+      const container = mapContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
 
-    if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
-      return;
-    }
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        return;
+      }
 
-    try {
-      const lngLat = map.unproject([x, y]);
-      const lng = lngLat.lng;
-      const lat = lngLat.lat;
+      try {
+        const lngLat = map.unproject([x, y]);
+        const lng = lngLat.lng;
+        const lat = lngLat.lat;
 
-      const t = getLocalTemperature(lng, lat);
-      const w = getLocalWindSpeed(lng, lat);
-      const precip = getLocalPrecipitation(lng, lat, stations);
-      const dbz = getLocalRadarDbz(lng, lat, precip);
-      const pressure = getLocalPressure(lng, lat);
-      const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
-      const name = getSectorName(lng, lat);
+        const t = getLocalTemperature(lng, lat);
+        const w = getLocalWindSpeed(lng, lat);
+        const precip = getLocalPrecipitation(lng, lat, stations);
+        const dbz = getLocalRadarDbz(lng, lat, precip);
+        const pressure = getLocalPressure(lng, lat);
+        const convectiveRisk = getLocalConvectiveRisk(lng, lat, stations, threatData, cloudburstEvent);
+        const name = getSectorName(lng, lat);
 
-      probeScreenPosRef.current = { x, y };
-      isProbeVisibleRef.current = true;
+        probeScreenPosRef.current = { x, y };
+        isProbeVisibleRef.current = true;
 
-      setProbe({
-        lon: lng,
-        lat,
-        temp: t,
-        wind: w,
-        precip,
-        dbz,
-        pressure,
-        convectiveRisk,
-        name
-      });
-      setProbeScreenPos({ x, y });
-      setIsProbeVisible(true);
-    } catch (err) {}
-  }, [stations, threatData]);
+        setProbe({
+          lon: lng,
+          lat,
+          temp: t,
+          wind: w,
+          precip,
+          dbz,
+          pressure,
+          convectiveRisk,
+          name
+        });
+        setProbeScreenPos({ x, y });
+        setIsProbeVisible(true);
+      } catch (err) {}
+    });
+  }, [stations, threatData, cloudburstEvent]);
 
   // Update probe box when user scrolls mouse wheel over the map
   const handleWheel = useCallback((e) => {
@@ -1953,124 +1905,17 @@ export default function CloudburstMap({
     };
   }, [updateProbeAtCoords]);
 
-  // 4.6 Adaptive Isotherm City Badges & Contour Midpoint Labels
-  const isothermMarkersRef = useRef([]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const renderIsothermMarkers = () => {
-      isothermMarkersRef.current.forEach((m) => m.remove());
-      isothermMarkersRef.current = [];
-
-      if (selectedWeatherLayer !== 'temp') return;
-
-      const zoom = map.getZoom();
-      const bounds = map.getBounds();
-
-      // 1. Adaptive Regional City Badges (Clean, non-cluttering LoD)
-      const activeCities = getActiveCityBadges(zoom, tempUnit);
-      activeCities.forEach((city) => {
-        if (
-          city.lon >= bounds.getWest() - 1 &&
-          city.lon <= bounds.getEast() + 1 &&
-          city.lat >= bounds.getSouth() - 1 &&
-          city.lat <= bounds.getNorth() + 1
-        ) {
-          const el = document.createElement('div');
-          el.className = 'isotherm-city-badge pointer-events-auto cursor-pointer select-none transition-transform hover:scale-110 active:scale-95';
-          el.title = `${city.name}: ${city.label} · Click to inspect`;
-          el.innerHTML = `
-            <div class="apple-liquid-glass px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-white/20 shadow-md backdrop-blur-md">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0 shadow-sm" style="background-color: ${city.color}"></span>
-              <span class="text-[10px] font-medium text-slate-200">${city.name}</span>
-              <span class="text-[10px] font-bold text-white font-mono">${city.label}</span>
-            </div>
-          `;
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            map.flyTo({
-              center: [city.lon, city.lat],
-              zoom: Math.max(map.getZoom(), 6.5),
-              speed: 1.2
-            });
-            updateProbeAtCoords(city.lon, city.lat);
-          });
-
-          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([city.lon, city.lat])
-            .addTo(map);
-
-          isothermMarkersRef.current.push(marker);
-        }
-      });
-
-      // 2. Contour Line Labels (midpoint indicators on contours)
-      const contourGeo = generateIsothermContourGeoJSON();
-      if (contourGeo?.labelFeatures) {
-        contourGeo.labelFeatures.forEach((pt) => {
-          const [lon, lat] = pt.geometry.coordinates;
-          if (
-            lon >= bounds.getWest() &&
-            lon <= bounds.getEast() &&
-            lat >= bounds.getSouth() &&
-            lat <= bounds.getNorth()
-          ) {
-            const el = document.createElement('div');
-            el.className = 'isotherm-contour-pill pointer-events-none select-none';
-            el.innerHTML = `
-              <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-slate-950/80 border border-white/20 shadow-sm" style="color: ${pt.properties.color}">
-                ${formatTemperature(pt.properties.temp, tempUnit)}
-              </span>
-            `;
-            const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-              .setLngLat([lon, lat])
-              .addTo(map);
-
-            isothermMarkersRef.current.push(marker);
-          }
-        });
-      }
-    };
-
-    renderIsothermMarkers();
-
-    map.on('moveend', renderIsothermMarkers);
-    map.on('zoomend', renderIsothermMarkers);
-
-    return () => {
-      map.off('moveend', renderIsothermMarkers);
-      map.off('zoomend', renderIsothermMarkers);
-      isothermMarkersRef.current.forEach((m) => m.remove());
-      isothermMarkersRef.current = [];
-    };
-  }, [selectedWeatherLayer, tempUnit, updateProbeAtCoords]);
-
-  // Update probe coordinates on map pan/zoom/scroll
+  // Update probe screen position on map pan/zoom/rotate so it stays anchored to geographical coordinates
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const onMapChange = () => {
-      const pos = probeScreenPosRef.current;
-      if (!isProbeVisibleRef.current || !pos || pos.x <= 0) return;
+      if (!isProbeVisibleRef.current || !probeRef.current) return;
       try {
-        const lngLat = map.unproject([pos.x, pos.y]);
-        const lng = lngLat.lng;
-        const lat = lngLat.lat;
-
-        const t = getLocalTemperature(lng, lat);
-        const w = getLocalWindSpeed(lng, lat);
-        const name = getSectorName(lng, lat);
-
-        setProbe({
-          lon: lng,
-          lat,
-          temp: t,
-          wind: w,
-          name
-        });
+        const pt = map.project([probeRef.current.lon, probeRef.current.lat]);
+        setProbeScreenPos({ x: pt.x, y: pt.y });
+        probeScreenPosRef.current = { x: pt.x, y: pt.y };
       } catch (err) {}
     };
 
@@ -2195,7 +2040,7 @@ export default function CloudburstMap({
         ref={particleCanvasRef}
         className="pointer-events-none absolute inset-0 z-[10] w-full h-full transition-opacity duration-150"
         style={{
-          opacity: (showParticles && windParticleMode !== 'off')
+          opacity: ((showParticles && windParticleMode !== 'off') || selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp')
             ? 1
             : 0,
           pointerEvents: 'none'
@@ -2203,7 +2048,7 @@ export default function CloudburstMap({
       />
 
       {/* 2.2 Interactive Windy Cursor Probe / Flag Picker */}
-      {isProbeVisible && probe && !isHomeView && (
+      {isProbeVisible && probe && (
         <div
           className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-[calc(100%+14px)] transition-transform duration-75 select-none"
           style={{

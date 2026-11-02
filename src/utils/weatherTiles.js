@@ -31,10 +31,10 @@ export const WEATHER_LAYERS = {
     label: 'Temperature',
     shortLabel: 'Temp',
     icon: 'Thermometer',
-    type: 'vector-isotherm',
-    opacity: 0.0,
+    type: 'raster',
+    opacity: 0.68,
     unit: '°C',
-    description: 'Vector isotherm contour lines & adaptive regional city temperatures'
+    description: 'Smooth continuous thermodynamic color field with streamline particles (Windy style)'
   },
   wind: {
     id: 'wind',

@@ -99,7 +99,7 @@ export default function TemperatureLegendBar({
       {/* Visual Mode Subtitle Tag */}
       <div className="flex justify-center mb-1">
         <span className="text-[10px] font-mono font-medium text-slate-300 apple-liquid-glass px-2.5 py-0.5 rounded-full border border-white/10 shadow-sm">
-          {isTemp ? 'Isotherm Contours · 5°C intervals' : isWind ? 'Speed-Coded Streamline Flow' : config.label}
+          {isTemp ? 'Thermodynamic Field (Windy Style)' : isWind ? 'Speed-Coded Streamlines' : config.label}
         </span>
       </div>
 
