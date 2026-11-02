@@ -37,6 +37,7 @@ class Settings:
     openmeteo_forecast_url: str
     openmeteo_archive_url: str
     openmeteo_models: str              # optional `models=` parameter (e.g. "era5"); empty = default
+    openmeteo_api_key: str             # optional commercial or customer Open-Meteo API key
     http_timeout: float
     http_retries: int
     min_hours_per_day: int             # a daily aggregate needs at least this many valid hours
@@ -73,8 +74,9 @@ class Settings:
             openmeteo_forecast_url=os.getenv("OPENMETEO_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"),
             openmeteo_archive_url=os.getenv("OPENMETEO_ARCHIVE_URL", "https://archive-api.open-meteo.com/v1/archive"),
             openmeteo_models=os.getenv("OPENMETEO_MODELS", ""),
-            http_timeout=float(os.getenv("HTTP_TIMEOUT", "6")),
-            http_retries=int(os.getenv("HTTP_RETRIES", "1")),
+            openmeteo_api_key=os.getenv("OPENMETEO_API_KEY", ""),
+            http_timeout=float(os.getenv("HTTP_TIMEOUT", "10")),
+            http_retries=int(os.getenv("HTTP_RETRIES", "3")),
             min_hours_per_day=int(os.getenv("MIN_HOURS_PER_DAY", "20")),
             db_path=Path(os.getenv("DB_PATH", BASE_DIR / "data" / "predictions.db")),
             enable_scheduler=_bool("ENABLE_SCHEDULER", True),

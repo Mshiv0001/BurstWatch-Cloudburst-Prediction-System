@@ -31,6 +31,10 @@ class OpenMeteoClient:
         self.s = settings
         self.variables = list(variables)
         self.session = session or requests.Session()
+        self.session.headers.update({
+            "User-Agent": "BurstWatch-Cloudburst-Engine/2.5 (+https://burstwatch-cloudburst-prediction.vercel.app)",
+            "Accept": "application/json",
+        })
         self._sleep = sleep
         self._terrain_cache_path = Path(self.s.db_path).parent / "cache" / "terrain_cache.json"
 
@@ -59,6 +63,8 @@ class OpenMeteoClient:
 
         url = "https://api.open-meteo.com/v1/elevation"
         params = {"latitude": ",".join(map(str, lats)), "longitude": ",".join(map(str, lons))}
+        if getattr(self.s, "openmeteo_api_key", None):
+            params["apikey"] = self.s.openmeteo_api_key
         try:
             payload = self._get_json(url, params)
             elevs = payload.get("elevation", [])
@@ -110,6 +116,8 @@ class OpenMeteoClient:
         }
         if self.s.openmeteo_models:
             params["models"] = self.s.openmeteo_models
+        if getattr(self.s, "openmeteo_api_key", None):
+            params["apikey"] = self.s.openmeteo_api_key
 
         payload = self._get_json(url, params)
         hourly = payload.get("hourly") or {}
@@ -146,7 +154,7 @@ class OpenMeteoClient:
                     raise WeatherError(f"Open-Meteo rejected the request ({resp.status_code}): {reason}")
                 last_error = f"HTTP {resp.status_code}"
             if attempt < self.s.http_retries:
-                delay = 2 ** attempt
+                delay = max(2, 2 ** attempt)
                 logger.warning("Open-Meteo attempt %d failed (%s); retrying in %ds", attempt + 1, last_error, delay)
                 self._sleep(delay)
         raise WeatherError(f"Open-Meteo unavailable after retries: {last_error}")
