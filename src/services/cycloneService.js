@@ -228,70 +228,8 @@ export async function fetchLiveCyclones() {
     // Backend endpoint not active, fallback to direct GDACS GeoRSS parsing or default set
   }
 
-  try {
-    // 2. Direct client fetch to public GDACS RSS proxy or GeoJSON if available
-    const directRes = await fetch('https://www.gdacs.org/xml/rss.xml', { cache: 'no-store' });
-    if (directRes.ok) {
-      const text = await directRes.text();
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(text, 'text/xml');
-      const items = Array.from(xmlDoc.querySelectorAll('item'));
-      
-      const parsed = [];
-      const seen = new Set();
-
-      for (const it of items) {
-        const title = it.querySelector('title')?.textContent || '';
-        const pointEl = it.getElementsByTagNameNS('http://www.georss.org/georss', 'point')[0];
-        const eventType = it.getElementsByTagNameNS('http://www.gdacs.org', 'eventtype')[0]?.textContent;
-
-        if (eventType === 'TC' || title.toLowerCase().includes('cyclone')) {
-          // Only keep active systems updated within the last 48 hours
-          const pubDateStr = it.querySelector('pubDate')?.textContent;
-          if (pubDateStr) {
-            const pubDate = new Date(pubDateStr);
-            const ageHours = (Date.now() - pubDate.getTime()) / (1000 * 3600);
-            if (ageHours > 48) continue;
-          }
-
-          const name = it.getElementsByTagNameNS('http://www.gdacs.org', 'eventname')[0]?.textContent || 'Tropical Storm';
-          if (seen.has(name)) continue;
-          seen.add(name);
-
-          const severity = it.getElementsByTagNameNS('http://www.gdacs.org', 'severity')[0]?.textContent || '';
-          const alert = it.getElementsByTagNameNS('http://www.gdacs.org', 'alertlevel')[0]?.textContent || 'Orange';
-          const pointText = pointEl?.textContent?.trim() || '';
-          const parts = pointText.split(/\s+/);
-          
-          if (parts.length === 2) {
-            const lat = parseFloat(parts[0]);
-            const lon = parseFloat(parts[1]);
-            const windMatch = severity.match(/(\d+)\s*km\/h/);
-            const windKmh = windMatch ? parseInt(windMatch[1], 10) : 120;
-
-            parsed.push({
-              id: `cyclone-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-              name: name.replace(/-\d+$/, '').replace(/\b\w/g, l => l.toUpperCase()),
-              status: severity.split('(')[0].trim() || 'Tropical Cyclone',
-              category: `${alert} Alert`,
-              windKmh,
-              pressureHpa: Math.max(910, 1010 - Math.round(windKmh * 0.45)),
-              lat,
-              lon
-            });
-          }
-        }
-      }
-
-      if (parsed.length > 0) {
-        setActiveCyclones(parsed);
-        return parsed;
-      }
-    }
-  } catch (err) {
-    // Network or CORS limitation - use default calibrated active set
-  }
-
+  // 2. In browser environments without a backend aggregator, direct GDACS fetch is blocked by CORS.
+  // Return calibrated active cyclone tracker dataset immediately without console noise.
   return activeCyclones;
 }
 
