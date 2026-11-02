@@ -23,11 +23,14 @@ export default function ThreatAnalyticsPanel({
   onClose
 }) {
   const isIndia = station ? isIndiaSector(station.lon ?? station.lng, station.lat) : true;
+  const isOffline = riskPercent == null;
   // SVG Gauge calculations (radius = 52)
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const arcLength = circumference * 0.75;
-  const strokeDashoffset = arcLength - (arcLength * Math.min(100, isIndia ? riskPercent : 28)) / 100;
+  const strokeDashoffset = isOffline 
+    ? arcLength 
+    : arcLength - (arcLength * Math.min(100, isIndia ? riskPercent : 28)) / 100;
 
   // SVG Chart Dimensions for Rainfall
   const svgWidth = 270;
@@ -204,19 +207,36 @@ export default function ThreatAnalyticsPanel({
 
           {/* Centered Percentage Display */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white font-mono tabular-nums">
-              {riskPercent}%
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-slate-300 font-semibold -mt-0.5">
-              {(riskPercent / 100).toFixed(3)} P(Y=1)
-            </span>
+            {isOffline ? (
+              <>
+                <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-rose-300 font-mono">
+                  OFFLINE
+                </span>
+                <span className="text-[9px] uppercase tracking-wider text-rose-400 font-semibold -mt-0.5 text-center px-2">
+                  Model Offline
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white font-mono tabular-nums">
+                  {riskPercent}%
+                </span>
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-semibold -mt-0.5">
+                  {(riskPercent / 100).toFixed(3)} P(Y=1)
+                </span>
+              </>
+            )}
           </div>
         </div>
 
         {/* Binary Model Classification Badge */}
         <div className="w-full flex items-center justify-between pt-1.5 border-t border-white/10 text-[10px]">
           <span className="text-slate-300 font-medium">Model Output:</span>
-          {isPositiveClassification ? (
+          {isOffline ? (
+            <span className="apple-liquid-glass-pill px-2.5 py-0.5 rounded-full text-rose-300 font-semibold border-rose-500/40">
+              Model is offline, cannot calculate risk percentage
+            </span>
+          ) : isPositiveClassification ? (
             <span className="apple-liquid-glass-pill px-2.5 py-0.5 rounded-full text-rose-200 font-semibold flex items-center gap-1 border-rose-500/40">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
               Positive (&ge;50mm/day)

@@ -4,8 +4,9 @@
  * Strictly zero hardcoded presets. Reports offline / unreachable status explicitly when down.
  */
 
-const API_BASE = '/api';
-const DIRECT_BACKEND_URL = 'http://localhost:8000';
+const PROD_BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const API_BASE = PROD_BACKEND_URL || '/api';
+const DIRECT_BACKEND_URL = PROD_BACKEND_URL || 'http://localhost:8000';
 
 /**
  * Generates an evacuation hazard radius GeoJSON circle for MapLibre map rendering
@@ -63,8 +64,8 @@ export async function checkBackendHealth() {
     return { 
       isLive: false, 
       error: err.name === 'AbortError' 
-        ? 'Connection timed out to ML backend (http://localhost:8000)'
-        : 'ML backend is offline or unreachable at http://localhost:8000'
+        ? `Connection timed out to ML backend (${DIRECT_BACKEND_URL})`
+        : `ML backend is offline or unreachable at ${DIRECT_BACKEND_URL}`
     };
   }
 }
@@ -192,17 +193,17 @@ export async function getCloudburstEventData(station = null) {
     return {
       isLive: false,
       status: 'OFFLINE',
-      error: err.message || 'Cannot reach prediction engine at http://localhost:8000',
+      error: err.message || `Cannot reach prediction engine at ${DIRECT_BACKEND_URL}`,
       title: 'Cloudburst Prediction Engine Offline',
       locationName: station?.name || 'Kedarnath Temple Valley',
       coordinates: station ? [station.lon, station.lat] : [79.0669, 30.7346],
       elevationMeters: station?.elevation || 600,
       detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       metrics: {
-        riskPercent: 4,
-        predictedRainRateMmh: 0.0,
+        riskPercent: null,
+        predictedRainRateMmh: null,
       },
-      advisory: `System Error: The ML Prediction System is not responding. Please start the backend service (uvicorn app.main:create_app --factory --port 8000).`
+      advisory: `ML model is offline; cannot calculate risk percentage. Please ensure backend service is running at ${DIRECT_BACKEND_URL}.`
     };
   }
 }

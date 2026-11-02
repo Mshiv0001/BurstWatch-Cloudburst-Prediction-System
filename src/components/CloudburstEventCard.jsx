@@ -14,8 +14,28 @@ import {
   RefreshCw,
   ServerOff,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  SlidersHorizontal,
+  Mountain,
+  Droplets,
+  Gauge,
+  Wind
 } from 'lucide-react';
+
+const FEATURE_MAP = {
+  aspect_deg: { name: 'Ridge Aspect', unit: '°', color: 'text-cyan-400' },
+  temperature_c: { name: 'Surface Temp', unit: '°C', color: 'text-amber-400' },
+  surface_pressure_hpa: { name: 'Surface Pressure', unit: 'hPa', color: 'text-rose-400' },
+  dew_point_c: { name: 'Dew Point', unit: '°C', color: 'text-sky-400' },
+  theta_e_k: { name: 'Theta-e (θe)', unit: 'K', color: 'text-amber-300' },
+  orographic_lift_ms: { name: 'Orographic Lift', unit: 'm/s', color: 'text-cyan-300' },
+  valley_trapping_index: { name: 'Valley Trapping', unit: '', color: 'text-teal-400' },
+  relative_humidity_pct: { name: 'Relative Humidity', unit: '%', color: 'text-blue-400' },
+  dew_point_depression_c: { name: 'Dew Point Depression', unit: '°C', color: 'text-sky-300' },
+  elevation_m: { name: 'Elevation', unit: 'm', color: 'text-emerald-400' },
+  slope_deg: { name: 'Mountain Slope', unit: '°', color: 'text-emerald-300' },
+  wind_speed_kmh: { name: 'Wind Speed', unit: 'km/h', color: 'text-cyan-400' },
+};
 
 export default function CloudburstEventCard({
   event,
@@ -27,6 +47,7 @@ export default function CloudburstEventCard({
   className = ""
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isFactorsExpanded, setIsFactorsExpanded] = useState(true);
 
   if (!event) return null;
 
@@ -39,7 +60,7 @@ export default function CloudburstEventCard({
   if (!isLive) {
     return (
       <aside 
-        className={`select-none pointer-events-auto transition-all duration-300 z-30 ${className}`}
+        className={`select-none pointer-events-auto transition-all duration-300 z-30 flex flex-col gap-2.5 ${className}`}
         aria-label="Cloudburst Prediction Engine Offline Report"
       >
         <div className="w-[330px] sm:w-[380px] bg-[#0c1524]/95 backdrop-blur-xl border border-rose-500/40 rounded-2xl shadow-[0_8px_32px_rgba(244,63,94,0.25)] overflow-hidden">
@@ -138,6 +159,40 @@ export default function CloudburstEventCard({
             </div>
           )}
         </div>
+
+        {/* Small Box Directly Under It: Common Factors Spec */}
+        <div className="w-[330px] sm:w-[380px] bg-[#0c1524]/95 backdrop-blur-xl rounded-2xl overflow-hidden border border-rose-500/30 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] text-slate-300">
+          <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-2">
+            <span className="text-[11px] font-bold text-white flex items-center gap-1.5">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+              ML Risk Calculation Factors
+            </span>
+            <span className="text-[9px] font-mono text-rose-300 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-500/30 font-medium">
+              Offline Spec
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-300 leading-snug">
+            When online, the Dual Ensemble evaluates 12 physics & terrain parameters across 4 triggers to compute convective risk %:
+          </p>
+          <div className="grid grid-cols-2 gap-1.5 mt-2 font-mono text-[9px]">
+            <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+              <span className="text-cyan-300 font-bold block">Orographic Lift</span>
+              Slope • Aspect • DEM 30m
+            </div>
+            <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+              <span className="text-amber-300 font-bold block">θe Instability</span>
+              Theta-e • CAPE Energy
+            </div>
+            <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+              <span className="text-sky-300 font-bold block">Moisture Trapping</span>
+              RH% • Dew Point Depression
+            </div>
+            <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+              <span className="text-rose-300 font-bold block">ΔP Plunge</span>
+              Surface Pressure Collapse
+            </div>
+          </div>
+        </div>
       </aside>
     );
   }
@@ -145,7 +200,7 @@ export default function CloudburstEventCard({
   // 2. Live ML Cloudburst Warning Telemetry Card
   return (
     <aside 
-      className={`select-none pointer-events-auto transition-all duration-300 z-30 ${className}`}
+      className={`select-none pointer-events-auto transition-all duration-300 z-30 flex flex-col gap-2.5 ${className}`}
       aria-label="Live Cloudburst Prediction Alert"
     >
       <div className={`w-[330px] sm:w-[380px] bg-[#0c1524]/92 backdrop-blur-xl rounded-2xl overflow-hidden border ${
@@ -325,25 +380,6 @@ export default function CloudburstEventCard({
               </div>
             </div>
 
-            {/* Top ML Risk Factors if returned by backend */}
-            {event.topFactors && event.topFactors.length > 0 && (
-              <div className="flex flex-col gap-1 text-[11px]">
-                <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">
-                  Top Atmospheric Risk Factors:
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {event.topFactors.map((factor, idx) => (
-                    <span 
-                      key={idx}
-                      className="px-2 py-0.5 rounded bg-white/10 text-cyan-200 font-mono text-[9px] border border-cyan-500/20"
-                    >
-                      {factor.name || factor.feature || factor}: {factor.value ? Number(factor.value).toFixed(1) : ''}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Affected River Drainage Corridors */}
             {event.affectedBasins && event.affectedBasins.length > 0 && (
               <div className="flex flex-col gap-1 text-[11px]">
@@ -394,6 +430,153 @@ export default function CloudburstEventCard({
                 LightGBM + XGBoost
               </span>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dedicated Small Box Directly Under It: Common Factors Used to Calculate Risk Percentage */}
+      <div className="w-[330px] sm:w-[380px] bg-[#0c1524]/95 backdrop-blur-xl rounded-2xl overflow-hidden border border-cyan-500/30 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        {/* Header Bar */}
+        <div className="px-3.5 py-2 bg-gradient-to-r from-slate-900 via-[#0d1e35] to-slate-900 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] font-bold text-white tracking-wide">
+              Common ML Risk Factors
+            </span>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 font-medium">
+              Dual Ensemble
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsFactorsExpanded((prev) => !prev)}
+            title={isFactorsExpanded ? "Collapse Risk Factors" : "Expand Risk Factors"}
+            className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            {isFactorsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Collapsed View */}
+        {!isFactorsExpanded && (
+          <div 
+            onClick={() => setIsFactorsExpanded(true)}
+            className="px-3.5 py-2 text-[10px] text-slate-300 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+          >
+            <span className="text-slate-400 truncate">
+              4 Drivers: <span className="text-cyan-300 font-medium">Orographic Lift</span> • <span className="text-amber-300 font-medium">θe Instability</span> • <span className="text-sky-300 font-medium">Moisture</span> • <span className="text-rose-300 font-medium">ΔP Plunge</span>
+            </span>
+            <span className="text-[9px] text-cyan-400 font-mono shrink-0 ml-1">Expand →</span>
+          </div>
+        )}
+
+        {/* Expanded View */}
+        {isFactorsExpanded && (
+          <div className="p-3 flex flex-col gap-2.5">
+            <p className="text-[10.5px] text-slate-300 leading-snug">
+              The LightGBM + XGBoost ensemble computes convective risk percentage using 12 physics & terrain features across 4 critical drivers:
+            </p>
+
+            {/* 4 Pillars Grid */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {/* 1. Orographic Forcing */}
+              <div className="bg-white/5 border border-cyan-500/20 rounded-xl p-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-cyan-300">
+                  <Mountain className="w-3 h-3 text-cyan-400 shrink-0" />
+                  <span className="text-[10px] font-bold">Orographic Lift</span>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-tight">
+                  Valley wind velocity forced up steep slopes triggers rapid vertical cloud ascent.
+                </p>
+                <div className="text-[8.5px] font-mono text-cyan-400/90 mt-0.5">
+                  Slope • Aspect • Lift (m/s)
+                </div>
+              </div>
+
+              {/* 2. Thermodynamic Instability */}
+              <div className="bg-white/5 border border-amber-500/20 rounded-xl p-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-amber-300">
+                  <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="text-[10px] font-bold">θe Instability</span>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-tight">
+                  High equivalent potential temp releases latent heat, accelerating severe updrafts.
+                </p>
+                <div className="text-[8.5px] font-mono text-amber-400/90 mt-0.5">
+                  Theta-e (K) • CAPE Energy
+                </div>
+              </div>
+
+              {/* 3. Moisture Saturation */}
+              <div className="bg-white/5 border border-sky-500/20 rounded-xl p-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-sky-300">
+                  <Droplets className="w-3 h-3 text-sky-400 shrink-0" />
+                  <span className="text-[10px] font-bold">Moisture Saturation</span>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-tight">
+                  High humidity with narrow dew-point depression traps heavy vapor in valleys.
+                </p>
+                <div className="text-[8.5px] font-mono text-sky-400/90 mt-0.5">
+                  Humidity (%) • Dew Point
+                </div>
+              </div>
+
+              {/* 4. Barometric Pressure Plunge */}
+              <div className="bg-white/5 border border-rose-500/20 rounded-xl p-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-rose-300">
+                  <Gauge className="w-3 h-3 text-rose-400 shrink-0" />
+                  <span className="text-[10px] font-bold">Pressure Plunge (ΔP)</span>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-tight">
+                  Sudden localized barometric drop induces strong low-level wind convergence.
+                </p>
+                <div className="text-[8.5px] font-mono text-rose-400/90 mt-0.5">
+                  Pressure (hPa) • ΔP Drop
+                </div>
+              </div>
+            </div>
+
+            {/* Active Live Station Factors (If returned by ML backend) */}
+            {event.topFactors && event.topFactors.length > 0 && (
+              <div className="mt-0.5 pt-2 border-t border-white/10 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-semibold text-slate-300 flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-emerald-400" />
+                    <span>Station Readings ({event.locationName}):</span>
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    Live Model Weights
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {event.topFactors.map((factor, idx) => {
+                    const rawKey = factor.feature || factor.name || factor;
+                    const meta = FEATURE_MAP[rawKey] || { name: rawKey, unit: '', color: 'text-cyan-300' };
+                    const formattedVal = factor.value != null ? Number(factor.value).toFixed(1) : null;
+                    const weightPct = factor.importance_weight != null ? `${Math.round(factor.importance_weight * 100)}% wt` : null;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="px-2 py-1 rounded-lg bg-black/40 border border-white/10 flex items-center gap-1.5 text-[9.5px] font-mono"
+                      >
+                        <span className="text-slate-400">{meta.name}:</span>
+                        <span className={`font-bold ${meta.color}`}>
+                          {formattedVal != null ? `${formattedVal}${meta.unit}` : ''}
+                        </span>
+                        {weightPct && (
+                          <span className="text-[8.5px] text-slate-500 bg-white/5 px-1 py-0.2 rounded border border-white/5">
+                            {weightPct}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

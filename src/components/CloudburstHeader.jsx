@@ -4,11 +4,12 @@ import {
   MapPin, 
   Loader2, 
   X, 
-  LocateFixed 
+  LocateFixed,
+  RefreshCw 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FpsCounter from './FpsCounter';
-import { getCachedMLRisk, TOP_WATCHLIST_STATIONS } from '../services/mlPredictionService';
+import { getCachedMLRisk } from '../services/mlPredictionService';
 
 export default function CloudburstHeader({
   searchQuery,
@@ -25,8 +26,8 @@ export default function CloudburstHeader({
   isMeteoLoading = false,
   onReplayIntro,
   cloudburstEvent = null,
-  isCloudburstCardOpen = true,
-  onToggleCloudburstAlert = null
+  isMlRetrying = false,
+  onRefreshMlStatus = null
 }) {
   const [internalQuery, setInternalQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -144,10 +145,10 @@ export default function CloudburstHeader({
     .filter(Boolean);
 
   const getStationRisk = (stn) => {
-    if (!stn) return 3;
+    if (!stn) return null;
     const cached = getCachedMLRisk(stn.lat, stn.lon);
-    if (cached?.riskPercent != null) return cached.riskPercent;
-    return stn.elevation > 1500 ? 4 : 3;
+    if (cached?.isLive && cached?.riskPercent != null) return cached.riskPercent;
+    return null;
   };
 
   const handleKeyDown = (e) => {
@@ -326,6 +327,13 @@ export default function CloudburstHeader({
                       <div className="text-right">
                         {(() => {
                           const risk = getStationRisk(station);
+                          if (risk == null) {
+                            return (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-800/60 border border-white/10">
+                                ML Offline
+                              </span>
+                            );
+                          }
                           const isAlert = risk >= 25;
                           return (
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -412,9 +420,11 @@ export default function CloudburstHeader({
                           </div>
                         </div>
                         <span className={`text-[10px] font-bold ${
-                          isAlert ? 'text-rose-400' : 'text-emerald-400'
+                          risk == null
+                            ? 'text-slate-400 font-mono text-[9px]'
+                            : isAlert ? 'text-rose-400' : 'text-emerald-400'
                         }`}>
-                          {risk}% {isAlert ? 'Alert' : 'Normal'}
+                          {risk == null ? 'ML Offline' : `${risk}% ${isAlert ? 'Alert' : 'Normal'}`}
                         </span>
                       </button>
                     );
@@ -434,101 +444,43 @@ export default function CloudburstHeader({
         </AnimatePresence>
       </div>
 
-      {/* 2. Center: National Convective Watchlist (Top 3 Hotspots across India) */}
-      <div className="pointer-events-auto hidden md:flex items-center gap-1.5 apple-liquid-glass-pill px-3 py-1.5 rounded-full border border-white/10 text-xs shadow-lg">
-        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-          Top Watchlist:
-        </span>
-        {TOP_WATCHLIST_STATIONS.map((stn, idx) => {
-          const cached = getCachedMLRisk(stn.lat, stn.lon);
-          const liveRisk = cached?.riskPercent;
-          return (
-            <button
-              key={stn.id}
-              type="button"
-              onClick={() => {
-                const fullStn = stations.find(s => s.id === stn.id) || stn;
-                if (onSelectStation) {
-                  onSelectStation(fullStn);
-                }
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 hover:bg-cyan-500/20 hover:border-cyan-400/50 border border-white/10 text-slate-200 transition-all cursor-pointer text-[11px] group"
-              title={`Fly to ${stn.name} and execute live ML cloudburst inference`}
-            >
-              <span className="text-cyan-400 font-mono text-[10px] font-bold">#{idx + 1}</span>
-              <span className="font-medium group-hover:text-cyan-200 transition-colors">{stn.name}</span>
-              {liveRisk != null ? (
-                <span className={`font-mono font-bold text-[10px] px-1 py-0.2 rounded border ${
-                  liveRisk >= 25 
-                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/30' 
-                    : 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
-                }`}>
-                  {liveRisk}%
-                </span>
-              ) : (
-                <span className="text-cyan-400 font-mono text-[9px] opacity-75">Inspect &rarr;</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. Right: FPS Monitor, Model Scenario Button & Weather Mode Button */}
-      <div className="pointer-events-auto hidden sm:flex items-center gap-2.5 ml-auto">
+      {/* Right: FPS Monitor & ML Engine Status Button */}
+      <div className="pointer-events-auto flex items-center gap-2.5 ml-auto">
         {/* Real-time Fluidity FPS Monitor */}
-        <FpsCounter />
+        <div className="hidden sm:block">
+          <FpsCounter />
+        </div>
 
-        {/* Real-time ML Prediction Alert / Engine Status Button */}
-        {cloudburstEvent && (() => {
-          const isAlert = cloudburstEvent.isLive && (cloudburstEvent.isAlertActive || (cloudburstEvent.metrics?.riskPercent ?? 0) >= 25);
-          const riskVal = cloudburstEvent.metrics?.riskPercent ?? 3;
-          
-          return (
-            <button
-              type="button"
-              onClick={onToggleCloudburstAlert}
-              title={cloudburstEvent.isLive 
-                ? `Live ML Model Status: ${cloudburstEvent.title} (${cloudburstEvent.locationName}) — ${riskVal}% Risk` 
-                : `ML Prediction Engine Offline: ${cloudburstEvent.error || 'Cannot reach http://localhost:8000'}`}
-              className={`relative h-10 flex items-center justify-center gap-2 px-3.5 rounded-full transition-all cursor-pointer select-none box-border border ${
-                !cloudburstEvent.isLive
-                  ? 'bg-rose-950/80 border-rose-500/80 text-rose-200'
-                  : isAlert
-                    ? 'bg-gradient-to-r from-rose-600/90 to-amber-600/90 border-rose-400/80 shadow-[0_0_18px_rgba(244,63,94,0.35)] text-white'
-                    : isCloudburstCardOpen
-                      ? 'bg-emerald-950/80 border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)] text-emerald-200'
-                      : 'apple-liquid-glass-pill text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10'
-              }`}
-            >
-              <span className={`inline-flex h-2 w-2 rounded-full ${
-                !cloudburstEvent.isLive 
-                  ? 'bg-rose-500' 
-                  : isAlert 
-                    ? 'bg-rose-400 animate-ping' 
-                    : 'bg-emerald-400 animate-pulse'
-              }`} />
-              <div className="flex items-center gap-1.5 font-bold text-xs tracking-tight">
-                <span>
-                  {!cloudburstEvent.isLive 
-                    ? 'ML Offline' 
-                    : isAlert 
-                      ? 'Live ML Alert' 
-                      : 'Live ML Normal'}
-                </span>
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
-                  !cloudburstEvent.isLive
-                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/30'
-                    : isAlert
-                      ? 'bg-black/40 text-amber-200 border-amber-400/30 font-bold'
-                      : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
-                }`}>
-                  {!cloudburstEvent.isLive ? 'OFFLINE' : `${riskVal}% Risk`}
-                </span>
-              </div>
-            </button>
-          );
-        })()}
+        {/* Real-time ML Prediction Engine Status Button: Just shows ML Live or ML Offline */}
+        {cloudburstEvent && (
+          <button
+            type="button"
+            onClick={onRefreshMlStatus}
+            disabled={isMlRetrying}
+            title={cloudburstEvent.isLive 
+              ? 'Dual-Engine ML Model is LIVE (Click to refresh status)' 
+              : `ML Prediction Engine is OFFLINE: ${cloudburstEvent.error || 'Cannot reach http://localhost:8000'} (Click to retry)`}
+            className={`relative h-9 sm:h-10 flex items-center justify-center gap-2 px-3.5 sm:px-4 rounded-full transition-all cursor-pointer select-none box-border border shadow-md active:scale-95 ${
+              cloudburstEvent.isLive
+                ? 'bg-emerald-950/70 border-emerald-500/50 hover:bg-emerald-900/80 text-emerald-200 shadow-emerald-950/30 hover:border-emerald-400'
+                : 'bg-rose-950/80 border-rose-500/60 hover:bg-rose-900/80 text-rose-200 shadow-rose-950/30 hover:border-rose-400'
+            }`}
+          >
+            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${
+              cloudburstEvent.isLive
+                ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse'
+                : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+            }`} />
+            
+            <span className="font-bold text-xs tracking-wide">
+              {cloudburstEvent.isLive ? 'ML Live' : 'ML Offline'}
+            </span>
+
+            {isMlRetrying && (
+              <RefreshCw className="w-3 h-3 animate-spin text-slate-300 ml-0.5" />
+            )}
+          </button>
+        )}
       </div>
     </header>
   );

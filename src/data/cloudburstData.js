@@ -536,24 +536,6 @@ export const STATIONS_NETWORK = [
 
   // --- WESTERN GHATS & NON-HIMALAYAN CLOUDBURST BASINS ---
   {
-    id: "mumbai",
-    name: "Mumbai (Santacruz IMD)",
-    region: "Konkan / Western Ghats",
-    state: "Maharashtra",
-    lat: 19.0760,
-    lon: 72.8777,
-    elevation: 14
-  },
-  {
-    id: "wayanad",
-    name: "Wayanad (Meppadi / Chooralmala)",
-    region: "Western Ghats High Ranges",
-    state: "Kerala",
-    lat: 11.6854,
-    lon: 76.1320,
-    elevation: 850
-  },
-  {
     id: "barmer",
     name: "Barmer (Thar Desert Basin)",
     region: "Thar Desert",
@@ -570,15 +552,6 @@ export const STATIONS_NETWORK = [
     lat: 12.4244,
     lon: 75.7382,
     elevation: 1150
-  },
-  {
-    id: "mahabaleshwar",
-    name: "Mahabaleshwar Ghat Ridge",
-    region: "Western Ghats Crest",
-    state: "Maharashtra",
-    lat: 17.9237,
-    lon: 73.6586,
-    elevation: 1353
   }
 ];
 

@@ -7,11 +7,20 @@ import {
   sendBrowserNotification 
 } from '../utils/notifications';
 
+const DISMISSED_KEY = 'burstwatch_alert_permission_dismissed';
+
 export default function PermissionPrompt({ onLocationAcquired }) {
   const [isVisible, setIsVisible] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle' | 'requesting' | 'granted'
 
   useEffect(() => {
+    // Check if user has already dismissed or handled permission
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (localStorage.getItem(DISMISSED_KEY) === 'true') {
+        return;
+      }
+    }
+
     // Check if notification permission is not decided yet
     const perm = getNotificationPermission();
     if (perm === 'default') {
@@ -22,6 +31,13 @@ export default function PermissionPrompt({ onLocationAcquired }) {
     }
   }, []);
 
+  const handleDismiss = () => {
+    setIsVisible(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(DISMISSED_KEY, 'true');
+    }
+  };
+
   const handleRequestPermissions = async () => {
     setStatus('requesting');
     await requestPermissionsAndNotify({
@@ -31,6 +47,9 @@ export default function PermissionPrompt({ onLocationAcquired }) {
     });
 
     setStatus('granted');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(DISMISSED_KEY, 'true');
+    }
     setTimeout(() => {
       setIsVisible(false);
     }, 2500);
@@ -41,16 +60,17 @@ export default function PermissionPrompt({ onLocationAcquired }) {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+        exit={{ opacity: 0, y: 20, scale: 0.95 }}
         transition={{ duration: 0.3 }}
-        className="fixed top-16 right-4 sm:right-8 z-50 max-w-sm w-full select-none"
+        className="fixed bottom-24 left-20 sm:left-24 z-40 max-w-sm w-full select-none"
       >
-        <div className="apple-liquid-glass rounded-3xl p-5 shadow-2xl text-slate-100 flex flex-col gap-3.5 relative">
+        <div className="apple-liquid-glass rounded-3xl p-5 shadow-2xl text-slate-100 flex flex-col gap-3.5 relative border border-white/20">
           <button
-            onClick={() => setIsVisible(false)}
+            onClick={handleDismiss}
             className="apple-liquid-glass-pill absolute top-3.5 right-3.5 text-slate-300 hover:text-white p-1 rounded-full transition-colors cursor-pointer"
+            title="Dismiss"
           >
             <X className="w-4 h-4" />
           </button>
@@ -90,7 +110,7 @@ export default function PermissionPrompt({ onLocationAcquired }) {
               )}
             </button>
             <button
-              onClick={() => setIsVisible(false)}
+              onClick={handleDismiss}
               className="apple-liquid-glass-pill py-2.5 px-4 rounded-full text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
             >
               Later

@@ -14,11 +14,11 @@ const LAYER_CONFIGS = {
     id: 'temp',
     label: 'Temperature',
     unit: (tempUnit) => `°${tempUnit || 'C'}`,
-    gradient: 'linear-gradient(to right, #9b99cc 0%, #9b99cc 14%, #6ec6d9 28%, #1e7a96 42%, #4ca043 57%, #b8ba28 71%, #e67812 85%, #8c2014 100%)',
+    gradient: 'linear-gradient(to right, #535099 0%, #7875b2 10%, #9b99cc 18%, #56b5cb 28%, #1e7a96 38%, #4ca043 50%, #b8ba28 62%, #e67812 75%, #c24b10 85%, #8c2014 93%, #5a1008 100%)',
     getStops: (tempUnit) => (
       tempUnit === 'F'
-        ? ['-4', '14', '32', '50', '68', '86', '104']
-        : ['-20', '-10', '0', '10', '20', '30', '40']
+        ? ['-40', '-22', '-4', '14', '32', '50', '68', '86', '104', '122']
+        : ['-40', '-30', '-20', '-10', '0', '10', '20', '30', '40', '50']
     ),
     isClickableUnit: true,
     unitTooltip: (tempUnit) => `Current: °${tempUnit || 'C'} · Click to switch to °${tempUnit === 'F' ? 'C' : 'F'}`

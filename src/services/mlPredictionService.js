@@ -6,6 +6,7 @@
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache
 const predictionCache = new Map();
+const PROD_BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 
 // Helper to round coordinates to ~1 km grid
 function getCoordKey(lat, lon) {
@@ -31,7 +32,7 @@ export async function predictLocationML(lat, lon, source = 'auto') {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const payload = {
       latitude: Number(lat),
@@ -40,20 +41,29 @@ export async function predictLocationML(lat, lon, source = 'auto') {
     };
 
     let res;
-    try {
-      res = await fetch('/api/predict/location', {
+    if (PROD_BACKEND_URL) {
+      res = await fetch(`${PROD_BACKEND_URL}/predict/location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: controller.signal
       });
-    } catch {
-      res = await fetch('http://localhost:8000/predict/location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
+    } else {
+      try {
+        res = await fetch('/api/predict/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+      } catch {
+        res = await fetch('http://localhost:8000/predict/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+      }
     }
     clearTimeout(timeoutId);
 
@@ -91,24 +101,20 @@ export async function predictLocationML(lat, lon, source = 'auto') {
     return result;
 
   } catch (err) {
-    // If backend is unreachable or timed out, calculate realistic physics-based estimate
-    const isPlains = lat < 29.5 && (lon < 78.5 || lon > 88.0);
-    const fallbackProb = isPlains ? 0.032 : 0.045;
-    const fallbackPercent = Math.round(fallbackProb * 100);
-
+    // When backend ML is offline, strictly report offline without fake numbers
     const fallbackResult = {
       isLive: false,
-      probability: fallbackProb,
-      riskPercent: fallbackPercent,
-      cri: 0,
+      probability: null,
+      riskPercent: null,
+      cri: null,
       threshold: 0.18,
-      prediction: 0,
+      prediction: null,
       isAlertActive: false,
-      riskLabel: 'NORMAL / LOW RISK',
-      alertTier: 'GREEN_NORMAL',
-      advisory: 'ML model service offline; showing calibrated physical baseline.',
+      riskLabel: 'OFFLINE',
+      alertTier: 'OFFLINE',
+      advisory: 'ML model is offline; cannot calculate risk percentage.',
       coordinates: [lat, lon],
-      error: err.message
+      error: err.message || 'ML backend offline'
     };
 
     return fallbackResult;

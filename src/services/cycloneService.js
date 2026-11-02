@@ -213,8 +213,10 @@ export function computeCyclonePressureDrop(lon, lat, cyclone) {
  */
 export async function fetchLiveCyclones() {
   try {
-    // 1. Try local backend aggregator endpoint
-    const res = await fetch('/api/cyclones', { cache: 'no-store' });
+    // 1. Try backend aggregator endpoint
+    const backendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+    const endpoint = backendUrl ? `${backendUrl}/cyclones` : '/api/cyclones';
+    const res = await fetch(endpoint, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {

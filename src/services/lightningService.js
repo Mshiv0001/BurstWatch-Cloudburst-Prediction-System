@@ -37,18 +37,24 @@ function decodeBlitzortung(b) {
 class MutedThunderSynthesizer {
   constructor() {
     this.ctx = null;
-    this.muted = false;
+    this.muted = true; // Muted by default to comply with browser autoplay policies
     this.lastPlayedAt = 0;
     this.throttleMs = 3200; // Min time between thunder rumbles to prevent noise clutter
     
     // Load mute preference from storage
     if (typeof window !== 'undefined' && window.localStorage) {
-      this.muted = localStorage.getItem('burstwatch_thunder_muted') === 'true';
+      const stored = localStorage.getItem('burstwatch_thunder_muted');
+      this.muted = stored === null ? true : stored === 'true';
     }
   }
 
   ensureContext() {
-    if (!this.ctx && typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return null;
+    // Guard against Chrome autoplay policy if user hasn't interacted with page
+    if (navigator?.userActivation && !navigator.userActivation.hasBeenActive) {
+      return null;
+    }
+    if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();

@@ -1,13 +1,13 @@
 import { 
   Home, 
   LayoutGrid, 
-  Radar, 
-  Sliders, 
+  ArrowDownWideNarrow,
   BarChart3,
   Radio,
   Thermometer,
   Wind,
-  Satellite
+  Satellite,
+  CloudSun
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -27,9 +27,9 @@ export default function NavRail({
   const navItems = [
     { id: 'home', icon: Home, label: 'Overview' },
     { id: 'dashboard', icon: LayoutGrid, label: 'Convective Grid' },
-    { id: 'meteo', icon: Radio, label: 'Weather Data' },
-    { id: 'radar', icon: Radar, label: 'Doppler Radar Scan' },
-    { id: 'analytics', icon: BarChart3, label: 'Threat Analytics' }
+    { id: 'rankings', icon: ArrowDownWideNarrow, label: 'Risk Rankings (High → Low)' },
+    { id: 'analytics', icon: BarChart3, label: 'Threat Analytics' },
+    { id: 'meteo', icon: CloudSun, label: 'Station Telemetry' }
   ];
 
   return (
@@ -45,9 +45,6 @@ export default function NavRail({
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.94 }}
               onClick={() => {
-                if (item.id === 'meteo' && onToggleMeteo) {
-                  onToggleMeteo();
-                }
                 if (onSelectNav) onSelectNav(item.id);
               }}
               title={item.label}

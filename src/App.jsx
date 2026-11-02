@@ -7,10 +7,10 @@ import ThreatAnalyticsPanel from './components/ThreatAnalyticsPanel';
 import IncidentModal from './components/IncidentModal';
 import PermissionPrompt from './components/PermissionPrompt';
 import LiveMeteoPanel from './components/LiveMeteoPanel';
+import AreaRiskRankingsPanel from './components/AreaRiskRankingsPanel';
 import TemperatureLegendBar from './components/TemperatureLegendBar';
 import WindParticleDropdown from './components/WindParticleDropdown';
 import CinematicIntroSplash from './components/CinematicIntroSplash';
-import CloudburstEventCard from './components/CloudburstEventCard';
 import { getCloudburstEventData } from './services/cloudburstEventModel';
 
 import { fetchWeatherApiLiveData } from './services/weatherApiService';
@@ -21,7 +21,7 @@ import {
   getHighestRiskStation,
   MODEL_METADATA 
 } from './data/cloudburstData';
-import { BarChart3, MapPin, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { BarChart3, MapPin, Loader2, AlertTriangle, CheckCircle2, ArrowDownWideNarrow } from 'lucide-react';
 
 export default function App() {
   // Simulator Parameters using exact model features (ambient normal baseline)
@@ -47,6 +47,7 @@ export default function App() {
   }, []);
 
   // UI Drawer & Modal States - Default Closed for Clean Map Visibility
+  const [isRankingsOpen, setIsRankingsOpen] = useState(false);
   const [isMeteoPanelOpen, setIsMeteoPanelOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
@@ -55,7 +56,6 @@ export default function App() {
   // Live Dual-Engine Cloudburst ML Prediction State (Zero Hardcoded Presets)
   const [cloudburstEvent, setCloudburstEvent] = useState(null);
   const [isMlRetrying, setIsMlRetrying] = useState(false);
-  const [isCloudburstCardOpen, setIsCloudburstCardOpen] = useState(false);
 
   // User Live Geolocation State
   const [userLocation, setUserLocation] = useState(null);
@@ -121,21 +121,16 @@ export default function App() {
     });
   }, [humidity, pressureDrop, temperature, windSpeed, tcwv]);
 
-  // Dynamic Risk calculation for active location with percentage of risk
+  // Strictly use real ML model prediction; NEVER calculate fake numbers when ML is offline
   const currentRiskPercent = useMemo(() => {
-    // 1. Live ML Backend Prediction Risk if available
     if (cloudburstEvent?.isLive && cloudburstEvent?.metrics?.riskPercent != null) {
       return cloudburstEvent.metrics.riskPercent;
     }
-    // 2. Real-time atmospheric physics threat calculation from actual weather sensors
-    if (threatData?.riskPercent != null) {
-      return threatData.riskPercent;
-    }
-    return 4;
-  }, [cloudburstEvent, threatData]);
+    return null;
+  }, [cloudburstEvent]);
 
   const isHighRiskDetected = useMemo(() => {
-    return currentRiskPercent >= 25;
+    return currentRiskPercent != null && currentRiskPercent >= 25;
   }, [currentRiskPercent]);
 
   // Fetch live ML cloudburst prediction directly from backend service
@@ -144,10 +139,6 @@ export default function App() {
     try {
       const data = await getCloudburstEventData(stn || selectedStation);
       setCloudburstEvent(data);
-      // Auto-open alert card only if risk passes >= 25% threshold
-      if (data?.isAlertActive) {
-        setIsCloudburstCardOpen(true);
-      }
     } catch (err) {
       setCloudburstEvent({
         isLive: false,
@@ -181,7 +172,6 @@ export default function App() {
     const ev = eventToFocus || activeCloudburstEvent;
     if (!ev?.coordinates) return;
     setActiveLayer('convective');
-    setIsCloudburstCardOpen(true);
     if (window.map) {
       window.map.flyTo({
         center: ev.coordinates,
@@ -198,9 +188,7 @@ export default function App() {
     setSelectedStation(stn);
     loadLiveMeteo(stn.lat, stn.lon, stn.name || stn.stationName);
     fetchLivePrediction(stn);
-
-    // Manual inspection: show station's live ML metrics card
-    setIsCloudburstCardOpen(true);
+    setIsMeteoPanelOpen(true);
 
     if (window.map) {
       window.map.flyTo({
@@ -383,12 +371,14 @@ export default function App() {
     if (navId === 'home') {
       setIsMeteoPanelOpen(false);
       setIsAnalyticsOpen(false);
+      setIsRankingsOpen(false); // Collapsed on home tab as requested (pill view)
     } else if (navId === 'dashboard') {
-      setIsMeteoPanelOpen(true);
+      setIsRankingsOpen(false);
       setIsAnalyticsOpen(true);
       setActiveLayer('convective');
-      setIsCloudburstCardOpen(true);
       handleFocusCloudburstEpicenter(activeCloudburstEvent);
+    } else if (navId === 'rankings') {
+      setIsRankingsOpen((prev) => !prev);
     } else if (navId === 'meteo') {
       setIsMeteoPanelOpen((prev) => !prev);
       if (selectedStation) {
@@ -450,7 +440,7 @@ export default function App() {
           temperature={temperature}
           windSpeed={windSpeed}
           tcwv={tcwv}
-          riskPercent={threatData.riskPercent}
+          riskPercent={currentRiskPercent}
           currentTimeStr={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           userLocation={userLocation}
           activeLayer={activeLayer}
@@ -501,8 +491,8 @@ export default function App() {
           isMeteoLoading={isMeteoLoading}
           onReplayIntro={() => setShowIntro(true)}
           cloudburstEvent={activeCloudburstEvent}
-          isCloudburstCardOpen={isCloudburstCardOpen}
-          onToggleCloudburstAlert={() => setIsCloudburstCardOpen(!isCloudburstCardOpen)}
+          isMlRetrying={isMlRetrying}
+          onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
         />
 
         {/* Location Feedback Toast Notification */}
@@ -535,9 +525,38 @@ export default function App() {
           </div>
         )}
 
+        {/* Floating Right Panel: Area Risk Rankings (Highest to Lowest Risk %) - Rendered under FPS & ML Live buttons */}
+        {isRankingsOpen ? (
+          <div 
+            id="area-risk-rankings-container" 
+            className={`absolute top-16 z-20 pointer-events-auto transition-all ${
+              !isHomeView && isAnalyticsOpen ? 'right-4 sm:right-[390px]' : 'right-4'
+            }`}
+          >
+            <AreaRiskRankingsPanel
+              stations={STATIONS_NETWORK}
+              selectedStation={selectedStation}
+              onSelectStation={handleSelectStation}
+              cloudburstEvent={activeCloudburstEvent}
+              threatData={threatData}
+              onClose={() => setIsRankingsOpen(false)}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsRankingsOpen(true)}
+            className="absolute top-16 right-4 z-20 pointer-events-auto flex items-center gap-2 apple-liquid-glass-pill px-3.5 py-2 rounded-full shadow-xl text-xs font-semibold text-rose-300 hover:text-white transition-all cursor-pointer border border-rose-500/30 active:scale-95"
+            title="Open Area Risk Rankings"
+          >
+            <ArrowDownWideNarrow className="w-4 h-4 text-rose-400" />
+            <span>Risk Rankings (High &rarr; Low)</span>
+          </button>
+        )}
+
         {/* Floating Left Panel: Current Weather Data */}
         {!isHomeView && isMeteoPanelOpen && (
-          <div id="live-meteo-panel-container" className="absolute top-16 left-4 z-20 pointer-events-auto">
+          <div id="live-meteo-panel-container" className="absolute top-16 left-4 z-20 pointer-events-auto transition-all">
             <LiveMeteoPanel
               liveData={liveMeteoData}
               station={selectedStation}
@@ -553,29 +572,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Floating Emergency Mission Control: Cloudburst Event HUD Card */}
-        {isCloudburstCardOpen && activeCloudburstEvent && !isHomeView && (
-          <div className={`absolute top-16 z-30 transition-all duration-300 pointer-events-auto ${
-            isMeteoPanelOpen ? 'left-4 sm:left-[395px]' : 'left-4'
-          }`}>
-            <CloudburstEventCard
-              event={activeCloudburstEvent}
-              riskPercent={currentRiskPercent}
-              onRetry={() => fetchLivePrediction(selectedStation)}
-              isRetrying={isMlRetrying}
-              onFocusEpicenter={() => handleFocusCloudburstEpicenter(activeCloudburstEvent)}
-              onClose={() => setIsCloudburstCardOpen(false)}
-            />
-          </div>
-        )}
-
         {/* Floating Right Column: Threat Analytics Panel */}
         {!isHomeView && (
           isAnalyticsOpen ? (
-            <div id="threat-analytics-panel-container" className="absolute top-16 right-4 z-20 pointer-events-auto max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-none pr-0.5">
+            <div id="threat-analytics-panel-container" className="absolute top-28 right-4 z-20 pointer-events-auto max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-none pr-0.5">
               <ThreatAnalyticsPanel
-                riskPercent={threatData.riskPercent}
-                severity={threatData.severity}
+                riskPercent={currentRiskPercent}
+                severity={currentRiskPercent != null ? (currentRiskPercent >= 75 ? "SEVERE THREAT" : currentRiskPercent >= 25 ? "ELEVATED RISK" : "NORMAL") : "OFFLINE"}
                 features={threatData.features}
                 currentTimeStr={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 station={selectedStation}
@@ -594,7 +597,7 @@ export default function App() {
           ) : (
             <button
               onClick={() => setIsAnalyticsOpen(true)}
-              className="absolute top-16 right-4 z-20 pointer-events-auto flex items-center gap-2 apple-liquid-glass-pill px-4 py-2.5 rounded-full shadow-xl text-xs font-semibold text-white transition-all cursor-pointer"
+              className="absolute top-28 right-4 z-20 pointer-events-auto flex items-center gap-2 apple-liquid-glass-pill px-4 py-2.5 rounded-full shadow-xl text-xs font-semibold text-white transition-all cursor-pointer active:scale-95"
             >
               <BarChart3 className="w-4 h-4 text-rose-400" />
               <span>Show Threat Analytics</span>
@@ -606,7 +609,7 @@ export default function App() {
         {!isHomeView && (
           <div className={`absolute z-30 transition-all duration-300 pointer-events-auto ${
             isMeteoPanelOpen ? 'left-[400px]' : 'left-4'
-          } bottom-20`}>
+          } ${activeLayer === 'precip' ? 'bottom-32' : 'bottom-20'}`}>
             <WindParticleDropdown
               mode={windParticleMode}
               onChangeMode={(newMode) => {
@@ -624,9 +627,7 @@ export default function App() {
         {/* Floating Multi-Variable Weather Color Scale Legend Bar */}
         {activeLayer !== 'none' && !isHomeView && (
           <div className={`absolute z-30 transition-all duration-300 pointer-events-auto bottom-8 ${
-            isMeteoPanelOpen
-              ? 'left-[calc(50%+190px)] -translate-x-1/2'
-              : 'left-1/2 -translate-x-1/2'
+            isMeteoPanelOpen ? 'left-[calc(50%+190px)] -translate-x-1/2' : 'left-1/2 -translate-x-1/2'
           }`}>
             <TemperatureLegendBar
               activeLayer={activeLayer}

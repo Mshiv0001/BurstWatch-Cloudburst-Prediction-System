@@ -61,7 +61,7 @@ async function generateThermodynamicTile(z, x, y) {
   }
 
   const n = 1 << z;
-  const GRID_SIZE = 64; // 64x64 grid with bilinear scaling to 256x256
+  const GRID_SIZE = 96; // 96x96 high-resolution grid with bilinear scaling to 256x256
   const TILE_SIZE = 256;
 
   let smallCanvas, smallCtx, bigCanvas, bigCtx;

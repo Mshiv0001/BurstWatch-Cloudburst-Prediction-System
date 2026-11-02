@@ -9,7 +9,6 @@ import {
   CloudRain, 
   Wind,
   Sparkles, 
-  MapPin,
   Volume2,
   VolumeX
 } from 'lucide-react';
@@ -21,7 +20,8 @@ import {
   computeGlobalThermodynamicTemp,
   getWindSpeedColor,
   getWindSpeedCategory,
-  getTempColorHex
+  getTempColorHex,
+  formatTemperature
 } from '../utils/temperatureUtils';
 import {
   getActiveCyclones,
@@ -178,7 +178,6 @@ function getWindVector(lon, lat) {
 function getLocalTemperature(lon, lat) {
   return Math.round(computeGlobalThermodynamicTemp(lon, lat));
 }
-
 
 function getLocalWindSpeed(lon, lat) {
   const vec = getWindVector(lon, lat);
@@ -498,7 +497,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         tiles: [getWeatherApiTileUrl(cfg.layerKey)],
         tileSize: 256,
         minzoom: 0,
-        maxzoom: 6, // Crucial: tell MapLibre to overscale beyond zoom 6 to prevent 404s
+        maxzoom: cfg.layerKey === 'tmp2m' ? 14 : 6, // Thermo-temp procedural generator supports crisp tiles up to zoom 14
         attribution: '&copy; WeatherAPI.com'
       });
 
@@ -515,7 +514,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     }
 
     // Rain radar (precip) uses the authentic multi-tier Doppler radar reflectivity & dark relief basemap
-    const isThisRasterVisible = activeLayer === key && key !== 'precip';
+    const isThisRasterVisible = activeLayer === key && key !== 'precip' && (key !== 'temp' || isHeatmapVisible);
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -912,10 +911,23 @@ export default function CloudburstMap({
   const mapViewRef = useRef(mapView);
   mapViewRef.current = mapView;
   const selectedWeatherLayerRef = useRef(selectedWeatherLayer);
+  selectedWeatherLayerRef.current = selectedWeatherLayer;
+  const showTempRef = useRef(showTemperature);
+  showTempRef.current = showTemperature;
+  const tempUnitRef = useRef(tempUnit);
+  tempUnitRef.current = tempUnit;
 
   useEffect(() => {
     selectedWeatherLayerRef.current = selectedWeatherLayer;
   }, [selectedWeatherLayer]);
+
+  useEffect(() => {
+    showTempRef.current = showTemperature;
+  }, [showTemperature]);
+
+  useEffect(() => {
+    tempUnitRef.current = tempUnit;
+  }, [tempUnit]);
 
   // Dynamic map scale bar state (Metric vs Imperial)
   const [scaleUnit, setScaleUnit] = useState('metric');
@@ -974,8 +986,6 @@ export default function CloudburstMap({
   const [radarTimestampPath, setRadarTimestampPath] = useState(null);
   const [radarTimestampTime, setRadarTimestampTime] = useState(null);
   const [radarStatus, setRadarStatus] = useState('loading');
-  const [pinnedCoords, setPinnedCoords] = useState(null);
-  const [pinnedScreenPos, setPinnedScreenPos] = useState({ x: 0, y: 0 });
 
   // Fetch the latest available RainViewer radar frame and refresh every 10 minutes
   useEffect(() => {
@@ -1077,7 +1087,7 @@ export default function CloudburstMap({
     };
   }, [apply3DState]);
 
-  // Render user location & cloudburst epicenter markers on MapLibre map
+  // Clean map marker renderer (pin and station black dots removed as requested)
   const renderStationMarkers = useCallback((map) => {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
@@ -1092,7 +1102,7 @@ export default function CloudburstMap({
       userEl.className = 'custom-user-marker relative flex items-center justify-center cursor-pointer select-none';
       userEl.innerHTML = `
         <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-white shadow-lg flex items-center justify-center">
-          <div class="w-1 h-1 rounded-full bg-slate-950"></div>
+          <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
         </div>
       `;
 
@@ -1110,120 +1120,7 @@ export default function CloudburstMap({
         .addTo(map);
       markersRef.current.push(userMarker);
     }
-
-    // Convective Hazard Epicenter / Active Monitored Station Pin
-    if (cloudburstEvent?.coordinates) {
-      const [lon, lat] = cloudburstEvent.coordinates;
-      const displayRisk = cloudburstEvent.metrics?.riskPercent ?? cloudburstEvent.mlModel?.confidencePercent ?? 4;
-      const locName = cloudburstEvent.locationName || 'Monitored Sector';
-      const rainRate = cloudburstEvent.metrics?.predictedRainRateMmh || 0;
-      const isHighAlert = displayRisk >= 25 || cloudburstEvent.isAlertActive;
-
-      const epicenterEl = document.createElement('div');
-      epicenterEl.className = 'custom-cloudburst-epicenter relative flex items-center justify-center cursor-pointer select-none group pointer-events-auto';
-
-      if (isHighAlert) {
-        epicenterEl.title = `Convective Alert: ${locName} (${displayRisk}% Risk) — Predicted Rain: ${rainRate} mm/h (Click to focus)`;
-        epicenterEl.innerHTML = `
-          <div class="relative flex items-center justify-center pointer-events-auto">
-            <!-- Outer Pulsating Shockwave 1 -->
-            <span class="absolute w-20 h-20 rounded-full bg-rose-600/35 animate-ping pointer-events-none" style="animation-duration: 2.2s;"></span>
-            <!-- Outer Pulsating Shockwave 2 -->
-            <span class="absolute w-36 h-36 rounded-full border border-rose-500/40 animate-ping pointer-events-none" style="animation-duration: 3.5s;"></span>
-            <!-- Reticle boundary ring -->
-            <span class="absolute w-12 h-12 rounded-full border-2 border-dashed border-rose-400 animate-spin pointer-events-none" style="animation-duration: 12s;"></span>
-            <!-- Core Mission Control Badge -->
-            <div class="relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white font-mono text-[11px] font-black shadow-[0_0_24px_rgba(244,63,94,0.9)] border-2 border-white scale-100 group-hover:scale-110 transition-transform whitespace-nowrap">
-              <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
-              <span class="tracking-wide uppercase">⚡ ${locName} • <span class="text-amber-200 font-bold">${displayRisk}% RISK</span> ${rainRate > 0 ? `• ${rainRate} mm/h` : ''}</span>
-            </div>
-          </div>
-        `;
-      } else {
-        epicenterEl.title = `Peak Monitored Hotspot: ${locName} (ML Risk: ${displayRisk}% — Normal / All Clear) (Click to focus)`;
-        epicenterEl.innerHTML = `
-          <div class="relative flex items-center justify-center pointer-events-auto">
-            <!-- Subtle calm emerald ping -->
-            <span class="absolute w-10 h-10 rounded-full bg-emerald-500/25 animate-ping pointer-events-none" style="animation-duration: 3.5s;"></span>
-            <!-- Calm Watch Point Tag -->
-            <div class="relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-950/90 backdrop-blur-md text-emerald-400 font-mono text-[11px] font-bold shadow-[0_0_16px_rgba(16,185,129,0.3)] border border-emerald-500/50 scale-100 group-hover:scale-105 transition-transform whitespace-nowrap">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span class="text-slate-100 font-sans font-semibold">📍 Peak Monitored Cell: ${locName}</span>
-              <span class="text-emerald-400 font-mono font-bold">— ${displayRisk}% (All Clear)</span>
-            </div>
-          </div>
-        `;
-      }
-
-      epicenterEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        map.flyTo({
-          center: [lon, lat],
-          zoom: 10.5,
-          pitch: is3DRef.current ? 58 : 30,
-          bearing: 15,
-          speed: 1.2
-        });
-        updateProbeAtCoords(lon, lat);
-        if (onFocusEpicenter) {
-          onFocusEpicenter(cloudburstEvent);
-        }
-      });
-
-      const cbMarker = new maplibregl.Marker({ element: epicenterEl })
-        .setLngLat([lon, lat])
-        .addTo(map);
-
-      cloudburstMarkerRef.current = cbMarker;
-    }
-
-    // Render interactive station dots for major IMD stations across India
-    const keyStationIds = new Set([
-      'kedarnath', 'dehradun', 'chamoli', 'uttarkashi', 'nainital',
-      'shimla', 'dharamshala', 'manali', 'kullu', 'leh', 'srinagar',
-      'delhi', 'jaipur', 'mumbai', 'pune', 'bengaluru', 'chennai',
-      'kolkata', 'wayanad', 'cherrapunji', 'shillong', 'darjeeling', 'gangtok',
-      'bhopal', 'hyderabad', 'guwahati', 'ahmedabad', 'patna', 'lucknow',
-      'munnar', 'ooty', 'mahabaleshwar'
-    ]);
-
-    const activeStnLon = cloudburstEvent?.coordinates ? cloudburstEvent.coordinates[0] : null;
-    const activeStnLat = cloudburstEvent?.coordinates ? cloudburstEvent.coordinates[1] : null;
-
-    stations.forEach(stn => {
-      // Don't draw a small dot if it coincides with the primary active hotspot pin
-      if (activeStnLon != null && activeStnLat != null) {
-        if (Math.abs(stn.lon - activeStnLon) < 0.05 && Math.abs(stn.lat - activeStnLat) < 0.05) {
-          return;
-        }
-      }
-      if (!keyStationIds.has(stn.id)) return;
-
-      const dotEl = document.createElement('div');
-      dotEl.className = 'group relative flex items-center justify-center cursor-pointer select-none';
-      dotEl.title = `${stn.name} (${stn.state || stn.region}) — Click to run on-demand ML prediction`;
-      dotEl.innerHTML = `
-        <div class="relative flex items-center justify-center pointer-events-auto">
-          <span class="w-2.5 h-2.5 rounded-full bg-slate-900/90 border border-cyan-400/80 shadow-sm group-hover:scale-150 group-hover:bg-cyan-400 group-hover:border-white group-hover:shadow-[0_0_12px_#22d3ee] transition-all duration-200"></span>
-          <span class="absolute -bottom-6 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950/95 text-slate-200 text-[10px] font-sans font-medium px-2 py-0.5 rounded-md border border-cyan-500/30 whitespace-nowrap pointer-events-none z-30 shadow-lg">
-            ${stn.name} <span class="text-cyan-400 font-mono text-[9px] ml-1">⚡ Run ML</span>
-          </span>
-        </div>
-      `;
-
-      dotEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (onSelectStation) {
-          onSelectStation(stn);
-        }
-      });
-
-      const stnMarker = new maplibregl.Marker({ element: dotEl })
-        .setLngLat([stn.lon, stn.lat])
-        .addTo(map);
-      markersRef.current.push(stnMarker);
-    });
-  }, [userLocation, cloudburstEvent, stations, onSelectStation, updateProbeAtCoords, onFocusEpicenter]);
+  }, [userLocation]);
 
   // Initialize MapLibre GL JS with a raster basemap
   useEffect(() => {
@@ -1342,11 +1239,6 @@ export default function CloudburstMap({
         });
         setProbeScreenPos({ x, y });
         setIsProbeVisible(true);
-      });
-
-      // Pin location click listener in radar mode
-      map.on('click', (e) => {
-        setPinnedCoords([e.lngLat.lng, e.lngLat.lat]);
       });
 
       // Initialize probe at center of map
@@ -1503,29 +1395,6 @@ export default function CloudburstMap({
     const p = particlesRef.current;
     const count = MAX_PARTICLES;
 
-    const resize = () => {
-      const rect = map.getCanvas().getBoundingClientRect();
-      if (canvas.width !== rect.width || canvas.height !== rect.height) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-
-        for (let i = 0; i < count; i++) {
-          const rx = Math.random() * canvas.width;
-          const ry = Math.random() * canvas.height;
-          p.x[i] = rx;
-          p.y[i] = ry;
-          p.prevX[i] = rx;
-          p.prevY[i] = ry;
-          p.age[i] = Math.floor(Math.random() * 45);
-          p.maxAge[i] = 40 + Math.floor(Math.random() * 45);
-          p.speed[i] = 0.85 + Math.random() * 0.30;
-        }
-      }
-    };
-
-    resize();
-    map.on('resize', resize);
-
     let centerLng = 78.96, centerLat = 22.50, scale = 1, cX = 0, cY = 0;
     let isPitchedOrRotated = false;
 
@@ -1565,19 +1434,42 @@ export default function CloudburstMap({
       }
     };
 
+    const resize = () => {
+      const rect = map.getCanvas().getBoundingClientRect();
+      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        for (let i = 0; i < count; i++) {
+          const rx = Math.random() * canvas.width;
+          const ry = Math.random() * canvas.height;
+          p.x[i] = rx;
+          p.y[i] = ry;
+          p.prevX[i] = rx;
+          p.prevY[i] = ry;
+          p.age[i] = Math.floor(Math.random() * 45);
+          p.maxAge[i] = 40 + Math.floor(Math.random() * 45);
+          p.speed[i] = 0.85 + Math.random() * 0.30;
+        }
+      }
+    };
+
+    resize();
     updateCameraCache();
+
+    map.on('resize', resize);
     map.on('movestart', clearCanvasTrails);
-    map.on('move', () => {
-      updateCameraCache();
-      clearCanvasTrails();
-    });
-    map.on('moveend', updateCameraCache);
     map.on('zoomstart', clearCanvasTrails);
-    map.on('zoom', () => {
+
+    const onMapMove = () => {
       updateCameraCache();
       clearCanvasTrails();
-    });
-    map.on('zoomend', updateCameraCache);
+    };
+
+    map.on('move', onMapMove);
+    map.on('zoom', onMapMove);
+    map.on('moveend', onMapMove);
+    map.on('zoomend', onMapMove);
 
     let isRunning = true;
 
@@ -1784,11 +1676,11 @@ export default function CloudburstMap({
       }
       map.off('resize', resize);
       map.off('movestart', clearCanvasTrails);
-      map.off('move', updateCameraCache);
-      map.off('moveend', updateCameraCache);
       map.off('zoomstart', clearCanvasTrails);
-      map.off('zoom', updateCameraCache);
-      map.off('zoomend', updateCameraCache);
+      map.off('move', onMapMove);
+      map.off('zoom', onMapMove);
+      map.off('moveend', onMapMove);
+      map.off('zoomend', onMapMove);
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2094,6 +1986,65 @@ export default function CloudburstMap({
         }}
       />
 
+      {/* 2.2 Interactive Windy Cursor Probe / Flag Picker */}
+      {isProbeVisible && probe && !isHomeView && (
+        <div
+          className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-[calc(100%+14px)] transition-transform duration-75 select-none"
+          style={{
+            left: `${probeScreenPos.x}px`,
+            top: `${probeScreenPos.y}px`
+          }}
+        >
+          <div className="apple-liquid-glass px-2.5 py-1.5 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.6)] border border-white/20 flex flex-col gap-1 min-w-[130px] backdrop-blur-md">
+            {/* Top row: Sector & Coordinates */}
+            <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-300">
+              <span className="font-semibold text-slate-200 truncate max-w-[110px]">{probe.name}</span>
+              <span className="text-[9px] text-slate-400 shrink-0">
+                {probe.lat.toFixed(1)}°, {probe.lon.toFixed(1)}°
+              </span>
+            </div>
+
+            {/* Primary metric display */}
+            <div className="flex items-center justify-between gap-3 pt-0.5 border-t border-white/10">
+              {/* Temperature Badge */}
+              <div className="flex items-center gap-1.5">
+                <span 
+                  className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                  style={{ backgroundColor: getTempColorHex(probe.temp) }}
+                />
+                <span className="text-xs font-bold text-white font-sans">
+                  {formatTemperature(probe.temp, tempUnit)}
+                </span>
+              </div>
+
+              {/* Wind Speed Badge */}
+              <div className="flex items-center gap-1 text-[11px] font-mono font-medium">
+                <Wind className="w-3 h-3 text-cyan-300 shrink-0" />
+                <span style={{ color: getWindSpeedColor(probe.wind) }}>
+                  {probe.wind} <span className="text-[9px] text-slate-400">km/h</span>
+                </span>
+              </div>
+            </div>
+
+            {/* If radar or cloudburst layer is active, show radar dBZ or risk % */}
+            {selectedWeatherLayer === 'precip' && probe.dbz > 0 && (
+              <div className="text-[10px] font-mono text-cyan-300 flex items-center justify-between pt-0.5 border-t border-white/10">
+                <span>Radar:</span>
+                <span className="font-bold">{probe.dbz} dBZ</span>
+              </div>
+            )}
+            {selectedWeatherLayer === 'convective' && probe.convectiveRisk > 0 && (
+              <div className="text-[10px] font-mono text-amber-300 flex items-center justify-between pt-0.5 border-t border-white/10">
+                <span>Cloudburst Risk:</span>
+                <span className="font-bold">{Math.round(probe.convectiveRisk)}%</span>
+              </div>
+            )}
+          </div>
+          {/* Downward indicator arrow pointing at cursor position */}
+          <div className="w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-black/60 mx-auto" />
+        </div>
+      )}
+
       {/* 2.5 Weather Overlay Layer Floating Pill Bar */}
       {!isHomeView && (
         <div className={`absolute bottom-20 z-20 flex items-center gap-1 apple-liquid-glass px-2.5 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none transition-all duration-300 max-w-[calc(100vw-32px)] overflow-x-auto scrollbar-none ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
@@ -2149,48 +2100,6 @@ export default function CloudburstMap({
         </div>
       )}
 
-
-
-
-      {/* Pinned user-selected location tooltip */}
-      {selectedWeatherLayer === 'precip' && pinnedCoords && pinnedScreenPos.x > 0 && (
-        <div 
-          id="radar-pin-badge"
-          className="absolute z-25 pointer-events-none select-none transition-transform duration-75"
-          style={{
-            left: `${pinnedScreenPos.x}px`,
-            top: `${pinnedScreenPos.y}px`,
-            transform: 'translate(-50%, -100%)'
-          }}
-        >
-          <div className="relative bg-white text-slate-900 px-3.5 py-1.5 rounded-lg shadow-2xl border border-black/15 flex flex-col items-center select-none">
-            <div className="flex items-center gap-1 text-[13px] font-bold font-sans tracking-tight whitespace-nowrap">
-              <MapPin className="w-3.5 h-3.5 text-blue-600 fill-blue-500 shrink-0" />
-              <span>
-                {(() => {
-                  const lat = pinnedCoords[1] ?? 17.05;
-                  const lon = pinnedCoords[0] ?? 88.33;
-                  const latDeg = Math.floor(Math.abs(lat));
-                  const latMin = Math.round((Math.abs(lat) - latDeg) * 60);
-                  const latDir = lat >= 0 ? 'N' : 'S';
-                  const lonDeg = Math.floor(Math.abs(lon));
-                  const lonMin = Math.round((Math.abs(lon) - lonDeg) * 60);
-                  const lonDir = lon >= 0 ? 'E' : 'W';
-                  return `${latDeg}°${String(latMin).padStart(2, '0')}'${latDir} ${lonDeg}°${String(lonMin).padStart(2, '0')}'${lonDir}`;
-                })()}
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 font-medium">0 mi</span>
-            {/* Downward triangle arrow */}
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white rotate-45 border-r border-b border-black/15" />
-          </div>
-        </div>
-      )}
-
-
-
-
-
       {/* 4.8 Radar source and time */}
       {selectedWeatherLayer === 'precip' && !isHomeView && (
         <div className="absolute bottom-16 left-4 z-20 apple-liquid-glass-pill px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold text-slate-100 shadow-xl border border-white/20 select-none pointer-events-auto">
@@ -2205,77 +2114,73 @@ export default function CloudburstMap({
       )}
 
       {/* 5. Clean Basic Map Navigation Controls */}
-      {!isHomeView && (
-        <div className={`absolute bottom-8 z-20 flex flex-col gap-1.5 apple-liquid-glass p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 ${isAnalyticsOpen ? 'right-[360px]' : 'right-4'}`}>
-          <button
-            onClick={handleZoomIn}
-            title="Zoom In"
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleZoomOut}
-            title="Zoom Out"
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
+      <div className={`absolute bottom-8 z-20 flex flex-col gap-1.5 apple-liquid-glass p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 ${isAnalyticsOpen ? 'right-[360px]' : 'right-4'}`}>
+        <button
+          onClick={handleZoomIn}
+          title="Zoom In"
+          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          title="Zoom Out"
+          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
 
-          <button
-            onClick={() => {
-              const nextMuted = !isThunderMuted;
-              thunderSynth.setMuted(nextMuted);
-              setIsThunderMuted(nextMuted);
-              if (!nextMuted) {
-                thunderSynth.play();
-              }
-            }}
-            title={isThunderMuted ? "Enable Muted Thunder Audio" : "Mute Thunder Audio (Currently Active)"}
-            className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
-              isThunderMuted 
-                ? 'text-slate-400 hover:text-white hover:bg-white/15' 
-                : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
-            }`}
-          >
-            {isThunderMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
+        <button
+          onClick={() => {
+            const nextMuted = !isThunderMuted;
+            thunderSynth.setMuted(nextMuted);
+            setIsThunderMuted(nextMuted);
+            if (!nextMuted) {
+              thunderSynth.play();
+            }
+          }}
+          title={isThunderMuted ? "Enable Muted Thunder Audio" : "Mute Thunder Audio (Currently Active)"}
+          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+            isThunderMuted 
+              ? 'text-slate-400 hover:text-white hover:bg-white/15' 
+              : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+          }`}
+        >
+          {isThunderMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
 
-          <button
-            onClick={() => {
-              mapRef.current?.flyTo({
-                center: [78.96, 23.50],
-                zoom: 4.8,
-                pitch: is3D ? 58 : 0,
-                bearing: is3D ? 20 : 0,
-                speed: 1.2
-              });
-            }}
-            title="Focus India / Himalayas"
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer flex items-center justify-center font-bold text-xs active:scale-95"
-          >
-            <span>🇮🇳</span>
-          </button>
-        </div>
-      )}
+        <button
+          onClick={() => {
+            mapRef.current?.flyTo({
+              center: [78.96, 23.50],
+              zoom: 4.8,
+              pitch: is3D ? 58 : 0,
+              bearing: is3D ? 20 : 0,
+              speed: 1.2
+            });
+          }}
+          title="Focus India / Himalayas"
+          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer flex items-center justify-center font-bold text-xs active:scale-95"
+        >
+          <span>🇮🇳</span>
+        </button>
+      </div>
 
       {/* Bottom Left Dynamic Scale Indicator */}
-      {!isHomeView && (
-        <button
-          type="button"
-          onClick={() => setScaleUnit((u) => (u === 'metric' ? 'imperial' : 'metric'))}
-          title={`Click to toggle units (${scaleUnit === 'metric' ? 'Metric: km' : 'Imperial: mi'})`}
-          className="absolute bottom-8 left-4 z-20 flex flex-col gap-1 text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-3 py-1 rounded-full shadow-xl pointer-events-auto select-none border border-white/20 cursor-pointer hover:bg-white/20 transition-all active:scale-95"
-        >
-          <div className="flex items-center gap-2">
-            <span
-              style={{ width: `${scaleInfo.widthPx}px` }}
-              className="h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
-            />
-            <span className="font-semibold whitespace-nowrap">{scaleInfo.label}</span>
-          </div>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setScaleUnit((u) => (u === 'metric' ? 'imperial' : 'metric'))}
+        title={`Click to toggle units (${scaleUnit === 'metric' ? 'Metric: km' : 'Imperial: mi'})`}
+        className="absolute bottom-8 left-4 z-20 flex flex-col gap-1 text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-3 py-1 rounded-full shadow-xl pointer-events-auto select-none border border-white/20 cursor-pointer hover:bg-white/20 transition-all active:scale-95"
+      >
+        <div className="flex items-center gap-2">
+          <span
+            style={{ width: `${scaleInfo.widthPx}px` }}
+            className="h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
+          />
+          <span className="font-semibold whitespace-nowrap">{scaleInfo.label}</span>
+        </div>
+      </button>
     </div>
   );
 }

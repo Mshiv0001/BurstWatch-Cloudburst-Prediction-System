@@ -83,7 +83,7 @@ class Settings:
             run_on_startup=_bool("RUN_ON_STARTUP", True),
             stale_after_hours=float(os.getenv("STALE_AFTER_HOURS", "12")),
             admin_api_key=os.getenv("ADMIN_API_KEY", ""),
-            cors_origins=_csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"),
+            cors_origins=_csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,*"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             alert_webhook_url=os.getenv("ALERT_WEBHOOK_URL", ""),
             extreme_threshold_mm=float(os.getenv("EXTREME_THRESHOLD_MM", "50")),
