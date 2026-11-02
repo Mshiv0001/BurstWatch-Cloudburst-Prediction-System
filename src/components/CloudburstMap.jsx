@@ -34,6 +34,10 @@ import {
 } from '../services/cycloneService';
 import { generateCloudburstHeatmapGeoJSON } from '../utils/heatmapGeoJson';
 import { WEATHER_LAYERS, getWeatherApiTileUrl, getWeatherApiTimestamp } from '../utils/weatherTiles';
+import { 
+  generateIsothermContourGeoJSON, 
+  getActiveCityBadges 
+} from '../utils/isothermContourGenerator';
 import {
   getLocalRadarDbz
 } from '../utils/radarEchoesData';
@@ -502,8 +506,8 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       });
     }
 
-    // Individual raster layers are visible when selected; precip is handled via RainViewer doppler radar
-    const isThisRasterVisible = activeLayer === key && key !== 'precip';
+    // Both temp and wind now use transparent vector rendering (isotherm lines & speed-colored particles)
+    const isThisRasterVisible = false;
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -514,18 +518,79 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           visibility: isThisRasterVisible ? 'visible' : 'none'
         },
         paint: {
-          'raster-opacity': cfg.opacity,
+          'raster-opacity': 0.0,
           'raster-fade-duration': 0,
           'raster-resampling': 'linear'
         }
       }, beforeId);
     } else {
-      map.setLayoutProperty(cfg.layerId, 'visibility', isThisRasterVisible ? 'visible' : 'none');
+      map.setLayoutProperty(cfg.layerId, 'visibility', 'none');
       try {
-        map.setPaintProperty(cfg.layerId, 'raster-resampling', 'linear');
+        map.setPaintProperty(cfg.layerId, 'raster-opacity', 0.0);
       } catch (e) {}
     }
   });
+
+  // 3.5 High-Precision Vector Isotherm Contour Lines (5°C synoptic intervals)
+  const isTempContourVis = activeLayer === 'temp';
+  const isothermData = generateIsothermContourGeoJSON();
+
+  if (!map.getSource('isotherm-contours-source')) {
+    map.addSource('isotherm-contours-source', {
+      type: 'geojson',
+      data: isothermData
+    });
+  } else {
+    map.getSource('isotherm-contours-source').setData(isothermData);
+  }
+
+  // A. Subtle Soft Glow under Contour Lines
+  if (!map.getLayer('isotherm-contours-glow')) {
+    map.addLayer({
+      id: 'isotherm-contours-glow',
+      type: 'line',
+      source: 'isotherm-contours-source',
+      layout: {
+        visibility: isTempContourVis ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 3.5,
+        'line-opacity': 0.35,
+        'line-blur': 1.5
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('isotherm-contours-glow', 'visibility', isTempContourVis ? 'visible' : 'none');
+  }
+
+  // B. Crisp Solid Isotherm Contour Lines
+  if (!map.getLayer('isotherm-contours-line')) {
+    map.addLayer({
+      id: 'isotherm-contours-line',
+      type: 'line',
+      source: 'isotherm-contours-source',
+      layout: {
+        visibility: isTempContourVis ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          2, 1.2,
+          5, 1.8,
+          9, 2.5
+        ],
+        'line-opacity': 0.90
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('isotherm-contours-line', 'visibility', isTempContourVis ? 'visible' : 'none');
+  }
 
   // 4. Heatmap GeoJSON Source for Convective Cloudburst Hazard Plumes
   if (heatmapGeoJSON) {
@@ -1363,7 +1428,7 @@ export default function CloudburstMap({
     const map = mapRef.current;
     if (!canvas || !map) return;
 
-    const isOff = (!showParticles || windParticleMode === 'off') && activeLayer !== 'wind';
+    const isOff = (!showParticles || windParticleMode === 'off') && selectedWeatherLayer !== 'wind';
     if (isOff) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -1523,6 +1588,12 @@ export default function CloudburstMap({
       const width = canvas.width;
       const height = canvas.height;
 
+      const isWindLayer = selectedWeatherLayer === 'wind';
+      const tierCalm = [];     // < 22 km/h (Ice-Cyan)
+      const tierModerate = []; // 22-48 km/h (Emerald Green)
+      const tierBrisk = [];    // 48-78 km/h (Solar Amber)
+      const tierStorm = [];    // >= 78 km/h (Neon Magenta/Crimson)
+
       const tierFine = [];   // delicate background streamlines
       const tierMid = [];    // standard active streamlines
       const tierStrong = []; // brilliant, luminous streaks (matching Ventusky reference)
@@ -1578,14 +1649,27 @@ export default function CloudburstMap({
 
         if (Math.abs(dx) <= maxJump && Math.abs(dy) <= maxJump) {
           if (p.age[i] > 1 && alpha > 0.04) {
-            let targetTier = tierFine;
-            if (mag2 >= 5.2 || alpha > 0.82) {
-              targetTier = tierStrong;
-            } else if (mag2 >= 2.6 || alpha > 0.48) {
-              targetTier = tierMid;
+            if (isWindLayer) {
+              const estSpeedKmh = mag2 * 12.5;
+              if (estSpeedKmh >= 78) {
+                tierStorm.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
+              } else if (estSpeedKmh >= 48) {
+                tierBrisk.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
+              } else if (estSpeedKmh >= 22) {
+                tierModerate.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
+              } else {
+                tierCalm.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
+              }
+            } else {
+              let targetTier = tierFine;
+              if (mag2 >= 5.2 || alpha > 0.82) {
+                targetTier = tierStrong;
+              } else if (mag2 >= 2.6 || alpha > 0.48) {
+                targetTier = tierMid;
+              }
+              // Continuous 2-micro-step curvilinear path (curr -> mid -> next) eliminates angular crease
+              targetTier.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
             }
-            // Continuous 2-micro-step curvilinear path (curr -> mid -> next) eliminates angular crease
-            targetTier.push(currX, currY, midX, midY, midX, midY, nextX, nextY);
           }
         }
 
@@ -1612,40 +1696,91 @@ export default function CloudburstMap({
         }
       }
 
-      // 1. Delicate background streamlines (translucent silk)
-      if (tierFine.length > 0) {
-        ctx.beginPath();
-        ctx.lineWidth = widthFine;
-        ctx.strokeStyle = strokeFine;
-        for (let j = 0; j < tierFine.length; j += 4) {
-          ctx.moveTo(tierFine[j], tierFine[j + 1]);
-          ctx.lineTo(tierFine[j + 2], tierFine[j + 3]);
+      if (isWindLayer) {
+        // Speed-Coded Streamlines (Ventusky / Beaufort Spectrum)
+        // 1. Calm / Gentle (< 22 km/h) - Translucent Ice-Cyan
+        if (tierCalm.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = 'rgba(165, 243, 252, 0.75)';
+          for (let j = 0; j < tierCalm.length; j += 4) {
+            ctx.moveTo(tierCalm[j], tierCalm[j + 1]);
+            ctx.lineTo(tierCalm[j + 2], tierCalm[j + 3]);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
-      }
 
-      // 2. Medium active streamlines (clear crisp white)
-      if (tierMid.length > 0) {
-        ctx.beginPath();
-        ctx.lineWidth = widthMid;
-        ctx.strokeStyle = strokeMid;
-        for (let j = 0; j < tierMid.length; j += 4) {
-          ctx.moveTo(tierMid[j], tierMid[j + 1]);
-          ctx.lineTo(tierMid[j + 2], tierMid[j + 3]);
+        // 2. Moderate (22-48 km/h) - Electric Mint / Emerald
+        if (tierModerate.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.30;
+          ctx.strokeStyle = 'rgba(52, 211, 153, 0.90)';
+          for (let j = 0; j < tierModerate.length; j += 4) {
+            ctx.moveTo(tierModerate[j], tierModerate[j + 1]);
+            ctx.lineTo(tierModerate[j + 2], tierModerate[j + 3]);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
-      }
 
-      // 3. Crisp luminous foreground streaks (matching Ventusky reference)
-      if (tierStrong.length > 0) {
-        ctx.beginPath();
-        ctx.lineWidth = widthStrong;
-        ctx.strokeStyle = strokeStrong;
-        for (let j = 0; j < tierStrong.length; j += 4) {
-          ctx.moveTo(tierStrong[j], tierStrong[j + 1]);
-          ctx.lineTo(tierStrong[j + 2], tierStrong[j + 3]);
+        // 3. Fresh / Strong (48-78 km/h) - Glowing Solar Amber
+        if (tierBrisk.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.60;
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.98)';
+          for (let j = 0; j < tierBrisk.length; j += 4) {
+            ctx.moveTo(tierBrisk[j], tierBrisk[j + 1]);
+            ctx.lineTo(tierBrisk[j + 2], tierBrisk[j + 3]);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
+
+        // 4. Gale / Storm / Cyclone (>= 78 km/h) - Neon Magenta / Crimson
+        if (tierStorm.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 2.10;
+          ctx.strokeStyle = 'rgba(244, 63, 94, 1.0)';
+          for (let j = 0; j < tierStorm.length; j += 4) {
+            ctx.moveTo(tierStorm[j], tierStorm[j + 1]);
+            ctx.lineTo(tierStorm[j + 2], tierStorm[j + 3]);
+          }
+          ctx.stroke();
+        }
+      } else {
+        // 1. Delicate background streamlines (translucent silk)
+        if (tierFine.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = widthFine;
+          ctx.strokeStyle = strokeFine;
+          for (let j = 0; j < tierFine.length; j += 4) {
+            ctx.moveTo(tierFine[j], tierFine[j + 1]);
+            ctx.lineTo(tierFine[j + 2], tierFine[j + 3]);
+          }
+          ctx.stroke();
+        }
+
+        // 2. Medium active streamlines (clear crisp white)
+        if (tierMid.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = widthMid;
+          ctx.strokeStyle = strokeMid;
+          for (let j = 0; j < tierMid.length; j += 4) {
+            ctx.moveTo(tierMid[j], tierMid[j + 1]);
+            ctx.lineTo(tierMid[j + 2], tierMid[j + 3]);
+          }
+          ctx.stroke();
+        }
+
+        // 3. Crisp luminous foreground streaks (matching Ventusky reference)
+        if (tierStrong.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = widthStrong;
+          ctx.strokeStyle = strokeStrong;
+          for (let j = 0; j < tierStrong.length; j += 4) {
+            ctx.moveTo(tierStrong[j], tierStrong[j + 1]);
+            ctx.lineTo(tierStrong[j + 2], tierStrong[j + 3]);
+          }
+          ctx.stroke();
+        }
       }
 
       animFrameRef.current = requestAnimationFrame(render);
@@ -1671,7 +1806,7 @@ export default function CloudburstMap({
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     };
-  }, [showParticles, windParticleMode]);
+  }, [showParticles, windParticleMode, selectedWeatherLayer]);
 
 
   // Real-time hover cursor coordinate, temperature & windspeed probe tracking
@@ -1815,6 +1950,100 @@ export default function CloudburstMap({
       cycloneMarkersRef.current = [];
     };
   }, [updateProbeAtCoords]);
+
+  // 4.6 Adaptive Isotherm City Badges & Contour Midpoint Labels
+  const isothermMarkersRef = useRef([]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const renderIsothermMarkers = () => {
+      isothermMarkersRef.current.forEach((m) => m.remove());
+      isothermMarkersRef.current = [];
+
+      if (selectedWeatherLayer !== 'temp') return;
+
+      const zoom = map.getZoom();
+      const bounds = map.getBounds();
+
+      // 1. Adaptive Regional City Badges (Clean, non-cluttering LoD)
+      const activeCities = getActiveCityBadges(zoom, tempUnit);
+      activeCities.forEach((city) => {
+        if (
+          city.lon >= bounds.getWest() - 1 &&
+          city.lon <= bounds.getEast() + 1 &&
+          city.lat >= bounds.getSouth() - 1 &&
+          city.lat <= bounds.getNorth() + 1
+        ) {
+          const el = document.createElement('div');
+          el.className = 'isotherm-city-badge pointer-events-auto cursor-pointer select-none transition-transform hover:scale-110 active:scale-95';
+          el.title = `${city.name}: ${city.label} · Click to inspect`;
+          el.innerHTML = `
+            <div class="apple-liquid-glass px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-white/20 shadow-md backdrop-blur-md">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0 shadow-sm" style="background-color: ${city.color}"></span>
+              <span class="text-[10px] font-medium text-slate-200">${city.name}</span>
+              <span class="text-[10px] font-bold text-white font-mono">${city.label}</span>
+            </div>
+          `;
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            map.flyTo({
+              center: [city.lon, city.lat],
+              zoom: Math.max(map.getZoom(), 6.5),
+              speed: 1.2
+            });
+            updateProbeAtCoords(city.lon, city.lat);
+          });
+
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([city.lon, city.lat])
+            .addTo(map);
+
+          isothermMarkersRef.current.push(marker);
+        }
+      });
+
+      // 2. Contour Line Labels (midpoint indicators on contours)
+      const contourGeo = generateIsothermContourGeoJSON();
+      if (contourGeo?.labelFeatures) {
+        contourGeo.labelFeatures.forEach((pt) => {
+          const [lon, lat] = pt.geometry.coordinates;
+          if (
+            lon >= bounds.getWest() &&
+            lon <= bounds.getEast() &&
+            lat >= bounds.getSouth() &&
+            lat <= bounds.getNorth()
+          ) {
+            const el = document.createElement('div');
+            el.className = 'isotherm-contour-pill pointer-events-none select-none';
+            el.innerHTML = `
+              <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-slate-950/80 border border-white/20 shadow-sm" style="color: ${pt.properties.color}">
+                ${formatTemperature(pt.properties.temp, tempUnit)}
+              </span>
+            `;
+            const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+              .setLngLat([lon, lat])
+              .addTo(map);
+
+            isothermMarkersRef.current.push(marker);
+          }
+        });
+      }
+    };
+
+    renderIsothermMarkers();
+
+    map.on('moveend', renderIsothermMarkers);
+    map.on('zoomend', renderIsothermMarkers);
+
+    return () => {
+      map.off('moveend', renderIsothermMarkers);
+      map.off('zoomend', renderIsothermMarkers);
+      isothermMarkersRef.current.forEach((m) => m.remove());
+      isothermMarkersRef.current = [];
+    };
+  }, [selectedWeatherLayer, tempUnit, updateProbeAtCoords]);
 
   // Update probe coordinates on map pan/zoom/scroll
   useEffect(() => {

@@ -31,10 +31,10 @@ export const WEATHER_LAYERS = {
     label: 'Temperature',
     shortLabel: 'Temp',
     icon: 'Thermometer',
-    type: 'raster',
-    opacity: 0.70,
+    type: 'vector-isotherm',
+    opacity: 0.0,
     unit: '°C',
-    description: 'Seamless continuous global thermodynamic temperature isotherms'
+    description: 'Vector isotherm contour lines & adaptive regional city temperatures'
   },
   wind: {
     id: 'wind',
@@ -44,10 +44,10 @@ export const WEATHER_LAYERS = {
     label: 'Wind Speed',
     shortLabel: 'Wind',
     icon: 'Wind',
-    type: 'raster',
-    opacity: 0.65,
+    type: 'vector-streamlines',
+    opacity: 0.0,
     unit: 'km/h',
-    description: 'Continuous global atmospheric wind velocity field and streamline flow'
+    description: 'Beaufort speed-colored streamline particle flow (zero background fill)'
   },
   precip: {
     id: 'precip',

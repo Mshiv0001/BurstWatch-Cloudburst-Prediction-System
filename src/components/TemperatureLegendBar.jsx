@@ -96,6 +96,13 @@ export default function TemperatureLegendBar({
       className={`select-none pointer-events-auto transition-all duration-300 ${className}`}
       aria-label={`${config.label} Color Scale`}
     >
+      {/* Visual Mode Subtitle Tag */}
+      <div className="flex justify-center mb-1">
+        <span className="text-[10px] font-mono font-medium text-slate-300 apple-liquid-glass px-2.5 py-0.5 rounded-full border border-white/10 shadow-sm">
+          {isTemp ? 'Isotherm Contours · 5°C intervals' : isWind ? 'Speed-Coded Streamline Flow' : config.label}
+        </span>
+      </div>
+
       {/* Horizontal Rounded Pill Bar matching Windy visual reference */}
       <div 
         className="relative flex items-center justify-between px-3 sm:px-4 w-[330px] sm:w-[380px] h-7 sm:h-7.5 rounded-full border border-black/40 ring-1 ring-black/25 shadow-[0_4px_16px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_2px_rgba(0,0,0,0.45)] transition-all duration-300"
