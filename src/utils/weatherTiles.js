@@ -32,9 +32,9 @@ export const WEATHER_LAYERS = {
     shortLabel: 'Temp',
     icon: 'Thermometer',
     type: 'raster',
-    opacity: 0.68,
+    opacity: 0.88,
     unit: '°C',
-    description: 'Smooth continuous thermodynamic color field with streamline particles (Windy style)'
+    description: 'Vivid thermodynamic color field with streamline particles (Windy style)'
   },
   wind: {
     id: 'wind',
@@ -73,7 +73,7 @@ let isProtocolRegistered = false;
  * Fully continuous ($C^\infty$) across all Web Mercator tile borders and the 180° meridian
  */
 async function generateThermodynamicTile(z, x, y) {
-  const cacheKey = `${z}/${x}/${y}`;
+  const cacheKey = `v2/${z}/${x}/${y}`;
   if (tileCache.has(cacheKey)) {
     return tileCache.get(cacheKey);
   }
@@ -114,7 +114,7 @@ async function generateThermodynamicTile(z, x, y) {
       const lon = (px / n) * 360 - 180;
 
       const temp = computeGlobalThermodynamicTemp(lon, lat);
-      const [r, g, b, a] = getInterpolatedTempColor(temp, 0.72);
+      const [r, g, b, a] = getInterpolatedTempColor(temp, 0.95);
 
       const idx = (gy * GRID_SIZE + gx) * 4;
       data[idx] = r;

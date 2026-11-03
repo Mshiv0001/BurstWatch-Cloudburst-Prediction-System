@@ -9,22 +9,23 @@
  */
 
 export const TEMPERATURE_STOPS = [
-  { c: 50, color: '#5a1008', rgb: [90, 16, 8], isDarkText: false },
-  { c: 40, color: '#8c2014', rgb: [140, 32, 20], isDarkText: false },
-  { c: 35, color: '#c24b10', rgb: [194, 75, 16], isDarkText: false },
-  { c: 30, color: '#e67812', rgb: [230, 120, 18], isDarkText: false },
-  { c: 25, color: '#d39a1d', rgb: [211, 154, 29], isDarkText: false },
-  { c: 20, color: '#b8ba28', rgb: [184, 186, 40], isDarkText: false },
-  { c: 15, color: '#7ea735', rgb: [126, 167, 53], isDarkText: false },
-  { c: 10, color: '#4ca043', rgb: [76, 160, 67], isDarkText: false },
-  { c: 5,  color: '#328a6f', rgb: [50, 138, 111], isDarkText: false },
-  { c: 0,  color: '#1e7a96', rgb: [30, 122, 150], isDarkText: false },
-  { c: -5, color: '#3fa3b9', rgb: [63, 163, 185], isDarkText: false },
-  { c: -10, color: '#56b5cb', rgb: [86, 181, 203], isDarkText: false },
-  { c: -15, color: '#7badd0', rgb: [123, 173, 208], isDarkText: false },
-  { c: -20, color: '#9b99cc', rgb: [155, 153, 204], isDarkText: false },
-  { c: -30, color: '#7875b2', rgb: [120, 117, 178], isDarkText: false },
-  { c: -40, color: '#535099', rgb: [83, 80, 153], isDarkText: false }
+  { c: 50, color: '#990000', rgb: [153, 0, 0], isDarkText: false },
+  { c: 42, color: '#d50000', rgb: [213, 0, 0], isDarkText: false },
+  { c: 36, color: '#f43f1e', rgb: [244, 63, 30], isDarkText: false },
+  { c: 31, color: '#ff5722', rgb: [255, 87, 34], isDarkText: false },
+  { c: 27, color: '#ff8f00', rgb: [255, 143, 0], isDarkText: false },
+  { c: 23, color: '#ffb300', rgb: [255, 179, 0], isDarkText: true },
+  { c: 19, color: '#ffd600', rgb: [255, 214, 0], isDarkText: true },
+  { c: 15, color: '#aeea00', rgb: [174, 234, 0], isDarkText: true },
+  { c: 11, color: '#43a047', rgb: [67, 160, 71], isDarkText: false },
+  { c: 6,  color: '#00897b', rgb: [0, 137, 123], isDarkText: false },
+  { c: 1,  color: '#00acc1', rgb: [0, 172, 193], isDarkText: false },
+  { c: -4, color: '#00b0ff', rgb: [0, 176, 255], isDarkText: false },
+  { c: -9, color: '#448aff', rgb: [68, 138, 255], isDarkText: false },
+  { c: -15, color: '#7c4dff', rgb: [124, 77, 255], isDarkText: false },
+  { c: -22, color: '#ab47bc', rgb: [171, 71, 188], isDarkText: false },
+  { c: -30, color: '#d81b60', rgb: [216, 27, 96], isDarkText: false },
+  { c: -40, color: '#4a148c', rgb: [74, 20, 140], isDarkText: false }
 ];
 
 export function celsiusToFahrenheit(c) {

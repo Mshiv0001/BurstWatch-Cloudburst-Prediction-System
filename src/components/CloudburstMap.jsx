@@ -516,7 +516,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           visibility: isThisRasterVisible ? 'visible' : 'none'
         },
         paint: {
-          'raster-opacity': isThisRasterVisible ? 0.68 : 0.0,
+          'raster-opacity': isThisRasterVisible ? 0.93 : 0.0,
           'raster-fade-duration': 0,
           'raster-resampling': 'linear'
         }
@@ -524,7 +524,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     } else {
       map.setLayoutProperty(cfg.layerId, 'visibility', isThisRasterVisible ? 'visible' : 'none');
       try {
-        map.setPaintProperty(cfg.layerId, 'raster-opacity', isThisRasterVisible ? 0.68 : 0.0);
+        map.setPaintProperty(cfg.layerId, 'raster-opacity', isThisRasterVisible ? 0.93 : 0.0);
         map.setPaintProperty(cfg.layerId, 'raster-resampling', 'linear');
       } catch (e) {}
     }
@@ -830,6 +830,42 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   }
   if (map.getSource('antimeridian-seam-source')) {
     map.removeSource('antimeridian-seam-source');
+  }
+
+  // 6.5 Top-level Overlay for Country/City Names & Boundaries
+  // Ensures cities, countries, and borders are always rendered crisply ON TOP of colorful weather & satellite layers
+  if (!map.getSource('esri-reference-labels')) {
+    map.addSource('esri-reference-labels', {
+      type: 'raster',
+      tiles: [
+        'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '&copy; Esri & OpenStreetMap'
+    });
+  }
+
+  const isOverlayVisible = isSatellite || activeLayer === 'temp' || activeLayer === 'precip' || isHeatmapVisible;
+
+  if (!map.getLayer('overlay-labels-and-boundaries')) {
+    map.addLayer({
+      id: 'overlay-labels-and-boundaries',
+      type: 'raster',
+      source: 'esri-reference-labels',
+      layout: {
+        visibility: isOverlayVisible ? 'visible' : 'none'
+      },
+      paint: {
+        'raster-opacity': isOverlayVisible ? 1.0 : 0.0,
+        'raster-fade-duration': 150
+      }
+    });
+  } else {
+    map.setLayoutProperty('overlay-labels-and-boundaries', 'visibility', isOverlayVisible ? 'visible' : 'none');
+    try {
+      map.setPaintProperty('overlay-labels-and-boundaries', 'raster-opacity', isOverlayVisible ? 1.0 : 0.0);
+    } catch (e) {}
   }
 
   // 7. Refresh place label typography

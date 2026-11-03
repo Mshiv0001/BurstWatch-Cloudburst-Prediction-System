@@ -14,7 +14,7 @@ const LAYER_CONFIGS = {
     id: 'temp',
     label: 'Temperature',
     unit: (tempUnit) => `°${tempUnit || 'C'}`,
-    gradient: 'linear-gradient(to right, #535099 0%, #7875b2 10%, #9b99cc 18%, #56b5cb 28%, #1e7a96 38%, #4ca043 50%, #b8ba28 62%, #e67812 75%, #c24b10 85%, #8c2014 93%, #5a1008 100%)',
+    gradient: 'linear-gradient(to right, #4a148c 0%, #d81b60 10%, #7c4dff 20%, #00b0ff 30%, #00acc1 40%, #43a047 50%, #aeea00 60%, #ffd600 70%, #ff8f00 80%, #ff5722 90%, #d50000 96%, #990000 100%)',
     getStops: (tempUnit) => (
       tempUnit === 'F'
         ? ['-40', '-22', '-4', '14', '32', '50', '68', '86', '104', '122']
