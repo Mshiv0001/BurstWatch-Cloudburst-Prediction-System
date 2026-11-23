@@ -256,7 +256,7 @@ export default function LiveMeteoPanel({
                   </div>
                   <div>
                     <div className="text-[10px] uppercase font-bold tracking-wider text-sky-300">
-                      🌐 Global Synoptic Monitoring
+                      Global Synoptic Monitoring
                     </div>
                     <div className="text-xs font-semibold leading-tight text-slate-200">
                       {isLive ? 'Current weather observations available' : 'Estimated baseline data · not a current observation'}

@@ -3,10 +3,10 @@ import { ChevronDown, Wind } from 'lucide-react';
 
 export const WIND_PARTICLE_OPTIONS = [
   { id: 'off', label: 'Off' },
-  { id: 'normal', label: 'Normal' },
-  { id: 'strong', label: 'Strong' },
-  { id: 'dark', label: 'Dark' },
-  { id: 'fast', label: 'Fast-motion' },
+  { id: 'fast', label: 'Big Ribbons (Fast)' },
+  { id: 'normal', label: 'Normal Ribbons' },
+  { id: 'strong', label: 'Strong Ribbons' },
+  { id: 'dark', label: 'Dark Ribbons' },
 ];
 
 export default function WindParticleDropdown({ 

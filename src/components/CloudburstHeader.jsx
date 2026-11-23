@@ -371,11 +371,11 @@ export default function CloudburstHeader({
                             <span>{item.name}</span>
                             {item.isIndia ? (
                               <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                                🇮🇳 India
+                                India
                               </span>
                             ) : (
                               <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                                🌐 Global
+                                Global
                               </span>
                             )}
                           </div>

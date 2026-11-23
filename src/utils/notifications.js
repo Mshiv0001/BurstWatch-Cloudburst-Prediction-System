@@ -73,7 +73,7 @@ export const requestPermissionsAndNotify = async ({
 
         // Send confirmation notification once location is acquired
         if (notifPermission === 'granted') {
-          sendBrowserNotification("📍 Real-Time Location Connected", {
+          sendBrowserNotification("Real-Time Location Connected", {
             body: `Latitude: ${userCoords.lat.toFixed(3)}°, Longitude: ${userCoords.lng.toFixed(3)}°. Localized Cloudburst tracking is now active.`,
             tag: "location-connected"
           });
@@ -85,7 +85,7 @@ export const requestPermissionsAndNotify = async ({
 
         // Still send active alert notification if notification permission was granted
         if (notifPermission === 'granted') {
-          sendBrowserNotification("⚡ Cloudburst Early Warning Active", {
+          sendBrowserNotification("Cloudburst Early Warning Active", {
             body: "Convective alert tracking active. (Default catchment stations in Western Himalayas).",
             tag: "alert-active"
           });
@@ -98,7 +98,7 @@ export const requestPermissionsAndNotify = async ({
       }
     );
   } else if (notifPermission === 'granted') {
-    sendBrowserNotification("⚡ Cloudburst Early Warning Active", {
+    sendBrowserNotification("Cloudburst Early Warning Active", {
       body: "Convective alert monitoring is active.",
       tag: "alert-active"
     });

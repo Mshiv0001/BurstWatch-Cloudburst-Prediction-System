@@ -14,7 +14,7 @@ const LAYER_CONFIGS = {
     id: 'temp',
     label: 'Temperature',
     unit: (tempUnit) => `°${tempUnit || 'C'}`,
-    gradient: 'linear-gradient(to right, #4a148c 0%, #d81b60 10%, #7c4dff 20%, #00b0ff 30%, #00acc1 40%, #43a047 50%, #aeea00 60%, #ffd600 70%, #ff8f00 80%, #ff5722 90%, #d50000 96%, #990000 100%)',
+    gradient: 'linear-gradient(to right, #dd06c1 0.0%, #cf06f1 8.9%, #a305f3 13.3%, #7604f6 17.8%, #4703f9 22.2%, #2902fa 25.0%, #0b01fc 27.8%, #0116fd 30.6%, #0034ff 33.3%, #2363fb 35.6%, #458bf7 37.8%, #66abf5 40.0%, #86c5f5 42.2%, #72e8a5 44.4%, #4ee885 46.7%, #28e960 48.9%, #11dc3d 51.1%, #09bf24 53.3%, #04a00f 55.6%, #008000 57.8%, #28a000 60.0%, #60c000 62.2%, #a7df00 64.4%, #ffff00 66.7%, #ffed00 68.9%, #ffdb00 71.1%, #ffc900 73.3%, #ffb700 75.6%, #ffa500 77.8%, #ff8a00 80.0%, #ff6e00 82.2%, #ff5300 84.4%, #ff3700 86.7%, #ff1b00 88.9%, #ff0000 91.1%, #e4000a 93.3%, #c90012 95.6%, #ae0017 97.8%, #93001a 100.0%)',
     getStops: (tempUnit) => (
       tempUnit === 'F'
         ? ['-40', '-22', '-4', '14', '32', '50', '68', '86', '104', '122']
@@ -96,13 +96,6 @@ export default function TemperatureLegendBar({
       className={`select-none pointer-events-auto transition-all duration-300 ${className}`}
       aria-label={`${config.label} Color Scale`}
     >
-      {/* Visual Mode Subtitle Tag */}
-      <div className="flex justify-center mb-1">
-        <span className="text-[10px] font-mono font-medium text-slate-300 apple-liquid-glass px-2.5 py-0.5 rounded-full border border-white/10 shadow-sm">
-          {isTemp ? 'Thermodynamic Field (Windy Style)' : isWind ? 'Speed-Coded Streamlines' : config.label}
-        </span>
-      </div>
-
       {/* Horizontal Rounded Pill Bar matching Windy visual reference */}
       <div 
         className="relative flex items-center justify-between px-3 sm:px-4 w-[330px] sm:w-[380px] h-7 sm:h-7.5 rounded-full border border-black/40 ring-1 ring-black/25 shadow-[0_4px_16px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_2px_rgba(0,0,0,0.45)] transition-all duration-300"

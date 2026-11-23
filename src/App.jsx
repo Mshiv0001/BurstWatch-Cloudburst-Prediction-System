@@ -10,6 +10,7 @@ import LiveMeteoPanel from './components/LiveMeteoPanel';
 import AreaRiskRankingsPanel from './components/AreaRiskRankingsPanel';
 import TemperatureLegendBar from './components/TemperatureLegendBar';
 import WindParticleDropdown from './components/WindParticleDropdown';
+import RainingCitiesPanel from './components/RainingCitiesPanel';
 import CinematicIntroSplash from './components/CinematicIntroSplash';
 import { getCloudburstEventData } from './services/cloudburstEventModel';
 
@@ -21,6 +22,7 @@ import {
   getHighestRiskStation,
   MODEL_METADATA 
 } from './data/cloudburstData';
+import { preloadTemperatureEngine } from './utils/temperatureUtils';
 import { BarChart3, MapPin, Loader2, AlertTriangle, CheckCircle2, ArrowDownWideNarrow } from 'lucide-react';
 
 export default function App() {
@@ -36,7 +38,7 @@ export default function App() {
   const [mapView, setMapView] = useState('positron'); // 'liberty' | 'positron' | 'bright' | 'satellite'
   const [activeLayer, setActiveLayer] = useState('convective'); // Default to Convective Cloudburst Heatmap
   const [showParticles, setShowParticles] = useState(true);
-  const [windParticleMode, setWindParticleMode] = useState('normal'); // 'off' | 'normal' | 'strong' | 'soft' | 'dark' | 'fast'
+  const [windParticleMode, setWindParticleMode] = useState('fast'); // Default to 'fast' (big ribbons in fast motion)
   const [showIsobars, setShowIsobars] = useState(false);
   const [showTemperatureLayer, setShowTemperatureLayer] = useState(true);
   const [tempUnit, setTempUnit] = useState('C'); // 'C' | 'F'
@@ -44,6 +46,18 @@ export default function App() {
 
   const handleToggleTempUnit = useCallback(() => {
     setTempUnit((prev) => (prev === 'C' ? 'F' : 'C'));
+  }, []);
+
+  // Pre-warm Open-Meteo WebAssembly engine & S3 metadata on idle (0ms cold start)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const triggerWarmup = () => preloadTemperatureEngine();
+    if ('requestIdleCallback' in window) {
+      const handle = window.requestIdleCallback(triggerWarmup, { timeout: 2000 });
+      return () => window.cancelIdleCallback?.(handle);
+    }
+    const timer = setTimeout(triggerWarmup, 1200);
+    return () => clearTimeout(timer);
   }, []);
 
   // UI Drawer & Modal States - Default Closed for Clean Map Visibility
@@ -239,7 +253,7 @@ export default function App() {
 
         setLocationToast({
           type: 'fallback',
-          title: `📍 Located Sector: ${cityName}, ${regionName}`,
+          title: `Located Sector: ${cityName}, ${regionName}`,
           message: reason === 'denied'
             ? 'Browser GPS was blocked by site settings. Centered via network location. (Allow location in browser for exact GPS).'
             : `Radar centered on ${cityName}, ${regionName}.`
@@ -266,7 +280,7 @@ export default function App() {
     setIsLocatingUser(true);
     setLocationToast({
       type: 'requesting',
-      title: '📍 Requesting Location Permission',
+      title: 'Requesting Location Permission',
       message: 'Please click "Allow" on the browser prompt to fly to your exact position...'
     });
 
@@ -322,12 +336,12 @@ export default function App() {
 
         setLocationToast({
           type: 'success',
-          title: '📍 Centered on Your Location!',
+          title: 'Centered on Your Location',
           message: `Live GPS acquired: ${cityName} (${coords.lat.toFixed(3)}°, ${coords.lng.toFixed(3)}°)`
         });
         setTimeout(() => setLocationToast(null), 4000);
 
-        sendBrowserNotification("📍 Centered on Your Location", {
+        sendBrowserNotification("Centered on Your Location", {
           body: `GPS coordinates acquired: ${cityName} (Lat ${coords.lat.toFixed(3)}°, Lon ${coords.lng.toFixed(3)}°). Radar focused.`,
           tag: "user-relocated"
         });
@@ -572,6 +586,32 @@ export default function App() {
           </div>
         )}
 
+        {/* Floating Real-Time Raining Cities Ranked Panel (Rain Radar Layer) */}
+        {!isHomeView && (
+          <div className={`absolute z-30 transition-all duration-300 ${
+            activeLayer === 'precip'
+              ? 'opacity-100 visible pointer-events-auto'
+              : 'opacity-0 invisible pointer-events-none'
+          } ${
+            isMeteoPanelOpen ? 'top-16 left-[400px]' : 'top-16 left-4'
+          }`}>
+            <RainingCitiesPanel
+              isActive={activeLayer === 'precip'}
+              onSelectCity={(city) => {
+                handleSelectStation({
+                  id: city.id,
+                  name: city.name,
+                  stationName: city.name,
+                  state: city.state,
+                  lat: city.lat,
+                  lon: city.lon
+                });
+              }}
+              cloudburstEvent={cloudburstEvent}
+            />
+          </div>
+        )}
+
         {/* Floating Right Column: Threat Analytics Panel */}
         {!isHomeView && (
           isAnalyticsOpen ? (
@@ -609,7 +649,7 @@ export default function App() {
         {!isHomeView && (
           <div className={`absolute z-30 transition-all duration-300 pointer-events-auto ${
             isMeteoPanelOpen ? 'left-[400px]' : 'left-4'
-          } ${activeLayer === 'precip' ? 'bottom-32' : 'bottom-20'}`}>
+          } bottom-20`}>
             <WindParticleDropdown
               mode={windParticleMode}
               onChangeMode={(newMode) => {

@@ -68,3 +68,63 @@ export function getLocalRadarDbz(lon, lat, precipRate = 0) {
   const dbz = 10 * Math.log10(Math.max(1, z));
   return Math.min(75, Math.max(0, Math.round(dbz)));
 }
+
+/**
+ * Resolves color, category and formatted label for a given dBZ / rain rate
+ */
+export function getRadarProbeInfo(dbz, rainRate = 0) {
+  if (dbz < 18 || rainRate < 0.1) {
+    return { dbz: 0, rainRate: 0, label: 'Clear', color: '#94a3b8' };
+  }
+  if (dbz < 30) {
+    return { dbz, rainRate, label: `Light Rain (${rainRate.toFixed(1)} mm/h)`, color: '#38bdf8' };
+  }
+  if (dbz < 42) {
+    return { dbz, rainRate, label: `Moderate Rain (${rainRate.toFixed(1)} mm/h)`, color: '#34d399' };
+  }
+  if (dbz < 52) {
+    return { dbz, rainRate, label: `Heavy Rain (${rainRate.toFixed(1)} mm/h)`, color: '#f59e0b' };
+  }
+  return { dbz, rainRate, label: `Severe Storm (${rainRate.toFixed(1)} mm/h)`, color: '#f43f5e' };
+}
+
+/**
+ * Estimates instantaneous ground precipitation rate (mm/h) based on meteorological systems
+ */
+export function estimateLocalRainRate(lon, lat, { cyclones = [], cloudburstEvent = null } = {}) {
+  let rate = 0;
+
+  // 1. Tropical Cyclones precipitation bands
+  if (Array.isArray(cyclones)) {
+    for (let i = 0; i < cyclones.length; i++) {
+      const c = cyclones[i];
+      if (c && typeof c.lat === 'number' && typeof c.lon === 'number') {
+        const dLat = lat - c.lat;
+        const dLon = ((((lon - c.lon + 180) % 360) + 360) % 360 - 180) * Math.cos((lat * Math.PI) / 180.0);
+        const dist = Math.hypot(dLat, dLon);
+        if (dist < 10.0) {
+          const windKmh = c.windKmh || 120;
+          const peak = Math.min(80.0, windKmh * 0.40);
+          rate = Math.max(rate, peak * Math.exp(-dist / 1.8));
+        }
+      }
+    }
+  }
+
+  // 2. Active Cloudburst Hazard Plume
+  if (cloudburstEvent?.coordinates) {
+    const [eLon, eLat] = cloudburstEvent.coordinates;
+    const dLat = lat - eLat;
+    const dLon = ((((lon - eLon + 180) % 360) + 360) % 360 - 180) * Math.cos((lat * Math.PI) / 180.0);
+    const distDeg = Math.hypot(dLat, dLon);
+    const radiusDeg = (cloudburstEvent.hazardRadiusKm || 30) / 111.0;
+    if (distDeg < radiusDeg * 2.5) {
+      const peakRate = cloudburstEvent.metrics?.rainfallMmPerHour || 85.0;
+      const factor = Math.exp(-(distDeg * distDeg) / (radiusDeg * radiusDeg * 0.8));
+      rate = Math.max(rate, peakRate * factor);
+    }
+  }
+
+  return rate;
+}
+
