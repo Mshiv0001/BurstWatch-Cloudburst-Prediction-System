@@ -534,6 +534,8 @@ export default function App() {
           windUnit={windUnit}
           onWindUnitChange={setWindUnit}
           cloudburstEvent={activeCloudburstEvent}
+          isMlRetrying={isMlRetrying}
+          onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
           onFocusEpicenter={handleFocusCloudburstEpicenter}
           onHoverTemp={setHoveredMapTemp}
         />
@@ -594,11 +596,18 @@ export default function App() {
           <NavRail
             activeNav={activeNav}
             onSelectNav={handleSelectNav}
+            activeLayer={activeLayer}
+            onChangeActiveLayer={(layer) => {
+              setActiveLayer(layer);
+              if (layer === 'wind') {
+                setShowParticles(true);
+                if (windParticleMode === 'off') {
+                  setWindParticleMode('silk');
+                }
+              }
+            }}
             isSatellite={mapView === 'satellite'}
             onToggleSatellite={() => setMapView((prev) => (prev === 'satellite' ? 'default' : 'satellite'))}
-            cloudburstEvent={activeCloudburstEvent}
-            isMlRetrying={isMlRetrying}
-            onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
             onOpenEmailModal={() => setIsEmailModalOpen(true)}
             isEmailSubscribed={isEmailSubscribed}
           />
