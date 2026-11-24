@@ -20,8 +20,11 @@ import {
   Compass,
   Activity,
   ShieldAlert,
-  Navigation
+  Navigation,
+  Cpu,
+  RefreshCw
 } from 'lucide-react';
+import FpsCounter from './FpsCounter';
 import { STATIONS_NETWORK } from '../data/cloudburstData';
 import { getCachedMLRisk } from '../services/mlPredictionService';
 import { isIndiaSector } from '../utils/geoUtils';
@@ -1687,9 +1690,12 @@ export default function CloudburstMap({
   windSpeed = 45,
   tcwv = 52,
   cloudburstEvent = null,
+  isMlRetrying = false,
+  onRefreshMlStatus = null,
   onFocusEpicenter = null,
   onHoverTemp = null
 }) {
+  const isMlLive = cloudburstEvent?.isLive === true;
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -4222,51 +4228,49 @@ export default function CloudburstMap({
           ) : null}
         </div>
 
-        {/* 3. Right: Weather Overlay Layer Floating Pill Bar */}
-        <div className="pointer-events-auto shrink-0">
-          <div className="flex items-center gap-1 glass-panel-translucent px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full shadow-2xl border border-white/20 select-none overflow-x-auto scrollbar-none">
-            <span className="px-1 text-[10px] font-mono font-bold text-amber-300 select-none shrink-0 hidden xl:inline">
-              Weather:
+        {/* 3. Right: System Telemetry (ML Model Status & Hardware FPS Monitor) */}
+        <div className="pointer-events-auto shrink-0 flex items-center gap-2">
+          {/* Dual-Engine ML Model Status Pill Button */}
+          <button
+            type="button"
+            onClick={onRefreshMlStatus}
+            disabled={isMlRetrying}
+            title={
+              isMlLive
+                ? 'Physics-Informed Dual-Engine ML Model: LIVE (Click to refresh status)'
+                : `Dual-Engine ML Model: OFFLINE (${cloudburstEvent?.error || 'Cannot reach localhost:8001'}) - Click to retry`
+            }
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none border shadow-2xl ${
+              isMlLive
+                ? 'apple-liquid-glass-emerald text-emerald-200 border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.25)] hover:border-emerald-300'
+                : 'apple-liquid-glass-crimson text-rose-200 border-rose-500/50 shadow-[0_0_14px_rgba(244,63,94,0.25)] hover:border-rose-400'
+            }`}
+          >
+            {isMlRetrying ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-200 shrink-0" />
+            ) : (
+              <Cpu className={`w-3.5 h-3.5 shrink-0 ${isMlLive ? 'text-emerald-300' : 'text-rose-300'}`} />
+            )}
+
+            <span className="font-mono text-[11px] font-semibold tracking-tight">
+              {isMlRetrying ? 'Checking ML...' : isMlLive ? 'ML LIVE' : 'ML OFFLINE'}
             </span>
 
-            {[
-              { id: 'temp', label: 'Temperature', short: 'Temp', icon: Thermometer },
-              { id: 'convective', label: 'Cloudburst', short: 'Cloudburst', icon: Zap },
-              { id: 'precip', label: 'Rain Radar', short: 'Radar', icon: CloudRain },
-              { id: 'wind', label: 'Wind Speed', short: 'Wind', icon: Wind },
-              { id: 'aqi', label: 'Air Quality', short: 'AQI', icon: Activity },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = selectedWeatherLayer === item.id;
-              const isItemLoading = (item.id === 'temp' && isActive && isTempLoading) || (item.id === 'aqi' && isActive && isAqiLoading);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleSelectWeatherLayer(isActive ? 'none' : item.id)}
-                  onPointerEnter={() => {
-                    if (item.id === 'temp') preloadTemperatureEngine();
-                  }}
-                  onFocus={() => {
-                    if (item.id === 'temp') preloadTemperatureEngine();
-                  }}
-                  title={`Toggle ${item.label} Overlay`}
-                  className={`flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10px] font-bold transition-all cursor-pointer shrink-0 ${isActive
-                    ? 'apple-liquid-glass-cyan text-cyan-200 border border-cyan-400/50 shadow-md scale-105'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                    }`}
-                >
-                  {isItemLoading ? (
-                    <Loader2 className="w-3 h-3 text-cyan-300 animate-spin" />
-                  ) : (
-                    <Icon className="w-3 h-3" />
-                  )}
-                  <span className="hidden md:inline">{item.label}</span>
-                  <span className="md:hidden">{item.short}</span>
-                </button>
-              );
-            })}
-          </div>
+            {/* Pulsing Status Dot */}
+            <span className="relative flex h-2 w-2">
+              {isMlLive ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                </>
+              ) : (
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+              )}
+            </span>
+          </button>
+
+          {/* Real-Time Hardware FPS Monitor (Opens HUD Popover Upwards) */}
+          <FpsCounter variant="bottom" />
         </div>
       </div>
     </div>
