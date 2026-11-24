@@ -124,6 +124,94 @@ class SubscriberApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("Unsubscribed", res.text)
 
+    def test_google_auth_zero_otp_and_session_jwt(self):
+        """Test Google login path requires ZERO OTP and returns signed session JWT with claims."""
+        import jwt
+
+        # 1. Post Google credential (simulated email or OIDC token)
+        google_email = "climate_researcher@gmail.com"
+        res = self.client.post("/subscribers/google-auth", json={
+            "credential": google_email,
+            "location_pref": "Western Ghats"
+        })
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+
+        # Zero OTP validation: Status is directly verified!
+        self.assertEqual(body["status"], "verified")
+        self.assertEqual(body["verified"], True)
+        self.assertEqual(body["email"], google_email)
+        self.assertEqual(body["auth_provider"], "google")
+        self.assertIn("access_token", body)
+
+        # 2. Decode and verify HS256 JWT
+        access_token = body["access_token"]
+        claims = jwt.decode(access_token, self.settings.jwt_secret, algorithms=["HS256"])
+        self.assertEqual(claims["sub"], google_email)
+        self.assertEqual(claims["email"], google_email)
+        self.assertEqual(claims["auth_provider"], "google")
+        self.assertIn("name", claims)
+        self.assertIn("picture", claims)
+
+        # 3. Use access token to fetch authenticated profile via /subscribers/me
+        me_res = self.client.get("/subscribers/me", headers={"Authorization": f"Bearer {access_token}"})
+        self.assertEqual(me_res.status_code, 200)
+        me_data = me_res.json()
+        self.assertEqual(me_data["email"], google_email)
+        self.assertEqual(me_data["auth_provider"], "google")
+        self.assertEqual(me_data["location_pref"], "Western Ghats")
+        self.assertEqual(me_data["verified"], True)
+
+    def test_brute_force_otp_limiting(self):
+        """Test that exceeding 5 failed OTP attempts locks out verification until code refresh."""
+        email = "brute_target@burstwatch.live"
+        self.client.post("/subscribers/register", json={"email": email})
+
+        # Send 5 incorrect OTP attempts
+        for attempt in range(1, 5):
+            res = self.client.post("/subscribers/verify", json={"email": email, "code": "999999"})
+            self.assertEqual(res.status_code, 400)
+            self.assertIn("attempt(s) remaining", res.json()["detail"])
+
+        # 5th failed attempt
+        res = self.client.post("/subscribers/verify", json={"email": email, "code": "999999"})
+        self.assertEqual(res.status_code, 400)
+
+        # 6th attempt is blocked completely due to brute-force protection
+        res = self.client.post("/subscribers/verify", json={"email": email, "code": "999999"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Too many failed attempts", res.json()["detail"])
+
+    def test_session_token_and_preference_update(self):
+        """Test updating notification preferences via Bearer JWT session token."""
+        email = "valley_watcher@burstwatch.live"
+        self.client.post("/subscribers/register", json={"email": email})
+        sub = self.store.get_subscriber(email)
+        code = sub["verification_code"]
+
+        # Verify to obtain session JWT
+        verify_res = self.client.post("/subscribers/verify", json={"email": email, "code": code})
+        self.assertEqual(verify_res.status_code, 200)
+        token = verify_res.json()["access_token"]
+        self.assertTrue(bool(token))
+
+        # Update preferences with Bearer token
+        pref_res = self.client.post(
+            "/subscribers/preferences",
+            json={"location_pref": "Kedarnath Valley", "min_threshold_mm": 65.0},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        self.assertEqual(pref_res.status_code, 200)
+        pref_data = pref_res.json()
+        self.assertEqual(pref_data["location_pref"], "Kedarnath Valley")
+        self.assertEqual(pref_data["min_threshold_mm"], 65.0)
+
+        # Verify persisted preferences via /subscribers/me
+        me_res = self.client.get("/subscribers/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(me_res.status_code, 200)
+        self.assertEqual(me_res.json()["location_pref"], "Kedarnath Valley")
+        self.assertEqual(me_res.json()["min_threshold_mm"], 65.0)
+
 
 if __name__ == "__main__":
     unittest.main()
