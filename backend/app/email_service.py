@@ -157,12 +157,17 @@ class EmailService:
 </body>
 </html>"""
 
-    def _dispatch_smtp(self, to_email: str, subject: str, text_content: str, html_content: str) -> tuple[bool, str]:
+    def _dispatch_smtp(self, to_email: str, subject: str, text_content: str, html_content: str,
+                       headers: Optional[Dict[str, str]] = None) -> tuple[bool, str]:
         """Send via real SMTP server with TLS/SSL."""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = self.settings.smtp_from
         msg["To"] = to_email
+
+        if headers:
+            for k, v in headers.items():
+                msg[k] = v
 
         msg.attach(MIMEText(text_content, "plain", "utf-8"))
         msg.attach(MIMEText(html_content, "html", "utf-8"))
@@ -231,19 +236,24 @@ class EmailService:
             }
 
     def send_alert_email(self, to_email: str, alert_data: Dict[str, Any], unsubscribe_token: str) -> Dict[str, Any]:
-        """Dispatch a severe convective rainfall warning to a subscriber."""
+        """Dispatch a severe convective rainfall warning to a subscriber with RFC 8058 one-click headers."""
         loc = alert_data.get("location", "Monitored Region")
         prob = float(alert_data.get("predicted_probability", 0.0))
         subject = f"⚠️ [BurstWatch Alert] Convective Rainfall Risk ({prob*100:.0f}%) - {loc}"
+        unsub_url = f"https://burstwatch.live/api/subscribers/unsubscribe?token={unsubscribe_token}"
         text_content = (
             f"BurstWatch Weather Alert for {loc}\n"
             f"Target Date: {alert_data.get('target_date', 'Next Day')}\n"
             f"Predicted Risk: {prob*100:.1f}%\n"
             f"Threshold: {float(alert_data.get('threshold', 0.5))*100:.1f}%\n\n"
             "Precautionary Advisory: Rapid convective development anticipated. Avoid low-lying riverbeds.\n\n"
-            f"Unsubscribe: http://localhost:8000/subscribers/unsubscribe?token={unsubscribe_token}\n"
+            f"Unsubscribe: {unsub_url}\n"
         )
         html_content = self._render_alert_html(alert_data, unsubscribe_token)
+        rfc8058_headers = {
+            "List-Unsubscribe": f"<{unsub_url}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
 
         if self.is_dev_mode:
             banner = (
@@ -252,13 +262,16 @@ class EmailService:
                 f" TO: {to_email}\n"
                 f" SUBJECT: {subject}\n"
                 f" LOCATION: {loc} | PROBABILITY: {prob*100:.1f}%\n"
+                f" RFC 8058 HEADERS:\n"
+                f"   List-Unsubscribe: <{unsub_url}>\n"
+                f"   List-Unsubscribe-Post: List-Unsubscribe=One-Click\n"
                 + "!" * 72 + "\n"
             )
             print(banner)
             return {"success": True, "dev_mode": True, "recipient": to_email}
         else:
-            ok = self._dispatch_smtp(to_email, subject, text_content, html_content)
-            return {"success": ok, "dev_mode": False, "recipient": to_email}
+            ok, err_msg = self._dispatch_smtp(to_email, subject, text_content, html_content, headers=rfc8058_headers)
+            return {"success": ok, "dev_mode": False, "recipient": to_email, "error": err_msg if not ok else None}
 
     def broadcast_weather_alert(self, subscribers: List[Dict[str, Any]], alert_data: Dict[str, Any]) -> Dict[str, Any]:
         """Broadcast alert to all verified subscribers."""
