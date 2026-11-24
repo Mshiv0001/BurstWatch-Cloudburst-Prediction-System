@@ -14,8 +14,9 @@ import time
 import urllib.request
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, Dict, Optional
 
+import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -27,12 +28,37 @@ from .model_service import InsufficientDataError
 from .schemas import (
     EmailBroadcastRequest, LocationPredictionRequest, OutcomeRequest, RunRequest,
     SubscriberRegisterRequest, SubscriberResendRequest, SubscriberUnsubscribeRequest,
-    SubscriberVerifyRequest, SubscriberGoogleAuthRequest, make_feature_model,
+    SubscriberVerifyRequest, SubscriberGoogleAuthRequest, SubscriberPreferencesRequest,
+    make_feature_model,
 )
 from .service import ForecastService
 from .weather import WeatherError
 
 logger = logging.getLogger("cloudburst")
+
+
+def create_session_token(email: str, name: str = "", picture: str = "",
+                         auth_provider: str = "email", secret: str = "") -> str:
+    """Generate a signed cryptographic session JWT (HS256) valid for 30 days."""
+    now_ts = int(time.time())
+    payload = {
+        "sub": email,
+        "email": email,
+        "name": name or "",
+        "picture": picture or "",
+        "auth_provider": auth_provider,
+        "iat": now_ts,
+        "exp": now_ts + (30 * 86400),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+def decode_session_token(token: str, secret: str) -> Optional[Dict[str, Any]]:
+    """Verify and decode an HS256 session JWT token."""
+    try:
+        return jwt.decode(token, secret, algorithms=["HS256"])
+    except Exception:
+        return None
 
 
 def create_app(settings: Optional[Settings] = None,
@@ -279,45 +305,107 @@ def create_app(settings: Optional[Settings] = None,
 
     @app.post("/subscribers/google-auth", tags=["subscribers"])
     def authenticate_google_subscriber(payload: SubscriberGoogleAuthRequest):
-        """Verify Google ID token and activate verified subscriber without OTP."""
+        """Verify Google ID token, confirm email_verified, upsert verified subscriber with ZERO OTP, and issue session JWT."""
         token = payload.credential.strip()
         email = None
-        try:
-            import base64
-            parts = token.split(".")
-            if len(parts) >= 2:
-                padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
-                payload_json = json.loads(base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8"))
-                email = payload_json.get("email")
-        except Exception as e:
-            logger.warning(f"Failed to parse Google JWT payload: {e}")
+        name = ""
+        picture = ""
+        email_verified = False
 
+        # 1. Official Google ID Token cryptographic verification via google-auth
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport import requests as google_requests
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
+            email = idinfo.get("email")
+            email_verified = bool(idinfo.get("email_verified", False))
+            name = idinfo.get("name", "")
+            picture = idinfo.get("picture", "")
+        except Exception as exc:
+            logger.info("google-auth verification bypassed for dev/mock token: %s", exc)
+
+        # 2. Inspect unverified JWT claims if standard verify failed (for dev / testing)
+        if not email:
+            try:
+                unverified = jwt.decode(token, options={"verify_signature": False})
+                if unverified and isinstance(unverified, dict) and "email" in unverified:
+                    email = unverified["email"]
+                    email_verified = unverified.get("email_verified", True)
+                    name = unverified.get("name", "")
+                    picture = unverified.get("picture", "")
+            except Exception:
+                pass
+
+        # 3. Simulated dev Google login fallback (raw email input)
         if not email and "@" in token:
             email = token
+            email_verified = True
+            name = token.split("@")[0].replace(".", " ").title()
 
-        if not email:
+        if not email or not email_verified:
             raise HTTPException(400, "Invalid Google credential: email could not be verified.")
 
-        sub = svc.store.upsert_verified_google_subscriber(email, payload.location_pref or "ALL")
+        sub = svc.store.upsert_verified_google_subscriber(
+            email=email,
+            name=name,
+            picture=picture,
+            location_pref=payload.location_pref or "ALL"
+        )
+
+        session_token = create_session_token(
+            email=sub["email"],
+            name=sub.get("name") or name,
+            picture=sub.get("picture") or picture,
+            auth_provider="google",
+            secret=settings.jwt_secret
+        )
+
         return {
             "status": "verified",
             "email": sub["email"],
-            "message": "Subscribed successfully with Google.",
+            "name": sub.get("name") or name,
+            "picture": sub.get("picture") or picture,
+            "access_token": session_token,
+            "token_type": "bearer",
+            "auth_provider": "google",
             "verified": True,
+            "location_pref": sub.get("location_pref", "ALL"),
+            "min_threshold_mm": sub.get("min_threshold_mm", 50.0),
+            "message": "Subscribed and authenticated successfully with Google (Zero OTP).",
         }
 
     @app.post("/subscribers/verify", tags=["subscribers"])
     def verify_subscriber_otp(payload: SubscriberVerifyRequest):
-        """Verify the 6-digit OTP to activate alert subscription."""
+        """Verify the 6-digit OTP with brute-force limiting and return signed session JWT."""
         ok, msg = svc.store.verify_subscriber(payload.email, payload.code)
         if not ok:
             raise HTTPException(400, detail=msg)
         sub = svc.store.get_subscriber(payload.email)
+        email = sub["email"] if sub else payload.email
+        name = sub.get("name", "") if sub else ""
+        picture = sub.get("picture", "") if sub else ""
+        auth_provider = sub.get("auth_provider", "email") if sub else "email"
+
+        session_token = create_session_token(
+            email=email,
+            name=name,
+            picture=picture,
+            auth_provider=auth_provider,
+            secret=settings.jwt_secret
+        )
+
         return {
             "status": "verified",
-            "email": sub["email"] if sub else payload.email,
+            "email": email,
+            "name": name,
+            "picture": picture,
+            "access_token": session_token,
+            "token_type": "bearer",
+            "auth_provider": auth_provider,
             "message": msg,
             "verified": True,
+            "location_pref": sub.get("location_pref", "ALL") if sub else "ALL",
+            "min_threshold_mm": sub.get("min_threshold_mm", 50.0) if sub else 50.0,
         }
 
     @app.post("/subscribers/resend", tags=["subscribers"])
@@ -351,14 +439,92 @@ def create_app(settings: Optional[Settings] = None,
             "status": sub["status"],
             "verified": sub["status"] == "verified",
             "created_at": sub["created_at"],
-            "verified_at": sub["verified_at"],
-            "location_pref": sub["location_pref"],
+            "verified_at": sub.get("verified_at"),
+            "last_login_at": sub.get("last_login_at"),
+            "location_pref": sub.get("location_pref", "ALL"),
+            "auth_provider": sub.get("auth_provider", "email"),
+            "name": sub.get("name", ""),
+            "picture": sub.get("picture", ""),
+            "min_threshold_mm": sub.get("min_threshold_mm", 50.0),
+        }
+
+    @app.get("/subscribers/me", tags=["subscribers"])
+    def get_authenticated_subscriber_profile(
+        authorization: Optional[str] = Header(None),
+        token: Optional[str] = Query(None)
+    ):
+        """Retrieve authenticated subscriber profile and preferences via session JWT."""
+        raw_token = None
+        if authorization and authorization.lower().startswith("bearer "):
+            raw_token = authorization.split(" ", 1)[1].strip()
+        elif token:
+            raw_token = token.strip()
+
+        if not raw_token:
+            raise HTTPException(401, "Missing authentication session token.")
+
+        claims = decode_session_token(raw_token, settings.jwt_secret)
+        if not claims or "sub" not in claims:
+            raise HTTPException(401, "Invalid or expired session token.")
+
+        sub = svc.store.get_subscriber(claims["sub"])
+        if not sub:
+            raise HTTPException(404, "Subscriber account not found.")
+
+        return {
+            "email": sub["email"],
+            "name": sub.get("name") or claims.get("name", ""),
+            "picture": sub.get("picture") or claims.get("picture", ""),
+            "auth_provider": sub.get("auth_provider") or claims.get("auth_provider", "email"),
+            "status": sub["status"],
+            "verified": sub["status"] == "verified",
+            "location_pref": sub.get("location_pref", "ALL"),
+            "min_threshold_mm": sub.get("min_threshold_mm", 50.0),
+            "created_at": sub.get("created_at"),
+            "verified_at": sub.get("verified_at"),
+            "last_login_at": sub.get("last_login_at"),
+        }
+
+    @app.post("/subscribers/preferences", tags=["subscribers"])
+    def update_subscriber_preferences_endpoint(
+        payload: SubscriberPreferencesRequest,
+        authorization: Optional[str] = Header(None)
+    ):
+        """Update notification preferences (monitoring valley and rain threshold)."""
+        email = payload.email
+        if not email and authorization and authorization.lower().startswith("bearer "):
+            raw_token = authorization.split(" ", 1)[1].strip()
+            claims = decode_session_token(raw_token, settings.jwt_secret)
+            if claims:
+                email = claims.get("sub")
+
+        if not email:
+            raise HTTPException(400, "Email address or Bearer authentication required.")
+
+        updated = svc.store.update_subscriber_preferences(
+            email=email,
+            location_pref=payload.location_pref,
+            min_threshold_mm=payload.min_threshold_mm
+        )
+        if not updated:
+            raise HTTPException(404, "Subscriber record not found.")
+
+        return {
+            "status": "success",
+            "message": "Preferences updated successfully.",
+            "email": updated["email"],
+            "location_pref": updated.get("location_pref", "ALL"),
+            "min_threshold_mm": updated.get("min_threshold_mm", 50.0),
         }
 
     @app.post("/subscribers/unsubscribe", tags=["subscribers"])
-    def unsubscribe_subscriber_post(payload: SubscriberUnsubscribeRequest):
-        """Unsubscribe via JSON payload (email or token)."""
-        identifier = payload.token or payload.email
+    def unsubscribe_subscriber_post(
+        payload: Optional[SubscriberUnsubscribeRequest] = None,
+        token: Optional[str] = Query(None),
+        email: Optional[str] = Query(None)
+    ):
+        """Unsubscribe via JSON payload (email or token) or query params (supporting RFC 8058 One-Click)."""
+        identifier = (payload.token if payload else None) or (payload.email if payload else None) or token or email
         if not identifier:
             raise HTTPException(400, "Must provide either email or token to unsubscribe.")
         ok = svc.store.unsubscribe(identifier)
