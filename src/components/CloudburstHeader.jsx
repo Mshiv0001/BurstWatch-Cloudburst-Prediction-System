@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  MapPin, 
-  Loader2, 
-  X, 
-  LocateFixed,
-  RefreshCw 
+import {
+  Search,
+  MapPin,
+  Loader2,
+  X,
+  LocateFixed
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import FpsCounter from './FpsCounter';
+import WindParticleDropdown from './WindParticleDropdown';
 import { getCachedMLRisk } from '../services/mlPredictionService';
 
 export default function CloudburstHeader({
@@ -16,18 +15,13 @@ export default function CloudburstHeader({
   setSearchQuery,
   onSelectStation,
   stations = [],
-  is3D = false,
-  onToggle3D,
-  mapView = 'default',
-  onToggleMapView,
   userLocation,
   onGoToMyLocation,
   isLocatingUser = false,
   isMeteoLoading = false,
   onReplayIntro,
-  cloudburstEvent = null,
-  isMlRetrying = false,
-  onRefreshMlStatus = null
+  windParticleMode = 'silk',
+  onWindParticleModeChange = null
 }) {
   const [internalQuery, setInternalQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -132,7 +126,7 @@ export default function CloudburstHeader({
 
   // Local matching across stations network
   const queryTerm = (currentQuery || '').trim().toLowerCase();
-  const localMatches = queryTerm ? stations.filter(stn => 
+  const localMatches = queryTerm ? stations.filter(stn =>
     stn.name.toLowerCase().includes(queryTerm) ||
     stn.region.toLowerCase().includes(queryTerm) ||
     (stn.state && stn.state.toLowerCase().includes(queryTerm)) ||
@@ -165,8 +159,6 @@ export default function CloudburstHeader({
     }
   };
 
-  const isSatellite = mapView === 'satellite';
-
   return (
     <header className="absolute top-3 left-4 right-4 z-40 flex items-center gap-3 pointer-events-none select-none">
       {/* 1. Left: Combined BurstWatch Brand + Search Box Pill */}
@@ -194,7 +186,7 @@ export default function CloudburstHeader({
 
           {/* Search icon */}
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <input 
+          <input
             type="text"
             placeholder="Search city or station..."
             value={currentQuery}
@@ -207,7 +199,7 @@ export default function CloudburstHeader({
             <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin shrink-0" />
           )}
           {currentQuery && !isSearchingOnline && (
-            <button 
+            <button
               type="button"
               onClick={handleClearQuery}
               className="text-slate-400 hover:text-white cursor-pointer p-0.5 shrink-0"
@@ -225,11 +217,10 @@ export default function CloudburstHeader({
               if (onGoToMyLocation) onGoToMyLocation();
             }}
             title={userLocation ? `Live Location Active (${userLocation.lat.toFixed(2)}°, ${userLocation.lng.toFixed(2)}°) - Click to Center` : "Go to My Location"}
-            className={`p-1 rounded-full transition-all cursor-pointer shrink-0 ${
-              userLocation 
-                ? 'text-cyan-400 bg-cyan-500/20 hover:bg-cyan-500/30' 
-                : 'text-slate-400 hover:text-cyan-300 hover:bg-white/10'
-            }`}
+            className={`p-1 rounded-full transition-all cursor-pointer shrink-0 ${userLocation
+              ? 'text-cyan-400 bg-cyan-500/20 hover:bg-cyan-500/30'
+              : 'text-slate-400 hover:text-cyan-300 hover:bg-white/10'
+              }`}
           >
             {isLocatingUser ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
@@ -242,15 +233,15 @@ export default function CloudburstHeader({
         {/* Search Results Dropdown */}
         <AnimatePresence>
           {showSearchDropdown && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
               transition={{ duration: 0.15 }}
-              className="absolute left-0 top-12 w-80 sm:w-96 md:w-[400px] apple-liquid-glass rounded-3xl shadow-2xl overflow-hidden py-1.5 z-[100] divide-y divide-white/5 max-h-[440px] overflow-y-auto no-scrollbar"
+              className="absolute left-0 top-12 w-80 sm:w-96 md:w-[400px] glass-panel-translucent rounded-3xl shadow-2xl overflow-hidden p-2 z-[100] divide-y divide-white/5 max-h-[440px] overflow-y-auto no-scrollbar"
             >
               {/* Option 1: Go to My Location */}
-              <div className="p-2 bg-gradient-to-r from-cyan-950/45 via-[#101c30] to-cyan-950/25">
+              <div className="pb-1.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -258,14 +249,13 @@ export default function CloudburstHeader({
                     setShowSearchDropdown(false);
                     handleClearQuery();
                   }}
-                  className="w-full text-left p-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400/60 transition-all flex items-center justify-between group cursor-pointer shadow-sm"
+                  className="w-full text-left p-2.5 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400/60 transition-all flex items-center justify-between group cursor-pointer shadow-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
-                      userLocation 
-                        ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/40' 
-                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${userLocation
+                      ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/40'
+                      : 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                      }`}>
                       {isLocatingUser ? (
                         <Loader2 className="w-4 h-4 animate-spin text-cyan-300" />
                       ) : (
@@ -276,20 +266,20 @@ export default function CloudburstHeader({
                       <div className="text-xs font-bold text-white group-hover:text-cyan-200 flex items-center gap-1.5">
                         <span>Go to My Location</span>
                         {userLocation ? (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                             Active GPS
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                             Live Device
                           </span>
                         )}
                       </div>
                       <div className="text-[10px] text-slate-300">
-                        {isLocatingUser 
-                          ? "Detecting live device coordinates..." 
-                          : userLocation 
-                            ? `Lat: ${userLocation.lat.toFixed(3)}°, Lon: ${userLocation.lng.toFixed(3)}°` 
+                        {isLocatingUser
+                          ? "Detecting live device coordinates..."
+                          : userLocation
+                            ? `Lat: ${userLocation.lat.toFixed(3)}°, Lon: ${userLocation.lng.toFixed(3)}°`
                             : "Center map on current location & auto-sync weather"}
                       </div>
                     </div>
@@ -302,7 +292,7 @@ export default function CloudburstHeader({
 
               {/* Local Station Matches */}
               {localMatches.length > 0 && (
-                <div className="p-1">
+                <div className="py-1">
                   <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     Network Stations ({localMatches.length})
                   </div>
@@ -311,7 +301,7 @@ export default function CloudburstHeader({
                       key={station.id}
                       type="button"
                       onClick={() => handleSelectStation(station)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
+                      className="w-full text-left px-3.5 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 group-hover:scale-110 transition-transform" />
@@ -329,18 +319,17 @@ export default function CloudburstHeader({
                           const risk = getStationRisk(station);
                           if (risk == null) {
                             return (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-800/60 border border-white/10">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-400 bg-slate-800/60 border border-white/10">
                                 ML Offline
                               </span>
                             );
                           }
                           const isAlert = risk >= 25;
                           return (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              isAlert 
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            }`}>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${isAlert
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              }`}>
                               {risk}% {isAlert ? 'Alert' : 'Normal'}
                             </span>
                           );
@@ -353,7 +342,7 @@ export default function CloudburstHeader({
 
               {/* Online Global Geocoding Results */}
               {onlineResults.length > 0 && (
-                <div className="p-1">
+                <div className="py-1">
                   <div className="px-3 py-1 text-[10px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
                     <span>Global Search ({onlineResults.length})</span>
                   </div>
@@ -362,7 +351,7 @@ export default function CloudburstHeader({
                       key={item.id}
                       type="button"
                       onClick={() => handleSelectStation(item)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-cyan-500/10 transition-colors flex items-center justify-between group cursor-pointer"
+                      className="w-full text-left px-3.5 py-2 rounded-full hover:bg-cyan-500/10 transition-colors flex items-center justify-between group cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 group-hover:scale-110 transition-transform" />
@@ -370,11 +359,11 @@ export default function CloudburstHeader({
                           <div className="text-xs font-semibold text-white group-hover:text-cyan-200 flex items-center gap-1.5">
                             <span>{item.name}</span>
                             {item.isIndia ? (
-                              <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
                                 India
                               </span>
                             ) : (
-                              <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                                 Global
                               </span>
                             )}
@@ -394,7 +383,7 @@ export default function CloudburstHeader({
 
               {/* Popular Stations when search bar is focused without input */}
               {!queryTerm && popularSuggestions.length > 0 && (
-                <div className="p-1">
+                <div className="py-1">
                   <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     Monitored Stations (IMD Model Network)
                   </div>
@@ -406,7 +395,7 @@ export default function CloudburstHeader({
                         key={station.id}
                         type="button"
                         onClick={() => handleSelectStation(station)}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
+                        className="w-full text-left px-3.5 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center justify-between group cursor-pointer"
                       >
                         <div className="flex items-center gap-2.5">
                           <MapPin className={`w-3.5 h-3.5 ${isAlert ? 'text-rose-400' : 'text-emerald-400'} shrink-0`} />
@@ -419,11 +408,10 @@ export default function CloudburstHeader({
                             </div>
                           </div>
                         </div>
-                        <span className={`text-[10px] font-bold ${
-                          risk == null
-                            ? 'text-slate-400 font-mono text-[9px]'
-                            : isAlert ? 'text-rose-400' : 'text-emerald-400'
-                        }`}>
+                        <span className={`text-[10px] font-bold ${risk == null
+                          ? 'text-slate-400 font-mono text-[9px]'
+                          : isAlert ? 'text-rose-400' : 'text-emerald-400'
+                          }`}>
                           {risk == null ? 'ML Offline' : `${risk}% ${isAlert ? 'Alert' : 'Normal'}`}
                         </span>
                       </button>
@@ -444,43 +432,12 @@ export default function CloudburstHeader({
         </AnimatePresence>
       </div>
 
-      {/* Right: FPS Monitor & ML Engine Status Button */}
-      <div className="pointer-events-auto flex items-center gap-2.5 ml-auto">
-        {/* Real-time Fluidity FPS Monitor */}
-        <div className="hidden sm:block">
-          <FpsCounter />
-        </div>
-
-        {/* Real-time ML Prediction Engine Status Button: Just shows ML Live or ML Offline */}
-        {cloudburstEvent && (
-          <button
-            type="button"
-            onClick={onRefreshMlStatus}
-            disabled={isMlRetrying}
-            title={cloudburstEvent.isLive 
-              ? 'Dual-Engine ML Model is LIVE (Click to refresh status)' 
-              : `ML Prediction Engine is OFFLINE: ${cloudburstEvent.error || 'Cannot reach http://localhost:8000'} (Click to retry)`}
-            className={`relative h-9 sm:h-10 flex items-center justify-center gap-2 px-3.5 sm:px-4 rounded-full transition-all cursor-pointer select-none box-border border shadow-md active:scale-95 ${
-              cloudburstEvent.isLive
-                ? 'bg-emerald-950/70 border-emerald-500/50 hover:bg-emerald-900/80 text-emerald-200 shadow-emerald-950/30 hover:border-emerald-400'
-                : 'bg-rose-950/80 border-rose-500/60 hover:bg-rose-900/80 text-rose-200 shadow-rose-950/30 hover:border-rose-400'
-            }`}
-          >
-            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${
-              cloudburstEvent.isLive
-                ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse'
-                : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-            }`} />
-            
-            <span className="font-bold text-xs tracking-wide">
-              {cloudburstEvent.isLive ? 'ML Live' : 'ML Offline'}
-            </span>
-
-            {isMlRetrying && (
-              <RefreshCw className="w-3 h-3 animate-spin text-slate-300 ml-0.5" />
-            )}
-          </button>
-        )}
+      {/* Right: Wind Particle Dropdown */}
+      <div className="pointer-events-auto flex items-center gap-2 sm:gap-2.5 ml-auto">
+        <WindParticleDropdown
+          mode={windParticleMode}
+          onChangeMode={onWindParticleModeChange}
+        />
       </div>
     </header>
   );

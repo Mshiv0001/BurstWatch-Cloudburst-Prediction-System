@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .alerts import Notifier
 from .config import Settings
+from .email_service import EmailService
 from .features import build_feature_plan, hourly_variables
 from .model_service import ModelService
 from .service import ForecastService
@@ -19,7 +20,10 @@ def build_service(settings: Settings) -> ForecastService:
     )
     plan = build_feature_plan(model.features)          # raises if a feature has no rule
     weather = OpenMeteoClient(settings, hourly_variables(plan))
+    store = Store(settings.db_path)
+    email_service = EmailService(settings)
+    notifier = Notifier(settings.alert_webhook_url, store=store, email_service=email_service)
     return ForecastService(
-        settings=settings, model=model, plan=plan, store=Store(settings.db_path),
-        weather=weather, notifier=Notifier(settings.alert_webhook_url),
+        settings=settings, model=model, plan=plan, store=store,
+        weather=weather, notifier=notifier,
     )

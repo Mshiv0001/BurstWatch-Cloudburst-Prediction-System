@@ -1,3 +1,10 @@
+import { 
+  getMeteoCacheKey, 
+  getCachedMeteo, 
+  setCachedMeteo, 
+  invalidateMeteoCache 
+} from './meteoCacheService';
+
 /**
  * Real-Time Cloudburst Event & ML Prediction Service Interface
  * Directly connects to FastAPI ML Backend (LightGBM + XGBoost Dual-Engine Ensemble)
@@ -10,7 +17,7 @@ const PROD_BACKEND_URL = (
   (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
 ).replace(/\/$/, '');
 const API_BASE = PROD_BACKEND_URL || '/api';
-const DIRECT_BACKEND_URL = PROD_BACKEND_URL || 'http://localhost:8000';
+const DIRECT_BACKEND_URL = PROD_BACKEND_URL || 'http://localhost:8001';
 
 /**
  * Generates an evacuation hazard radius GeoJSON circle for MapLibre map rendering
@@ -54,6 +61,14 @@ export async function checkBackendHealth() {
     let res;
     try {
       res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
+      if (!res.ok && res.status >= 500) {
+        try {
+          const directRes = await fetch(`${DIRECT_BACKEND_URL}/health`, { signal: controller.signal });
+          if (directRes && directRes.ok) res = directRes;
+        } catch {
+          // direct failed
+        }
+      }
     } catch {
       res = await fetch(`${DIRECT_BACKEND_URL}/health`, { signal: controller.signal });
     }
@@ -78,7 +93,20 @@ export async function checkBackendHealth() {
  * Fetches live cloudburst prediction from the ML dual-ensemble backend
  * Throws or returns an offline error state when the prediction system is unreachable
  */
-export async function getCloudburstEventData(station = null) {
+export async function getCloudburstEventData(station = null, forceRefresh = false) {
+  const lat = station?.lat ?? 30.7346;
+  const lon = station?.lon ?? 79.0669;
+  const cacheKey = getMeteoCacheKey(lat, lon, 'prediction');
+
+  if (!forceRefresh) {
+    const cached = getCachedMeteo(cacheKey, 20);
+    if (cached) {
+      return cached.data;
+    }
+  } else {
+    invalidateMeteoCache(cacheKey);
+  }
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 18000);
@@ -129,6 +157,19 @@ export async function getCloudburstEventData(station = null) {
             body: JSON.stringify(defaultPayload),
             signal: controller.signal
           });
+          if (!res.ok && res.status >= 500) {
+            try {
+              const directRes = await fetch(`${DIRECT_BACKEND_URL}/predict/location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(defaultPayload),
+                signal: controller.signal
+              });
+              if (directRes && directRes.ok) res = directRes;
+            } catch {
+              // direct failed
+            }
+          }
         } catch {
           res = await fetch(`${DIRECT_BACKEND_URL}/predict/location`, {
             method: 'POST',
@@ -168,7 +209,7 @@ export async function getCloudburstEventData(station = null) {
       ? Number(data.predicted_rain_mm) 
       : (prob >= 0.25 ? Math.round(35 + (prob - 0.25) * 160) : 0.0);
 
-    return {
+    const eventResult = {
       isLive: true,
       id: data.id ? `PRED-${data.id}` : `ML-${Date.now().toString().slice(-4)}`,
       title: data.risk_label || (isCritical ? 'High Convective Cloudburst Warning' : isWarning ? 'Elevated Convective Alert' : 'Normal / Low Convective Risk'),
@@ -215,6 +256,9 @@ export async function getCloudburstEventData(station = null) {
           : "Standard atmospheric conditions. Convective risk index within normal threshold."),
       error: null
     };
+
+    setCachedMeteo(cacheKey, eventResult);
+    return eventResult;
 
   } catch (err) {
     // Report failure explicitly without hardcoded false alarms

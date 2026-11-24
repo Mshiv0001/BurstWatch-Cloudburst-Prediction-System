@@ -53,6 +53,21 @@ CREATE TABLE IF NOT EXISTS runs (
     feature_date TEXT,
     error TEXT
 );
+CREATE TABLE IF NOT EXISTS subscribers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    verification_code TEXT,
+    token_expires_at TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    unsubscribe_token TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    verified_at TEXT,
+    last_alert_sent_at TEXT,
+    location_pref TEXT DEFAULT 'ALL'
+);
+CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers(email);
+CREATE INDEX IF NOT EXISTS idx_subscribers_status ON subscribers(status);
 """
 
 _JSON_COLUMNS = ("missing_features", "top_factors", "warnings", "features")
@@ -210,3 +225,179 @@ class Store:
         with self._conn() as c:
             row = c.execute("SELECT * FROM runs ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row else None
+
+    # ------------------------------------------------------------ subscribers
+    def upsert_subscriber(self, email: str, code: str, expires_at: str,
+                          unsubscribe_token: str, location_pref: str = "ALL") -> Dict[str, Any]:
+        """Register or re-register an email subscriber with a fresh verification code."""
+        norm_email = email.strip().lower()
+        now = utcnow()
+        with self._conn() as c:
+            existing = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
+            if existing:
+                row_dict = dict(existing)
+                # If already verified, update location pref and return without resetting verification
+                if row_dict["status"] == "verified":
+                    c.execute("UPDATE subscribers SET location_pref = ? WHERE id = ?",
+                              (location_pref, row_dict["id"]))
+                    row_dict["location_pref"] = location_pref
+                    return row_dict
+                # If pending or unsubscribed, update code and reactivate to pending
+                c.execute(
+                    """UPDATE subscribers 
+                    SET status = 'pending', verification_code = ?, token_expires_at = ?,
+                        attempts = 0, location_pref = ?
+                    WHERE id = ?""",
+                    (code, expires_at, location_pref, row_dict["id"])
+                )
+                updated = c.execute("SELECT * FROM subscribers WHERE id = ?", (row_dict["id"],)).fetchone()
+                return dict(updated)
+            else:
+                cur = c.execute(
+                    """INSERT INTO subscribers 
+                    (email, status, verification_code, token_expires_at, attempts,
+                     unsubscribe_token, created_at, location_pref)
+                    VALUES (?, 'pending', ?, ?, 0, ?, ?, ?)""",
+                    (norm_email, code, expires_at, unsubscribe_token, now, location_pref)
+                )
+                inserted = c.execute("SELECT * FROM subscribers WHERE id = ?", (cur.lastrowid,)).fetchone()
+                return dict(inserted)
+
+    def upsert_verified_google_subscriber(self, email: str, location_pref: str = "ALL") -> Dict[str, Any]:
+        """Register or update an email subscriber as pre-verified via Google OAuth."""
+        import secrets
+        norm_email = email.strip().lower()
+        now = utcnow()
+        with self._conn() as c:
+            existing = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
+            if existing:
+                row_dict = dict(existing)
+                c.execute(
+                    """UPDATE subscribers 
+                    SET status = 'verified', verified_at = ?, verification_code = NULL,
+                        attempts = 0, location_pref = ?
+                    WHERE id = ?""",
+                    (now, location_pref, row_dict["id"])
+                )
+                updated = c.execute("SELECT * FROM subscribers WHERE id = ?", (row_dict["id"],)).fetchone()
+                return dict(updated)
+            else:
+                unsub_token = secrets.token_hex(16)
+                cur = c.execute(
+                    """INSERT INTO subscribers 
+                    (email, status, verification_code, token_expires_at, attempts,
+                     unsubscribe_token, created_at, verified_at, location_pref)
+                    VALUES (?, 'verified', NULL, NULL, 0, ?, ?, ?, ?)""",
+                    (norm_email, unsub_token, now, now, location_pref)
+                )
+                inserted = c.execute("SELECT * FROM subscribers WHERE id = ?", (cur.lastrowid,)).fetchone()
+                return dict(inserted)
+
+    def verify_subscriber(self, email: str, code: str) -> tuple[bool, str]:
+        """Validate 6-digit OTP code and transition subscriber to 'verified' status."""
+        norm_email = email.strip().lower()
+        now = utcnow()
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
+            if not row:
+                return False, "Email address not found. Please register first."
+            sub = dict(row)
+            if sub["status"] == "verified":
+                return True, "Email is already verified."
+            if sub["status"] == "unsubscribed":
+                return False, "This email was unsubscribed. Please register again to re-activate."
+            if sub["attempts"] >= 5:
+                return False, "Too many failed attempts. Please request a new verification code."
+            if sub["token_expires_at"] and sub["token_expires_at"] < now:
+                return False, "Verification code has expired. Please request a new one."
+            
+            clean_code = str(code).strip()
+            if clean_code != str(sub["verification_code"]).strip():
+                new_attempts = sub["attempts"] + 1
+                c.execute("UPDATE subscribers SET attempts = ? WHERE id = ?", (new_attempts, sub["id"]))
+                remaining = max(0, 5 - new_attempts)
+                return False, f"Invalid verification code. {remaining} attempt(s) remaining."
+
+            # Code matches! Mark as verified
+            c.execute(
+                """UPDATE subscribers 
+                SET status = 'verified', verified_at = ?, verification_code = NULL, attempts = 0 
+                WHERE id = ?""",
+                (now, sub["id"])
+            )
+            return True, "Email verified successfully."
+
+    def get_subscriber(self, email: str) -> Optional[Dict[str, Any]]:
+        norm_email = email.strip().lower()
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
+        return dict(row) if row else None
+
+    def get_subscriber_by_token(self, token: str) -> Optional[Dict[str, Any]]:
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM subscribers WHERE unsubscribe_token = ?", (token.strip(),)).fetchone()
+        return dict(row) if row else None
+
+    def resend_verification_code(self, email: str, new_code: str, new_expires_at: str) -> tuple[bool, str]:
+        norm_email = email.strip().lower()
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
+            if not row:
+                return False, "Email not found. Please register first."
+            sub = dict(row)
+            if sub["status"] == "verified":
+                return False, "Email is already verified."
+            c.execute(
+                """UPDATE subscribers 
+                SET verification_code = ?, token_expires_at = ?, attempts = 0, status = 'pending'
+                WHERE id = ?""",
+                (new_code, new_expires_at, sub["id"])
+            )
+            return True, "Verification code refreshed."
+
+    def unsubscribe(self, email_or_token: str) -> bool:
+        identifier = email_or_token.strip().lower()
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT id FROM subscribers WHERE email = ? OR unsubscribe_token = ?",
+                (identifier, email_or_token.strip())
+            ).fetchone()
+            if row:
+                c.execute("UPDATE subscribers SET status = 'unsubscribed', verification_code = NULL WHERE id = ?",
+                          (row["id"],))
+                return True
+        return False
+
+    def get_verified_subscribers(self, location: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return all active verified subscribers, optionally matching location preference."""
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT id, email, unsubscribe_token, location_pref, created_at, last_alert_sent_at 
+                FROM subscribers 
+                WHERE status = 'verified'"""
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            if not location or d["location_pref"] == "ALL" or d["location_pref"] == location:
+                result.append(d)
+        return result
+
+    def record_alert_sent_to_subscribers(self, subscriber_ids: List[int]) -> None:
+        if not subscriber_ids:
+            return
+        now = utcnow()
+        placeholders = ",".join("?" for _ in subscriber_ids)
+        with self._conn() as c:
+            c.execute(f"UPDATE subscribers SET last_alert_sent_at = ? WHERE id IN ({placeholders})",
+                      [now] + subscriber_ids)
+
+    def list_subscribers_summary(self) -> Dict[str, Any]:
+        with self._conn() as c:
+            rows = c.execute("SELECT status, count(*) as cnt FROM subscribers GROUP BY status").fetchall()
+        summary = {"total": 0, "verified": 0, "pending": 0, "unsubscribed": 0}
+        for r in rows:
+            summary[r["status"]] = r["cnt"]
+            summary["total"] += r["cnt"]
+        return summary
+

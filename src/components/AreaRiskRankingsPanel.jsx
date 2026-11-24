@@ -171,17 +171,17 @@ export default function AreaRiskRankingsPanel({
   const scoredCount = rankedStations.filter(s => s.riskPercent != null).length;
 
   return (
-    <div className="w-[370px] sm:w-[410px] max-w-[calc(100vw-32px)] apple-liquid-glass rounded-3xl p-4 shadow-2xl border border-white/20 select-none flex flex-col max-h-[calc(100vh-95px)] backdrop-blur-2xl">
+    <div className="w-[370px] sm:w-[410px] max-w-[calc(100vw-32px)] glass-panel-translucent rounded-3xl p-4 shadow-2xl border border-white/15 select-none flex flex-col max-h-[calc(100vh-95px)]">
       {/* Header Bar */}
       <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-rose-500/30 to-amber-500/20 border border-rose-500/40 flex items-center justify-center text-rose-300 shadow-md">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500/30 to-amber-500/20 border border-rose-500/40 flex items-center justify-center text-rose-300 shadow-md">
             <ArrowDownWideNarrow className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-bold text-white tracking-tight">Area Risk Rankings</h2>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                 isMlOnline 
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                   : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
@@ -189,7 +189,15 @@ export default function AreaRiskRankingsPanel({
                 {isMlOnline ? 'ML Live' : 'ML Offline'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <div className="mt-1 flex items-center">
+              <span
+                title="Illustrative model output, not an official forecast or warning"
+                className="shrink-0 rounded-full border border-amber-300/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold text-amber-100"
+              >
+                Illustrative model · not an official forecast
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
               {isMlOnline 
                 ? `Real-time ML dual-ensemble (${scoredCount}/${stations.length} evaluated)` 
                 : 'Model is offline, cannot calculate risk percentage'}
@@ -211,20 +219,20 @@ export default function AreaRiskRankingsPanel({
 
       {/* Offline Diagnostic Banner when ML is offline */}
       {!isMlOnline ? (
-        <div className="mt-3 p-3 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-rose-200 shrink-0 shadow-lg">
+        <div className="mt-3 p-3 rounded-2xl bg-rose-950/50 border border-rose-500/40 text-rose-200 shrink-0 shadow-lg">
           <div className="flex items-center gap-2 font-bold text-xs text-rose-300">
             <ServerOff className="w-4 h-4 text-rose-400 shrink-0" />
             <span>Model is offline, cannot calculate risk percentage</span>
           </div>
           <p className="text-[11px] text-slate-300 mt-1 leading-snug">
-            Prediction engine at <code className="font-mono text-cyan-300 text-[10px] bg-black/40 px-1 py-0.5 rounded border border-white/10">http://localhost:8000</code> is offline. No synthetic or fake percentages are shown.
+            Prediction engine at <code className="font-mono text-cyan-300 text-[10px] bg-black/40 px-1 py-0.5 rounded-full border border-white/10">http://localhost:8001</code> is offline. No synthetic or fake percentages are shown.
           </p>
         </div>
       ) : topScoredArea && (
         /* Top Hotspot Highlight Callout (Only when live ML prediction exists) */
         <div 
           onClick={() => onSelectStation && onSelectStation(topScoredArea)}
-          className="mt-3 p-2.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-red-950/40 to-slate-900/60 border border-rose-500/40 hover:border-rose-400/80 transition-all cursor-pointer shrink-0 group shadow-lg"
+          className="mt-3 p-2.5 rounded-2xl bg-gradient-to-r from-rose-950/50 via-red-950/30 to-slate-900/50 border border-rose-500/40 hover:border-rose-400/80 transition-all cursor-pointer shrink-0 group shadow-lg"
           title={`Click to inspect highest risk area: ${topScoredArea.name}`}
         >
           <div className="flex items-center justify-between text-[11px]">
@@ -232,7 +240,7 @@ export default function AreaRiskRankingsPanel({
               <Flame className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
               Highest Evaluated ML Risk
             </span>
-            <span className="font-mono font-black text-rose-300 text-xs px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/30">
+            <span className="font-mono font-black text-rose-300 text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/30">
               {topScoredArea.riskPercent}% ML RISK
             </span>
           </div>
@@ -256,19 +264,19 @@ export default function AreaRiskRankingsPanel({
       <div className="mt-3 space-y-2 shrink-0">
         {/* Search input */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search areas, states, or valleys..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900/70 border border-white/10 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/50 transition-colors font-sans"
+            className="w-full pl-8 pr-8 py-1.5 rounded-full bg-slate-950/40 border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/60 transition-colors font-sans"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs cursor-pointer"
             >
               &times;
             </button>
@@ -288,9 +296,9 @@ export default function AreaRiskRankingsPanel({
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterMode(tab.id)}
-                className={`px-2.5 py-1 rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1 rounded-full font-mono transition-all cursor-pointer whitespace-nowrap ${
                   filterMode === tab.id
-                    ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 shadow-sm'
+                    ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/50 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
                 }`}
               >
@@ -325,20 +333,20 @@ export default function AreaRiskRankingsPanel({
                 className={`w-full text-left p-2.5 rounded-2xl transition-all flex flex-col gap-1.5 border group cursor-pointer ${
                   isSelected
                     ? 'bg-cyan-500/15 border-cyan-400/60 shadow-lg shadow-cyan-500/10'
-                    : 'bg-slate-900/50 hover:bg-slate-800/60 border-white/10 hover:border-white/20'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/10 hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   {/* Rank badge + Area name */}
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-bold text-[11px] shrink-0 ${
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-[11px] shrink-0 ${
                       risk != null && index === 0
                         ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40 font-black'
                         : risk != null && index === 1
                           ? 'bg-slate-300 text-slate-950 font-bold'
                           : risk != null && index === 2
                             ? 'bg-amber-700/80 text-amber-100 font-bold'
-                            : 'bg-slate-800 text-slate-400'
+                            : 'bg-white/10 text-slate-300'
                     }`}>
                       #{index + 1}
                     </span>
@@ -355,7 +363,7 @@ export default function AreaRiskRankingsPanel({
                   {/* Risk percentage badge or status indicator */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {risk != null ? (
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                         risk >= 45 
                           ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
                           : risk >= 20 
@@ -366,17 +374,17 @@ export default function AreaRiskRankingsPanel({
                       </span>
                     ) : isMlOnline ? (
                       isLoading ? (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
                           <Loader2 className="w-2.5 h-2.5 animate-spin" />
                           SCORING...
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800/80 text-cyan-300/80 border border-white/10 group-hover:border-cyan-400/40">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-white/10 text-cyan-300 border border-white/10 group-hover:border-cyan-400/40">
                           RUN ML &rarr;
                         </span>
                       )
                     ) : (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-950/80 text-rose-300 border border-rose-500/40">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-rose-950/60 text-rose-300 border border-rose-500/40">
                         OFFLINE
                       </span>
                     )}

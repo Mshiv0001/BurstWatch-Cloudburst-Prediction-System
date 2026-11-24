@@ -8,22 +8,22 @@ import IncidentModal from './components/IncidentModal';
 import PermissionPrompt from './components/PermissionPrompt';
 import LiveMeteoPanel from './components/LiveMeteoPanel';
 import AreaRiskRankingsPanel from './components/AreaRiskRankingsPanel';
-import TemperatureLegendBar from './components/TemperatureLegendBar';
-import WindParticleDropdown from './components/WindParticleDropdown';
 import RainingCitiesPanel from './components/RainingCitiesPanel';
 import CinematicIntroSplash from './components/CinematicIntroSplash';
+import EmailAlertModal from './components/EmailAlertModal';
+import { getLocalSubscription } from './services/subscriberService';
 import { getCloudburstEventData } from './services/cloudburstEventModel';
 
 import { fetchWeatherApiLiveData } from './services/weatherApiService';
 import { sendBrowserNotification } from './utils/notifications';
-import { 
-  STATIONS_NETWORK, 
+import {
+  STATIONS_NETWORK,
   calculateCloudburstThreat,
   getHighestRiskStation,
-  MODEL_METADATA 
+  MODEL_METADATA
 } from './data/cloudburstData';
 import { preloadTemperatureEngine } from './utils/temperatureUtils';
-import { BarChart3, MapPin, Loader2, AlertTriangle, CheckCircle2, ArrowDownWideNarrow } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   // Simulator Parameters using exact model features (ambient normal baseline)
@@ -38,10 +38,35 @@ export default function App() {
   const [mapView, setMapView] = useState('positron'); // 'liberty' | 'positron' | 'bright' | 'satellite'
   const [activeLayer, setActiveLayer] = useState('convective'); // Default to Convective Cloudburst Heatmap
   const [showParticles, setShowParticles] = useState(true);
-  const [windParticleMode, setWindParticleMode] = useState('fast'); // Default to 'fast' (big ribbons in fast motion)
+  const [windParticleMode, setWindParticleMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cloudburst_wind_particle_style');
+      if (saved) {
+        if (['silk', 'thermal', 'grand', 'off'].includes(saved)) {
+          return saved;
+        }
+        if (['starry', 'aurora'].includes(saved)) return 'grand';
+        if (['hokusai', 'normal', 'soft'].includes(saved)) return 'silk';
+      }
+      return 'silk';
+    } catch (e) {
+      return 'silk';
+    }
+  });
+
+  const [windUnit, setWindUnit] = useState('km/h');
+
+  useEffect(() => {
+    try {
+      if (windParticleMode && windParticleMode !== 'off') {
+        localStorage.setItem('cloudburst_wind_particle_style', windParticleMode);
+      }
+    } catch (e) { }
+  }, [windParticleMode]);
   const [showIsobars, setShowIsobars] = useState(false);
   const [showTemperatureLayer, setShowTemperatureLayer] = useState(true);
   const [tempUnit, setTempUnit] = useState('C'); // 'C' | 'F'
+  const [hoveredMapTemp, setHoveredMapTemp] = useState(null);
   const [showIntro, setShowIntro] = useState(false); // Clean initial load without blocking splash
 
   const handleToggleTempUnit = useCallback(() => {
@@ -65,6 +90,8 @@ export default function App() {
   const [isMeteoPanelOpen, setIsMeteoPanelOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isEmailSubscribed, setIsEmailSubscribed] = useState(() => getLocalSubscription().isVerified);
   const [isMuted, setIsMuted] = useState(false);
 
   // Live Dual-Engine Cloudburst ML Prediction State (Zero Hardcoded Presets)
@@ -87,12 +114,12 @@ export default function App() {
   // Active navigation tab
   const [activeNav, setActiveNav] = useState('dashboard');
 
-  // Sync current weather data for the selected station
-  const loadLiveMeteo = useCallback(async (lat, lon, stationName) => {
+  // Sync current weather data for the selected station (with intelligent caching)
+  const loadLiveMeteo = useCallback(async (lat, lon, stationName, forceRefresh = false) => {
     if (lat == null || lon == null) return;
     setIsMeteoLoading(true);
     try {
-      const data = await fetchWeatherApiLiveData(lat, lon, stationName);
+      const data = await fetchWeatherApiLiveData(lat, lon, stationName, forceRefresh);
       setLiveMeteoData(data);
       if (data.humidity !== undefined) setHumidity(data.humidity);
       if (data.temperature !== undefined) setTemperature(data.temperature);
@@ -120,7 +147,7 @@ export default function App() {
   // Refresh weather data when the selected station changes
   useEffect(() => {
     if (selectedStation) {
-      loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName);
+      loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName, false);
     }
   }, [selectedStation, loadLiveMeteo]);
 
@@ -147,27 +174,27 @@ export default function App() {
     return currentRiskPercent != null && currentRiskPercent >= 25;
   }, [currentRiskPercent]);
 
-  // Fetch live ML cloudburst prediction directly from backend service
-  const fetchLivePrediction = useCallback(async (stn = null) => {
+  // Fetch live ML cloudburst prediction directly from backend service (with intelligent caching)
+  const fetchLivePrediction = useCallback(async (stn = null, forceRefresh = false) => {
     setIsMlRetrying(true);
     try {
-      const data = await getCloudburstEventData(stn || selectedStation);
+      const data = await getCloudburstEventData(stn || selectedStation, forceRefresh);
       setCloudburstEvent(data);
     } catch (err) {
       setCloudburstEvent({
         isLive: false,
         status: 'OFFLINE',
-        error: err.message || 'Cannot reach prediction engine at http://localhost:8000',
+        error: err.message || 'Cannot reach prediction engine at http://localhost:8001',
         title: 'Cloudburst Prediction Engine Offline',
         locationName: stn?.name || selectedStation?.name || 'Kedarnath Temple Valley',
         coordinates: stn ? [stn.lon, stn.lat] : (selectedStation ? [selectedStation.lon, selectedStation.lat] : [79.0669, 30.7346]),
         elevationMeters: stn?.elevation || selectedStation?.elevation || 600,
         detectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         metrics: {
-          riskPercent: 4,
-          predictedRainRateMmh: 0.0
+          riskPercent: null,
+          predictedRainRateMmh: null
         },
-        advisory: 'ML Prediction System is offline. Please start the backend service (uvicorn app.main:create_app --factory --port 8000).'
+        advisory: 'ML Prediction System is offline. Real-time physical sensor telemetry remains active.'
       });
     } finally {
       setIsMlRetrying(false);
@@ -175,8 +202,46 @@ export default function App() {
   }, [selectedStation]);
 
   useEffect(() => {
-    fetchLivePrediction(selectedStation);
+    fetchLivePrediction(selectedStation, false);
   }, [selectedStation?.id, selectedStation?.lat, selectedStation?.lon]);
+
+  // 15–30 Minute Adaptive Reassessment Scheduler (Pauses when tab is hidden to save resources)
+  useEffect(() => {
+    const REASSESS_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes
+
+    const triggerReassessment = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return; // Skip background cycles when tab is minimized
+      }
+      if (selectedStation?.lat && selectedStation?.lon) {
+        loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName, false);
+        fetchLivePrediction(selectedStation, false);
+      }
+    };
+
+    const timerId = window.setInterval(triggerReassessment, REASSESS_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        triggerReassessment();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.clearInterval(timerId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [selectedStation, loadLiveMeteo, fetchLivePrediction]);
+
+  // Manual Force-Refresh Handler
+  const handleManualTelemetryRefresh = useCallback(() => {
+    if (selectedStation) {
+      loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName, true);
+      fetchLivePrediction(selectedStation, true);
+    }
+  }, [selectedStation, loadLiveMeteo, fetchLivePrediction]);
 
   const activeCloudburstEvent = useMemo(() => {
     return cloudburstEvent;
@@ -304,7 +369,7 @@ export default function App() {
             const data = await res.json();
             cityName = data.address?.city || data.address?.town || data.address?.state_district || data.address?.suburb || "Your Sector";
           }
-        } catch {}
+        } catch { }
 
         const loc = {
           ...coords,
@@ -417,32 +482,9 @@ export default function App() {
   const isHomeView = activeNav === 'home';
 
   return (
-    <div className="relative w-screen h-screen bg-[#070e1b] overflow-hidden select-none font-sans text-slate-100 flex">
-      {/* 1. Far-Left Vertical Icon Rail */}
-      <NavRail
-        activeNav={activeNav}
-        onSelectNav={handleSelectNav}
-        onToggleMeteo={() => setIsMeteoPanelOpen((prev) => !prev)}
-        showTemperature={activeLayer === 'temp'}
-        onToggleTemperature={() => setActiveLayer((prev) => (prev === 'temp' ? 'none' : 'temp'))}
-        showParticles={showParticles && windParticleMode !== 'off'}
-        onToggleParticles={() => {
-          if (windParticleMode === 'off' || !showParticles) {
-            setWindParticleMode('normal');
-            setShowParticles(true);
-          } else {
-            setWindParticleMode('off');
-            setShowParticles(false);
-          }
-        }}
-        isSatellite={mapView === 'satellite'}
-        onToggleSatellite={() => setMapView((prev) => (prev === 'satellite' ? 'default' : 'satellite'))}
-        tempUnit={tempUnit}
-        onToggleTempUnit={handleToggleTempUnit}
-      />
-
-      {/* 2. Main Dashboard Container: Full-Height Map + Floating Transparent BurstWatch Header + Glass Panels */}
-      <div className="relative flex-1 h-full overflow-hidden">
+    <div className="relative w-screen h-screen bg-[#070e1b] overflow-hidden select-none font-sans text-slate-100">
+      {/* 1. Main Dashboard Container: Edge-to-Edge Map + Floating Glass Overlays */}
+      <div className="relative w-full h-full overflow-hidden">
         {/* Base Interactive 2D/3D & Satellite Map (Spans Full Screen) */}
         <CloudburstMap
           stations={STATIONS_NETWORK}
@@ -464,13 +506,16 @@ export default function App() {
           mapView={mapView}
           isHomeView={isHomeView}
           isAnalyticsOpen={isAnalyticsOpen}
+          isMeteoPanelOpen={isMeteoPanelOpen}
           showParticles={!showIntro && showParticles && windParticleMode !== 'off'}
           onToggleParticles={(val) => {
             setShowParticles(val);
             if (!val) {
               setWindParticleMode('off');
             } else if (windParticleMode === 'off') {
-              setWindParticleMode('normal');
+              const rawSaved = localStorage.getItem('cloudburst_wind_particle_style');
+              const saved = ['silk', 'thermal', 'grand'].includes(rawSaved) ? rawSaved : 'silk';
+              setWindParticleMode(saved);
             }
           }}
           windParticleMode={windParticleMode}
@@ -485,8 +530,12 @@ export default function App() {
           liveMeteoData={liveMeteoData}
           showTemperature={!showIntro && activeLayer !== 'none'}
           tempUnit={tempUnit}
+          onToggleTempUnit={handleToggleTempUnit}
+          windUnit={windUnit}
+          onWindUnitChange={setWindUnit}
           cloudburstEvent={activeCloudburstEvent}
           onFocusEpicenter={handleFocusCloudburstEpicenter}
+          onHoverTemp={setHoveredMapTemp}
         />
 
         {/* Floating Transparent BurstWatch Top Header Bar */}
@@ -495,29 +544,30 @@ export default function App() {
           setSearchQuery={setSearchQuery}
           onSelectStation={handleSelectStation}
           stations={STATIONS_NETWORK}
-          is3D={is3D}
-          onToggle3D={handleToggle3D}
-          mapView={mapView}
-          onToggleMapView={(view) => setMapView(typeof view === 'string' ? view : (mapView === 'satellite' ? 'default' : 'satellite'))}
           userLocation={userLocation}
           onGoToMyLocation={handleGoToMyLocation}
           isLocatingUser={isLocatingUser}
           isMeteoLoading={isMeteoLoading}
           onReplayIntro={() => setShowIntro(true)}
-          cloudburstEvent={activeCloudburstEvent}
-          isMlRetrying={isMlRetrying}
-          onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
+          windParticleMode={windParticleMode}
+          onWindParticleModeChange={(newMode) => {
+            setWindParticleMode(newMode);
+            if (newMode === 'off') {
+              setShowParticles(false);
+            } else {
+              setShowParticles(true);
+            }
+          }}
         />
 
         {/* Location Feedback Toast Notification */}
         {locationToast && (
-          <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-full shadow-2xl text-xs font-semibold select-none transition-all ${
-            locationToast.type === 'requesting'
-              ? 'apple-liquid-glass-cyan text-cyan-200'
-              : locationToast.type === 'success'
-                ? 'apple-liquid-glass-emerald text-emerald-200'
-                : 'apple-liquid-glass-amber text-amber-200'
-          }`}>
+          <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-full shadow-2xl text-xs font-semibold select-none transition-all ${locationToast.type === 'requesting'
+            ? 'apple-liquid-glass-cyan text-cyan-200'
+            : locationToast.type === 'success'
+              ? 'apple-liquid-glass-emerald text-emerald-200'
+              : 'apple-liquid-glass-amber text-amber-200'
+            }`}>
             {locationToast.type === 'requesting' ? (
               <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
             ) : locationToast.type === 'success' ? (
@@ -529,8 +579,8 @@ export default function App() {
               <span className="font-bold text-white text-[12px]">{locationToast.title}</span>
               <span className="text-[11px] opacity-90">{locationToast.message}</span>
             </div>
-            <button 
-              onClick={() => setLocationToast(null)} 
+            <button
+              onClick={() => setLocationToast(null)}
               className="ml-2 text-slate-300 hover:text-white text-base leading-none cursor-pointer p-0.5"
               title="Dismiss"
             >
@@ -539,13 +589,27 @@ export default function App() {
           </div>
         )}
 
-        {/* Floating Right Panel: Area Risk Rankings (Highest to Lowest Risk %) - Rendered under FPS & ML Live buttons */}
-        {isRankingsOpen ? (
-          <div 
-            id="area-risk-rankings-container" 
-            className={`absolute top-16 z-20 pointer-events-auto transition-all ${
-              !isHomeView && isAnalyticsOpen ? 'right-4 sm:right-[390px]' : 'right-4'
-            }`}
+        {/* Floating Left Vertical Navigation Capsule Dock */}
+        <div className="absolute top-16 left-4 z-30 pointer-events-auto">
+          <NavRail
+            activeNav={activeNav}
+            onSelectNav={handleSelectNav}
+            isSatellite={mapView === 'satellite'}
+            onToggleSatellite={() => setMapView((prev) => (prev === 'satellite' ? 'default' : 'satellite'))}
+            cloudburstEvent={activeCloudburstEvent}
+            isMlRetrying={isMlRetrying}
+            onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
+            onOpenEmailModal={() => setIsEmailModalOpen(true)}
+            isEmailSubscribed={isEmailSubscribed}
+          />
+        </div>
+
+        {/* Floating Right Panel: Area Risk Rankings (Highest to Lowest Risk %) - Controlled Authoritatively from NavRail */}
+        {isRankingsOpen && (
+          <div
+            id="area-risk-rankings-container"
+            className={`absolute top-16 z-20 pointer-events-auto transition-all ${!isHomeView && isAnalyticsOpen ? 'right-4 sm:right-[390px]' : 'right-4'
+              }`}
           >
             <AreaRiskRankingsPanel
               stations={STATIONS_NETWORK}
@@ -556,21 +620,11 @@ export default function App() {
               onClose={() => setIsRankingsOpen(false)}
             />
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsRankingsOpen(true)}
-            className="absolute top-16 right-4 z-20 pointer-events-auto flex items-center gap-2 apple-liquid-glass-pill px-3.5 py-2 rounded-full shadow-xl text-xs font-semibold text-rose-300 hover:text-white transition-all cursor-pointer border border-rose-500/30 active:scale-95"
-            title="Open Area Risk Rankings"
-          >
-            <ArrowDownWideNarrow className="w-4 h-4 text-rose-400" />
-            <span>Risk Rankings (High &rarr; Low)</span>
-          </button>
         )}
 
         {/* Floating Left Panel: Current Weather Data */}
         {!isHomeView && isMeteoPanelOpen && (
-          <div id="live-meteo-panel-container" className="absolute top-16 left-4 z-20 pointer-events-auto transition-all">
+          <div id="live-meteo-panel-container" className="absolute top-16 left-[76px] sm:left-20 z-20 pointer-events-auto transition-all">
             <LiveMeteoPanel
               liveData={liveMeteoData}
               station={selectedStation}
@@ -588,13 +642,11 @@ export default function App() {
 
         {/* Floating Real-Time Raining Cities Ranked Panel (Rain Radar Layer) */}
         {!isHomeView && (
-          <div className={`absolute z-30 transition-all duration-300 ${
-            activeLayer === 'precip'
-              ? 'opacity-100 visible pointer-events-auto'
-              : 'opacity-0 invisible pointer-events-none'
-          } ${
-            isMeteoPanelOpen ? 'top-16 left-[400px]' : 'top-16 left-4'
-          }`}>
+          <div className={`absolute z-30 transition-all duration-300 ${activeLayer === 'precip'
+            ? 'opacity-100 visible pointer-events-auto'
+            : 'opacity-0 invisible pointer-events-none'
+            } ${isMeteoPanelOpen ? 'top-16 left-[450px]' : 'top-16 left-[76px] sm:left-20'
+            }`}>
             <RainingCitiesPanel
               isActive={activeLayer === 'precip'}
               onSelectCity={(city) => {
@@ -612,70 +664,30 @@ export default function App() {
           </div>
         )}
 
-        {/* Floating Right Column: Threat Analytics Panel */}
-        {!isHomeView && (
-          isAnalyticsOpen ? (
-            <div id="threat-analytics-panel-container" className="absolute top-28 right-4 z-20 pointer-events-auto max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-none pr-0.5">
-              <ThreatAnalyticsPanel
-                riskPercent={currentRiskPercent}
-                severity={currentRiskPercent != null ? (currentRiskPercent >= 75 ? "SEVERE THREAT" : currentRiskPercent >= 25 ? "ELEVATED RISK" : "NORMAL") : "OFFLINE"}
-                features={threatData.features}
-                currentTimeStr={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                station={selectedStation}
-                liveData={liveMeteoData}
-                onSelectIndiaHotspot={() => {
-                  const hotspot = getHighestRiskStation(STATIONS_NETWORK);
-                  if (hotspot) {
-                    setSelectedStation(hotspot);
-                    loadLiveMeteo(hotspot.lat, hotspot.lon, hotspot.name);
-                  }
-                }}
-                onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
-                onClose={() => setIsAnalyticsOpen(false)}
-              />
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsAnalyticsOpen(true)}
-              className="absolute top-28 right-4 z-20 pointer-events-auto flex items-center gap-2 apple-liquid-glass-pill px-4 py-2.5 rounded-full shadow-xl text-xs font-semibold text-white transition-all cursor-pointer active:scale-95"
-            >
-              <BarChart3 className="w-4 h-4 text-rose-400" />
-              <span>Show Threat Analytics</span>
-            </button>
-          )
-        )}
-
-        {/* Floating Ventusky-Style Wind Particle Dropdown Menu */}
-        {!isHomeView && (
-          <div className={`absolute z-30 transition-all duration-300 pointer-events-auto ${
-            isMeteoPanelOpen ? 'left-[400px]' : 'left-4'
-          } bottom-20`}>
-            <WindParticleDropdown
-              mode={windParticleMode}
-              onChangeMode={(newMode) => {
-                setWindParticleMode(newMode);
-                if (newMode === 'off') {
-                  setShowParticles(false);
-                } else {
-                  setShowParticles(true);
+        {/* Floating Right Column: Convective Grid Panel */}
+        {!isHomeView && isAnalyticsOpen && (
+          <div id="threat-analytics-panel-container" className="absolute top-28 right-4 z-20 pointer-events-auto max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-none pr-0.5">
+            <ThreatAnalyticsPanel
+              riskPercent={currentRiskPercent}
+              severity={currentRiskPercent != null ? (currentRiskPercent >= 75 ? "SEVERE THREAT" : currentRiskPercent >= 25 ? "ELEVATED RISK" : "NORMAL") : "OFFLINE"}
+              station={selectedStation}
+              liveData={liveMeteoData}
+              onRefresh={handleManualTelemetryRefresh}
+              isRefreshing={isMeteoLoading || isMlRetrying}
+              onSelectIndiaHotspot={() => {
+                const hotspot = getHighestRiskStation(STATIONS_NETWORK);
+                if (hotspot) {
+                  setSelectedStation(hotspot);
+                  loadLiveMeteo(hotspot.lat, hotspot.lon, hotspot.name, false);
+                  fetchLivePrediction(hotspot, false);
                 }
               }}
+              onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
+              onClose={() => setIsAnalyticsOpen(false)}
             />
           </div>
         )}
 
-        {/* Floating Multi-Variable Weather Color Scale Legend Bar */}
-        {activeLayer !== 'none' && (
-          <div className={`absolute z-30 transition-all duration-300 pointer-events-auto bottom-8 ${
-            isMeteoPanelOpen ? 'left-[calc(50%+190px)] -translate-x-1/2' : 'left-1/2 -translate-x-1/2'
-          }`}>
-            <TemperatureLegendBar
-              activeLayer={activeLayer}
-              tempUnit={tempUnit}
-              onToggleTempUnit={handleToggleTempUnit}
-            />
-          </div>
-        )}
 
       </div>
 
@@ -695,6 +707,13 @@ export default function App() {
       {showIntro && (
         <CinematicIntroSplash onComplete={() => setShowIntro(false)} />
       )}
+
+      {/* 6. Convective Weather Email Alerts Subscription Modal */}
+      <EmailAlertModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSubscribedChange={(status) => setIsEmailSubscribed(status)}
+      />
 
     </div>
   );

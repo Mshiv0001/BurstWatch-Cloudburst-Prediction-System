@@ -1053,5 +1053,30 @@
     "elevation_m": 0.0,
     "slope_deg": 0.0,
     "aspect_deg": 270.0
+  },
+  "1.2285_-4.8187": {
+    "elevation_m": 0.0,
+    "slope_deg": 0.0,
+    "aspect_deg": 270.0
+  },
+  "30.7340_79.0660": {
+    "elevation_m": 3534.0,
+    "slope_deg": 5.91,
+    "aspect_deg": 0.0
+  },
+  "-0.4664_44.0164": {
+    "elevation_m": 0.0,
+    "slope_deg": 0.0,
+    "aspect_deg": 270.0
+  },
+  "29.9561_78.0025": {
+    "elevation_m": 292.0,
+    "slope_deg": 1.22,
+    "aspect_deg": 282.2
+  },
+  "15.6351_86.1522": {
+    "elevation_m": 0.0,
+    "slope_deg": 0.0,
+    "aspect_deg": 270.0
   }
 }

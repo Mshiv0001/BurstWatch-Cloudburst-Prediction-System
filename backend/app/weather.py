@@ -31,10 +31,11 @@ class OpenMeteoClient:
         self.s = settings
         self.variables = list(variables)
         self.session = session or requests.Session()
-        self.session.headers.update({
-            "User-Agent": "BurstWatch-Cloudburst-Engine/2.5 (+https://burstwatch-cloudburst-prediction.vercel.app)",
-            "Accept": "application/json",
-        })
+        if hasattr(self.session, "headers") and hasattr(self.session.headers, "update"):
+            self.session.headers.update({
+                "User-Agent": "BurstWatch-Cloudburst-Engine/2.5 (+https://burstwatch-cloudburst-prediction.vercel.app)",
+                "Accept": "application/json",
+            })
         self._sleep = sleep
         self._terrain_cache_path = Path(self.s.db_path).parent / "cache" / "terrain_cache.json"
 
@@ -171,9 +172,14 @@ class OpenMeteoClient:
 
     def _get_json(self, url: str, params: dict) -> dict:
         last_error = "unknown error"
+        # Fast connect timeout (2.5s) and read timeout (4.0s) so blocked/unreachable networks fail over immediately to calibrated physics baseline
+        timeout = (min(2.5, self.s.http_timeout), min(4.0, self.s.http_timeout))
         for attempt in range(self.s.http_retries + 1):
             try:
-                resp = self.session.get(url, params=params, timeout=self.s.http_timeout)
+                resp = self.session.get(url, params=params, timeout=timeout)
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as exc:
+                # Host connection unreachable or timed out - raise immediately to activate physics fallback without 80-second hang
+                raise WeatherError(f"Weather provider host unreachable: {exc}") from exc
             except requests.RequestException as exc:
                 last_error = f"network error: {exc}"
             else:

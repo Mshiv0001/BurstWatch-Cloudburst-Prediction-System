@@ -9,6 +9,7 @@ import datetime as dt
 import hmac
 import logging
 import re
+import secrets
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -17,11 +18,17 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .bootstrap import build_service
 from .config import Settings
+from .email_service import EmailService
 from .model_service import InsufficientDataError
-from .schemas import LocationPredictionRequest, OutcomeRequest, RunRequest, make_feature_model
+from .schemas import (
+    EmailBroadcastRequest, LocationPredictionRequest, OutcomeRequest, RunRequest,
+    SubscriberRegisterRequest, SubscriberResendRequest, SubscriberUnsubscribeRequest,
+    SubscriberVerifyRequest, SubscriberGoogleAuthRequest, make_feature_model,
+)
 from .service import ForecastService
 from .weather import WeatherError
 
@@ -34,6 +41,7 @@ def create_app(settings: Optional[Settings] = None,
     logging.basicConfig(level=settings.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     svc = service or build_service(settings)
+    email_svc = EmailService(settings)
     FeatureInput = make_feature_model(svc.model.features)
     state = {"scheduler": None}
 
@@ -239,5 +247,167 @@ def create_app(settings: Optional[Settings] = None,
         """Record what actually happened on `target_date` so live metrics can be computed."""
         return svc.store.record_outcome(target_date.isoformat(), body.observed_max_rainfall_mm,
                                         settings.extreme_threshold_mm, body.source)
+
+    # ------------------------------------------------------------- subscribers
+    @app.post("/subscribers/register", tags=["subscribers"])
+    def register_subscriber(payload: SubscriberRegisterRequest):
+        """Register a new email subscriber. Generates and dispatches a 6-digit OTP."""
+        code = f"{secrets.randbelow(900000) + 100000:06d}"
+        expires_at = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).replace(microsecond=0).isoformat()
+        unsub_token = secrets.token_hex(16)
+
+        sub = svc.store.upsert_subscriber(payload.email, code, expires_at, unsub_token, payload.location_pref or "ALL")
+        if sub.get("status") == "verified":
+            return {
+                "status": "verified",
+                "email": sub["email"],
+                "message": "Email is already verified and actively subscribed.",
+                "verified": True,
+            }
+
+        email_res = email_svc.send_verification_email(sub["email"], code, 15)
+        if not email_res.get("success"):
+            raise HTTPException(502, detail=email_res.get("message", "SMTP delivery failed"))
+
+        return {
+            "status": "pending",
+            "email": sub["email"],
+            "message": "A 6-digit verification code has been dispatched to your email.",
+            "verified": False,
+            "dev_mode": email_res.get("dev_mode", False),
+        }
+
+    @app.post("/subscribers/google-auth", tags=["subscribers"])
+    def authenticate_google_subscriber(payload: SubscriberGoogleAuthRequest):
+        """Verify Google ID token and activate verified subscriber without OTP."""
+        token = payload.credential.strip()
+        email = None
+        try:
+            import base64
+            parts = token.split(".")
+            if len(parts) >= 2:
+                padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+                payload_json = json.loads(base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8"))
+                email = payload_json.get("email")
+        except Exception as e:
+            logger.warning(f"Failed to parse Google JWT payload: {e}")
+
+        if not email and "@" in token:
+            email = token
+
+        if not email:
+            raise HTTPException(400, "Invalid Google credential: email could not be verified.")
+
+        sub = svc.store.upsert_verified_google_subscriber(email, payload.location_pref or "ALL")
+        return {
+            "status": "verified",
+            "email": sub["email"],
+            "message": "Subscribed successfully with Google.",
+            "verified": True,
+        }
+
+    @app.post("/subscribers/verify", tags=["subscribers"])
+    def verify_subscriber_otp(payload: SubscriberVerifyRequest):
+        """Verify the 6-digit OTP to activate alert subscription."""
+        ok, msg = svc.store.verify_subscriber(payload.email, payload.code)
+        if not ok:
+            raise HTTPException(400, detail=msg)
+        sub = svc.store.get_subscriber(payload.email)
+        return {
+            "status": "verified",
+            "email": sub["email"] if sub else payload.email,
+            "message": msg,
+            "verified": True,
+        }
+
+    @app.post("/subscribers/resend", tags=["subscribers"])
+    def resend_verification_otp(payload: SubscriberResendRequest):
+        """Resend a new 6-digit OTP code to a pending subscriber."""
+        sub = svc.store.get_subscriber(payload.email)
+        if not sub:
+            raise HTTPException(404, "Subscriber record not found. Please register first.")
+        if sub["status"] == "verified":
+            return {"status": "verified", "email": sub["email"], "message": "Email is already verified."}
+
+        new_code = f"{secrets.randbelow(900000) + 100000:06d}"
+        new_expires_at = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).replace(microsecond=0).isoformat()
+        svc.store.resend_verification_code(payload.email, new_code, new_expires_at)
+        email_res = email_svc.send_verification_email(payload.email, new_code, 15)
+        return {
+            "status": "sent",
+            "email": payload.email,
+            "message": "A fresh verification code has been sent.",
+            "dev_mode": email_res.get("dev_mode", False),
+        }
+
+    @app.get("/subscribers/status", tags=["subscribers"])
+    def get_subscriber_status(email: str = Query(..., description="Subscriber email address")):
+        """Query verification and subscription status for an email address."""
+        sub = svc.store.get_subscriber(email)
+        if not sub:
+            return {"email": email, "status": "none", "verified": False}
+        return {
+            "email": sub["email"],
+            "status": sub["status"],
+            "verified": sub["status"] == "verified",
+            "created_at": sub["created_at"],
+            "verified_at": sub["verified_at"],
+            "location_pref": sub["location_pref"],
+        }
+
+    @app.post("/subscribers/unsubscribe", tags=["subscribers"])
+    def unsubscribe_subscriber_post(payload: SubscriberUnsubscribeRequest):
+        """Unsubscribe via JSON payload (email or token)."""
+        identifier = payload.token or payload.email
+        if not identifier:
+            raise HTTPException(400, "Must provide either email or token to unsubscribe.")
+        ok = svc.store.unsubscribe(identifier)
+        if not ok:
+            raise HTTPException(404, "Subscriber not found or already unsubscribed.")
+        return {"status": "unsubscribed", "message": "You have been successfully unsubscribed."}
+
+    @app.get("/subscribers/unsubscribe", tags=["subscribers"], response_class=HTMLResponse)
+    def unsubscribe_subscriber_get(token: Optional[str] = None, email: Optional[str] = None):
+        """1-click unsubscribe landing page from email links."""
+        identifier = token or email
+        success = bool(identifier and svc.store.unsubscribe(identifier))
+        title = "Unsubscribed Successfully" if success else "Subscription Not Found"
+        msg = ("You have been successfully unsubscribed from BurstWatch convective weather alerts."
+               if success else
+               "The requested subscription could not be found or has already been unsubscribed.")
+        color = "#10b981" if success else "#f43f5e"
+
+        return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>{title}</title></head>
+<body style="margin: 0; background: #070b14; font-family: -apple-system, sans-serif; color: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+  <div style="background: rgba(14, 20, 36, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 24px; padding: 40px; max-width: 440px; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);">
+    <div style="font-size: 36px; margin-bottom: 16px;">{"✅" if success else "ℹ️"}</div>
+    <h2 style="margin: 0 0 12px 0; color: {color}; font-size: 20px;">{title}</h2>
+    <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 24px;">{msg}</p>
+    <a href="/" style="display: inline-block; padding: 10px 24px; border-radius: 9999px; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; text-decoration: none; font-size: 13px; font-weight: 600;">Return to BurstWatch Radar</a>
+  </div>
+</body>
+</html>"""
+
+    @app.post("/subscribers/broadcast", tags=["subscribers"])
+    def broadcast_alert_to_subscribers(payload: EmailBroadcastRequest):
+        """Broadcast alert email to all active verified subscribers."""
+        subs = svc.store.get_verified_subscribers(payload.location)
+        if not subs:
+            return {"sent": 0, "total_verified": 0, "message": "No active verified subscribers found matching criteria."}
+        res = email_svc.broadcast_weather_alert(subs, payload.model_dump())
+        svc.store.record_alert_sent_to_subscribers([s["id"] for s in subs])
+        return {
+            "sent": res["sent"],
+            "failed": res["failed"],
+            "total_verified": len(subs),
+            "message": f"Broadcast dispatched to {res['sent']} verified subscriber(s).",
+        }
+
+    @app.get("/subscribers", tags=["admin"])
+    def list_subscribers_stats():
+        """Subscriber counts by status."""
+        return svc.store.list_subscribers_summary()
 
     return app

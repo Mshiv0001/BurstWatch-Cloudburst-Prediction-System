@@ -104,6 +104,13 @@ export function computeLiveCloudburstThreat(liveData) {
   };
 }
 
+import { 
+  getMeteoCacheKey, 
+  getCachedMeteo, 
+  setCachedMeteo, 
+  invalidateMeteoCache 
+} from './meteoCacheService';
+
 // In-memory cache to prevent redundant requests
 const weatherCache = new Map();
 
@@ -112,22 +119,23 @@ const weatherCache = new Map();
  * @param {number} lat Latitude
  * @param {number} lon Longitude
  * @param {string} stationName Name of the station/location
+ * @param {boolean} forceRefresh Bypass cache and force network fetch
  */
-export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected Station') {
-  const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
-  const now = Date.now();
+export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected Station', forceRefresh = false) {
+  const cacheKey = getMeteoCacheKey(lat, lon, 'weather');
 
-  // Return cached result if within 2 minutes
-  if (weatherCache.has(cacheKey)) {
-    const cached = weatherCache.get(cacheKey);
-    if (now - cached.timestamp < 120000) {
+  if (!forceRefresh) {
+    const cached = getCachedMeteo(cacheKey, 30);
+    if (cached) {
       return cached.data;
     }
+  } else {
+    invalidateMeteoCache(cacheKey);
   }
 
   const apiKey = getWeatherApiKey();
   if (!apiKey) {
-    return fetchOpenMeteoCurrent(lat, lon, stationName);
+    return fetchOpenMeteoCurrent(lat, lon, stationName, forceRefresh);
   }
 
   const endpoint = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lon}&days=2&aqi=no&alerts=yes`;
@@ -144,6 +152,7 @@ export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected 
     }
 
     const json = await response.json();
+    const now = Date.now();
     const curr = json.current || {};
     const loc = json.location || {};
     const forecastDays = json.forecast?.forecastday || [];
@@ -227,6 +236,7 @@ export async function fetchWeatherApiLiveData(lat, lon, stationName = 'Selected 
     // Calculate dynamic cloudburst threat strictly for India sectors
     liveData.threat = isIndia ? computeLiveCloudburstThreat(liveData) : null;
 
+    setCachedMeteo(cacheKey, liveData);
     weatherCache.set(cacheKey, { data: liveData, timestamp: now });
     return liveData;
   } catch (err) {
@@ -257,7 +267,15 @@ function generateSyntheticHourlySeries(baseTemp = 20, baseHumidity = 50, basePre
 }
 
 // Live Open-Meteo fallback when WeatherAPI key is not set
-async function fetchOpenMeteoCurrent(lat, lon, stationName) {
+async function fetchOpenMeteoCurrent(lat, lon, stationName, forceRefresh = false) {
+  const cacheKey = getMeteoCacheKey(lat, lon, 'openmeteo');
+  if (!forceRefresh) {
+    const cached = getCachedMeteo(cacheKey, 30);
+    if (cached) return cached.data;
+  } else {
+    invalidateMeteoCache(cacheKey);
+  }
+
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation&timezone=auto`);
     if (!res.ok) throw new Error('Open-Meteo error');
@@ -319,6 +337,7 @@ async function fetchOpenMeteoCurrent(lat, lon, stationName) {
       hourlySeries: realHourlySeries
     };
     liveData.threat = isIndia ? computeLiveCloudburstThreat(liveData) : null;
+    setCachedMeteo(cacheKey, liveData);
     return liveData;
   } catch (e) {
     return createFallbackLiveData(lat, lon, stationName);

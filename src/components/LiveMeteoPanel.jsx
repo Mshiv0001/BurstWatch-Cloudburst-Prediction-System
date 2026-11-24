@@ -3,31 +3,21 @@ import {
   Droplets, 
   CloudRain, 
   Gauge, 
-  Activity, 
-  AlertTriangle, 
-  Zap, 
-  Compass, 
-  ChevronDown, 
-  ChevronUp, 
-  TrendingDown, 
-  Maximize2, 
-  Minimize2, 
-  X,
-  RotateCw,
-  Wind,
-  Cloud,
-  Sun,
-  Moon,
-  CloudSun,
-  CloudLightning,
-  CloudHail,
-  CloudDrizzle,
-  Radio,
-  Clock,
-  Layers,
-  Globe
+  RotateCw, 
+  Wind, 
+  Cloud, 
+  Sun, 
+  Moon, 
+  CloudSun, 
+  CloudLightning, 
+  CloudHail, 
+  CloudDrizzle, 
+  Clock, 
+  MapPin, 
+  X
 } from 'lucide-react';
-import { isIndiaSector } from '../utils/geoUtils';
+import { motion } from 'framer-motion';
+import { celsiusToFahrenheit } from '../utils/temperatureUtils';
 
 const WEATHER_ICONS = {
   CloudLightning,
@@ -39,20 +29,32 @@ const WEATHER_ICONS = {
   Sun,
   Moon
 };
-import { celsiusToFahrenheit } from '../utils/temperatureUtils';
 
+function getCompassDirection(degrees) {
+  if (degrees == null || isNaN(degrees)) return 'NW';
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(((degrees % 360) / 45)) % 8;
+  return dirs[index];
+}
+
+/**
+ * LiveMeteoPanel.jsx (Station Telemetry Console)
+ * 
+ * Streamlined Surface Weather Telemetry Console (MeteoPulse™)
+ * - GlassAura™ Translucent Liquid Glass Hierarchy (VisionOS / Apple Weather standard)
+ * - Calibrated 4-Tier Semantic Palette (Electric Cyan, Emerald Jade, Solar Amber, Crimson Rose)
+ * - Symmetrical 2x2 Weather Telemetry Grid (Inflow Wind, Surface Barometer, Moisture, Precip Rate)
+ * - Continuous Ticking Local Station Clock in Station Timezone
+ * - Pure Essential Information (Zero redundant scroll strips, zero diagnostic bloat, zero dead buttons)
+ */
 export default function LiveMeteoPanel({
   liveData,
   station,
   isLoading = false,
   onRefresh,
-  onOpenTrendDrawer,
   onClose,
   tempUnit = 'C'
 }) {
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
   // Real-time ticking clock synchronized with the API local time
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const apiOffsetMsRef = useRef(0);
@@ -76,7 +78,7 @@ export default function LiveMeteoPanel({
     }
   }, [liveData?.localtimeEpoch, liveData?.localtime, liveData?.tzId, liveData?.fetchedAtEpoch]);
 
-  // Actively tick every second to keep the clock live and working
+  // Actively tick every second to keep the clock live
   useEffect(() => {
     const updateTick = () => {
       const stationEpoch = Date.now() + apiOffsetMsRef.current;
@@ -113,365 +115,274 @@ export default function LiveMeteoPanel({
   if (!liveData && !station) return null;
 
   const data = liveData || {};
-  const temp = data.temperature ?? station?.temp ?? 22;
+  const rawTemp = data.temperature ?? station?.temp ?? 22;
+  const displayTemp = tempUnit === 'F' ? celsiusToFahrenheit(rawTemp) : Math.round(rawTemp);
+  const displayApparent = data.apparentTemperature != null 
+    ? (tempUnit === 'F' ? celsiusToFahrenheit(data.apparentTemperature) : Math.round(data.apparentTemperature))
+    : null;
+
   const humidity = data.humidity ?? station?.humidity ?? 65;
-  const pressure = data.pressure ?? 1012;
+  const pressure = data.pressure != null ? Math.round(data.pressure) : 1012;
   const windSpeed = data.windSpeed ?? station?.windSpeed ?? 15;
-  const windGusts = data.windGusts ?? (windSpeed * 1.4);
-  const windDir = data.windDirection ?? 45;
-  const rainRate = data.precipitation ?? data.rainRate ?? station?.rainfallRate ?? 0;
-  const cloudCover = data.cloudCover ?? 60;
+  const windDir = data.windDirection ?? station?.windDirection ?? 45;
+  const compassDir = data.windCompass || getCompassDirection(windDir);
+  const rainRate = Number(data.precipitation ?? data.rainRate ?? station?.rainfallRate ?? 0);
   const condition = data.condition || station?.condition || 'Convective Air Mass';
   const isLive = data.isLive === true;
-  const source = data.source || (liveData ? 'Unknown data source' : 'Station network estimate (not live)');
+  const source = data.source || (liveData ? 'AWS Weather Network' : 'Station Network Baseline');
 
-  const threat = data.threat || null;
-  const isIndia = data.isIndia ?? (station ? isIndiaSector(station.lon ?? station.lng, station.lat) : true);
-
-  const isCritical = threat?.severity === 'CRITICAL';
-  const isHigh = threat?.severity === 'HIGH';
-  const isModerate = threat?.severity === 'MODERATE';
-
-  const WeatherIcon = WEATHER_ICONS[data.icon] || CloudRain;
+  const WeatherIcon = WEATHER_ICONS[data.icon] || CloudSun;
 
   return (
-    <aside
-      className={`pointer-events-auto transition-all duration-300 select-none ${
-        isMinimized ? 'w-72' : 'w-[360px] max-w-[calc(100vw-32px)]'
-      }`}
+    <motion.aside
+      initial={{ opacity: 0, x: -20, scale: 0.98 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: -20, scale: 0.98 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="w-80 sm:w-[350px] select-none z-20 text-slate-100 flex flex-col gap-2.5 font-sans"
+      aria-label="Station Telemetry Intelligence Panel"
     >
-      <div className="apple-liquid-glass rounded-3xl p-4 flex flex-col gap-3 text-white max-h-[calc(100vh-120px)] overflow-y-auto no-scrollbar shadow-2xl">
-        {/* Panel Header */}
-        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-white/10">
-          <div>
-            {/* Live Station Local Clock (API time, continuously ticking) */}
-            <div className="apple-liquid-glass-pill flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono text-cyan-300 w-fit">
-              <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0 animate-pulse" />
-              <span className="font-semibold tracking-wide">{formattedTime}</span>
+      {/* ===================================================================
+          MASTER CONTAINER: GlassAura™ Translucent Liquid Glass Console
+          =================================================================== */}
+      <div className="glass-panel-translucent rounded-3xl p-4 border border-white/12 shadow-[0_24px_64px_rgba(0,0,0,0.55)] flex flex-col gap-3 relative overflow-hidden">
+        
+        {/* Subtle Ambient Radial Glow */}
+        <div 
+          className="absolute -top-16 -left-16 w-44 h-44 rounded-full pointer-events-none opacity-20 blur-3xl transition-colors duration-500 bg-cyan-400"
+        />
+
+        {/* -----------------------------------------------------------------
+            1. HEADER: Station Telemetry Identity & Sector Context
+            ----------------------------------------------------------------- */}
+        <div className="flex flex-col gap-2 pb-2.5 border-b border-white/10 relative z-10">
+          <div className="flex items-center justify-between">
+            {/* Header Identity Badge */}
+            <div className="flex items-center gap-1.5 apple-liquid-glass-cyan px-2.5 py-1 rounded-full border border-cyan-400/40 text-cyan-200">
+              <CloudSun className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="text-[11px] font-mono font-bold tracking-wider uppercase">
+                Station Telemetry
+              </span>
             </div>
 
-            <h2 className="text-base font-extrabold text-white leading-tight mt-1.5">
-              {data.stationName || station?.name || station?.stationName || "Himalayan Sector"}
-            </h2>
-            <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 mt-0.5">
-              <span>Elev: <strong className="text-slate-200">{data.elevation ?? station?.elevation ?? 1800}m</strong></span>
-              <span>•</span>
-              <span>
-                {data.coordinates ? `${data.coordinates[0].toFixed(2)}°N, ${data.coordinates[1].toFixed(2)}°E` : ''}
-              </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Manual Refresh Button */}
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading}
+                title="Refresh Live Station Telemetry"
+                className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-all cursor-pointer border border-white/10 active:scale-95 disabled:opacity-50"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
+              </button>
+
+              {/* Panel Close Button */}
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-all cursor-pointer border border-white/10 active:scale-95"
+                  title="Close Station Telemetry Panel"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Refresh Button */}
-            <button
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="apple-liquid-glass-pill p-1.5 rounded-full text-slate-300 hover:text-white transition-all cursor-pointer"
-              title="Refresh current weather data"
-            >
-              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
-            </button>
-            <button
-              onClick={() => setIsMinimized(!isMinimized)}
-              className="apple-liquid-glass-pill p-1.5 rounded-full text-slate-300 hover:text-white transition-all cursor-pointer"
-              title={isMinimized ? "Expand Panel" : "Minimize Panel"}
-            >
-              {isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
-            </button>
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="apple-liquid-glass-pill p-1.5 rounded-full text-slate-300 hover:text-white transition-all cursor-pointer"
-                title="Close"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+          {/* Sector Details */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+              <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-white truncate">
+                  {data.stationName || station?.name || station?.stationName || "Himalayan Sector"}
+                </span>
+                <span className="text-[10px] text-slate-400 truncate">
+                  {station?.state || station?.region || 'India Sector'}
+                </span>
+              </div>
+            </div>
+
+            <span className="font-mono text-[10px] text-cyan-300/90 bg-cyan-950/50 px-2 py-0.5 rounded-full border border-cyan-800/40 shrink-0 font-medium">
+              {data.elevation ?? station?.elevation ?? 1800}m DEM
+            </span>
+          </div>
+
+          {/* Live Station Local Clock Pill */}
+          <div className="flex items-center justify-between pt-0.5">
+            <div className="apple-liquid-glass-pill flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono text-cyan-300 border border-cyan-400/30">
+              <Clock className="w-3 h-3 text-cyan-400 shrink-0 animate-pulse" />
+              <span className="font-semibold tracking-wide">{formattedTime}</span>
+            </div>
+            {data.coordinates && (
+              <span className="text-[9.5px] font-mono text-slate-400">
+                {data.coordinates[0].toFixed(2)}°N, {data.coordinates[1].toFixed(2)}°E
+              </span>
             )}
           </div>
         </div>
 
-        {/* Minimized View */}
-        {isMinimized ? (
-          <div className="flex items-center justify-between py-1">
-            <div className="flex items-center gap-2.5">
-              <WeatherIcon className="w-6 h-6 text-cyan-400" />
-              <span className="text-2xl font-black text-white font-mono">
-                {tempUnit === 'F' ? celsiusToFahrenheit(temp) : temp}°{tempUnit}
+        {/* -----------------------------------------------------------------
+            2. HERO TEMPERATURE & CONDITION CARD
+            ----------------------------------------------------------------- */}
+        <div className="apple-liquid-glass-well rounded-2xl p-3 border border-white/10 flex items-center justify-between relative">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-black font-mono text-white tracking-tight leading-none">
+                {displayTemp}°
               </span>
-            </div>
-            {threat ? (
-              <span className={`apple-liquid-glass-pill px-3 py-1 rounded-full text-[10px] font-bold ${
-                isCritical ? 'apple-liquid-glass-crimson text-red-200' :
-                isHigh ? 'apple-liquid-glass-amber text-amber-200' :
-                'apple-liquid-glass-emerald text-emerald-200'
-              }`}>
-                {threat.riskPercent}% RISK
-              </span>
-            ) : (
-              <span className="apple-liquid-glass-pill px-3 py-1 rounded-full text-[10px] font-bold text-sky-300">
-                GLOBAL
-              </span>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Live Convective Cloudburst Threat Banner (India) vs Global Synoptic Banner */}
-            {threat ? (
-              <div className={`p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl ${
-                isCritical
-                  ? 'apple-liquid-glass-crimson text-red-200'
-                  : isHigh
-                  ? 'apple-liquid-glass-amber text-amber-200'
-                  : 'apple-liquid-glass-emerald text-emerald-200'
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    isCritical ? 'bg-red-500/30 text-red-300 animate-pulse' :
-                    isHigh ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'
-                  }`}>
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">
-                      {isLive ? 'Current conditions · calculated risk' : 'Baseline estimate · not live'}
-                    </div>
-                    <div className="text-xs font-bold leading-tight">
-                      {threat.severity} MODEL RISK INDEX
-                    </div>
-                  </div>
-                </div>
-
-                {/* Risk Percentage Badge */}
-                <div className="flex flex-col items-end shrink-0">
-                  <span className="text-xl font-black font-mono leading-none">{threat.riskPercent}%</span>
-                  <span className="text-[9px] uppercase font-semibold opacity-75">Index</span>
-                </div>
-              </div>
-            ) : (
-              <div className="apple-liquid-glass-cyan p-3.5 rounded-2xl text-sky-200 flex items-center justify-between gap-3 shadow-xl">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-sky-500/25 text-sky-200">
-                    <Globe className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase font-bold tracking-wider text-sky-300">
-                      Global Synoptic Monitoring
-                    </div>
-                    <div className="text-xs font-semibold leading-tight text-slate-200">
-                      {isLive ? 'Current weather observations available' : 'Estimated baseline data · not a current observation'}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="apple-liquid-glass-pill text-[9px] font-mono px-2.5 py-0.5 rounded-full text-sky-300">
-                    Global Scope
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Current Weather Card with Compass Dial */}
-            <div className="apple-liquid-glass-well p-3.5 rounded-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="apple-liquid-glass-pill p-2.5 rounded-2xl text-cyan-300">
-                  <WeatherIcon className="w-8 h-8" />
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black text-white font-mono leading-none">
-                      {tempUnit === 'F' ? celsiusToFahrenheit(temp) : temp}°
-                    </span>
-                    <span className="text-xs font-semibold text-slate-400">{tempUnit}</span>
-                    {data.apparentTemperature != null && (
-                      <span className="text-[11px] font-mono text-slate-400 ml-1">
-                        Feels {tempUnit === 'F' ? celsiusToFahrenheit(data.apparentTemperature) : data.apparentTemperature}°
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-medium text-slate-300 block mt-1 leading-tight">
-                    {condition}
-                  </span>
-                </div>
-              </div>
-
-              {/* Wind Direction Dial */}
-              <div className="apple-liquid-glass-pill flex flex-col items-center px-3 py-1.5 rounded-xl">
-                <div className="relative w-6 h-6 flex items-center justify-center">
-                  <Compass className="w-6 h-6 text-slate-400" />
-                  <div 
-                    style={{ transform: `rotate(${windDir}deg)` }} 
-                    className="absolute transition-transform duration-500"
-                  >
-                    <svg className="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-                    </svg>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono font-bold text-slate-200 mt-0.5">
-                  {windSpeed} <span className="text-[8px] text-slate-400">km/h</span>
+              <span className="text-xs font-bold text-slate-400 font-mono">{tempUnit}</span>
+              {displayApparent != null && (
+                <span className="text-[11px] font-mono text-slate-400 ml-1.5 font-medium">
+                  Feels {displayApparent}°
                 </span>
-              </div>
-            </div>
-
-            {/* Primary Telemetry Grid */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Rainfall Rate */}
-              <div className="apple-liquid-glass-well p-2.5 rounded-2xl flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase">
-                  <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{isLive ? 'Precipitation rate' : 'Estimated rain rate'}</span>
-                </div>
-                <div className="flex items-baseline justify-between mt-0.5">
-                  <span className="text-base font-black text-white font-mono">{rainRate.toFixed(1)}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">mm/h</span>
-                </div>
-                <span className={`text-[9px] font-semibold ${
-                  rainRate > 20 ? 'text-red-400' : rainRate > 5 ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {rainRate > 20 ? 'Torrential Cloudburst' : rainRate > 5 ? 'Convective Showers' : 'Nominal'}
-                </span>
-              </div>
-
-              {/* Pressure & Tendency */}
-              <div className="apple-liquid-glass-well p-2.5 rounded-2xl flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase">
-                  <Gauge className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Surface Pressure</span>
-                </div>
-                <div className="flex items-baseline justify-between mt-0.5">
-                  <span className="text-base font-black text-white font-mono">{pressure}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">hPa</span>
-                </div>
-                <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-rose-400">
-                  <TrendingDown className="w-3 h-3" />
-                  <span>{pressure < 1000 ? 'Deep Depression' : 'Stable'}</span>
-                </div>
-              </div>
-
-              {/* Humidity */}
-              <div className="apple-liquid-glass-well p-2.5 rounded-2xl flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase">
-                  <Droplets className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Rel. Humidity</span>
-                </div>
-                <div className="flex items-baseline justify-between mt-0.5">
-                  <span className="text-base font-black text-white font-mono">{humidity}%</span>
-                  <span className="text-[10px] text-slate-400 font-mono">Sat</span>
-                </div>
-                <span className={`text-[9px] font-semibold truncate ${humidity > 85 ? 'text-rose-400' : 'text-blue-300'}`}>
-                  {humidity > 85 ? 'Moisture Saturated' : 'Normal Vapor'}
-                </span>
-              </div>
-
-              {/* Wind Gusts */}
-              <div className="apple-liquid-glass-well p-2.5 rounded-2xl flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase">
-                  <Wind className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Peak Wind Gusts</span>
-                </div>
-                <div className="flex items-baseline justify-between mt-0.5">
-                  <span className="text-base font-black text-white font-mono">{Math.round(windGusts)}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">km/h</span>
-                </div>
-                <span className={`text-[9px] font-semibold ${windGusts > 45 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                  {windGusts > 45 ? 'High Orographic Shear' : 'Calm / Moderate'}
-                </span>
-              </div>
-            </div>
-
-            {/* Next 8 Hours Live Meteogram Strip */}
-            {data.hourlySeries && data.hourlySeries.length > 0 && (
-              <div className="apple-liquid-glass-well p-3 rounded-2xl flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Radio className="w-3 h-3 text-cyan-400" />
-                    <span>{isLive ? '8-Hour Weather Forecast' : 'Simulated Hourly Baseline'}</span>
-                  </span>
-                  <span className="text-cyan-400 font-mono">Hourly</span>
-                </div>
-
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                  {data.hourlySeries.slice(0, 8).map((hour, idx) => (
-                    <div
-                      key={idx}
-                      className="apple-liquid-glass-pill flex-1 min-w-[42px] flex flex-col items-center gap-0.5 text-center p-1.5 rounded-xl"
-                    >
-                      <span className="text-[8px] font-mono text-slate-300">{hour.time}</span>
-                      <CloudRain className="w-3.5 h-3.5 text-cyan-400 my-0.5" />
-                      <span className="text-[10px] font-black font-mono text-white">
-                        {tempUnit === 'F' ? celsiusToFahrenheit(hour.temp) : hour.temp}°
-                      </span>
-                      {hour.rainRate > 0 ? (
-                        <span className="text-[8px] font-mono text-blue-300 font-bold leading-none">{hour.rainRate.toFixed(1)}</span>
-                      ) : (
-                        <span className="text-[8px] font-mono text-slate-500 leading-none">-</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Advanced Convective Model Diagnostics (Collapsible) */}
-            <div className="border-t border-white/10 pt-1.5 flex flex-col gap-2">
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between text-[11px] font-bold text-slate-300 hover:text-white px-2 py-1.5 rounded-xl apple-liquid-glass-pill transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 text-cyan-400">
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Atmospheric & Orographic Physics</span>
-                </div>
-                {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-
-              {showAdvanced && (
-                <div className="apple-liquid-glass-well grid grid-cols-2 gap-2 text-xs font-mono p-3 rounded-2xl">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-sans block">Cloud Fraction</span>
-                    <span className="font-bold text-cyan-300">{cloudCover}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-sans block">Pressure Deficit</span>
-                    <span className="font-bold text-amber-300">{(1013 - pressure)} hPa</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-sans block">Model Engine</span>
-                    <span className="font-bold text-slate-200">{source}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-sans block">Telemetry Sync</span>
-                    <span className={`font-bold ${isLive ? 'text-emerald-400' : 'text-amber-300'}`}>
-                      {isLive ? 'Current data' : 'Estimated data'}
-                    </span>
-                  </div>
-                </div>
               )}
             </div>
+            <span className="text-xs font-semibold text-slate-200 mt-1">
+              {condition}
+            </span>
+          </div>
 
-            {/* Expand Bottom Synoptic Meteogram Graph Action */}
-            {onOpenTrendDrawer && (
-              <button
-                onClick={onOpenTrendDrawer}
-                className="apple-liquid-glass-pill w-full py-2.5 px-3 rounded-full text-cyan-200 text-xs font-bold flex items-center justify-center gap-2 border border-cyan-400/40 shadow-lg cursor-pointer"
-              >
-                <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span>Open Synoptic Meteogram Graph</span>
-              </button>
-            )}
+          <div className="apple-liquid-glass-pill p-2.5 rounded-2xl text-cyan-300 border border-cyan-400/30 shadow-md">
+            <WeatherIcon className="w-7 h-7 text-cyan-300" />
+          </div>
+        </div>
 
-            {/* Provider attribution footer */}
-            <div className="text-[9px] font-mono text-slate-500 text-center pt-0.5">
-              Data source: <span className="text-slate-400">{source}</span>
-              {' · '}
-              <span className={`ml-2 ${isLive ? 'text-emerald-400' : 'text-amber-300'}`}>
-                {isLive ? 'Live' : 'Estimate'}
+        {/* -----------------------------------------------------------------
+            3. ESSENTIAL 2x2 WEATHER TELEMETRY GRID
+            ----------------------------------------------------------------- */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-400 px-0.5 font-semibold">
+            <span>Surface Meteorology</span>
+            <span className="text-cyan-400">AWS Sensors</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {/* Pillar 1: Inflow Wind Vector */}
+            <div className="apple-liquid-glass-well p-2.5 rounded-2xl border border-white/10 flex flex-col justify-between gap-1">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1 font-medium">
+                  <Wind className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Inflow Wind</span>
+                </span>
+                <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/60 px-1.5 py-0.2 rounded border border-cyan-800/40">
+                  {compassDir}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl font-bold font-mono text-white tracking-tight">
+                  {Math.round(windSpeed)}
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">km/h</span>
+              </div>
+              <span className="text-[9px] font-mono text-slate-400 truncate">
+                {windSpeed >= 40 ? (
+                  <span className="text-rose-400 font-semibold">Gale Inflow</span>
+                ) : windSpeed >= 20 ? (
+                  <span className="text-amber-300">Breezy Updraft</span>
+                ) : (
+                  'Gentle Breeze'
+                )}
               </span>
             </div>
-          </>
-        )}
+
+            {/* Pillar 2: Surface Barometer */}
+            <div className="apple-liquid-glass-well p-2.5 rounded-2xl border border-white/10 flex flex-col justify-between gap-1">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1 font-medium">
+                  <Gauge className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Barometer</span>
+                </span>
+                {pressure < 1000 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                )}
+              </div>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl font-bold font-mono text-white tracking-tight">
+                  {pressure}
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">hPa</span>
+              </div>
+              <span className="text-[9px] font-mono truncate">
+                {pressure < 1000 ? (
+                  <span className="text-amber-400 font-semibold">Low Depression</span>
+                ) : (
+                  <span className="text-emerald-400">Stable Pressure</span>
+                )}
+              </span>
+            </div>
+
+            {/* Pillar 3: Relative Humidity */}
+            <div className="apple-liquid-glass-well p-2.5 rounded-2xl border border-white/10 flex flex-col justify-between gap-1">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1 font-medium">
+                  <Droplets className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Air Moisture</span>
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl font-bold font-mono text-white tracking-tight">
+                  {humidity}
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">% RH</span>
+              </div>
+              <span className="text-[9px] font-mono text-slate-400 truncate">
+                {humidity >= 85 ? (
+                  <span className="text-amber-300">High Saturation</span>
+                ) : (
+                  'Optimal Catchment'
+                )}
+              </span>
+            </div>
+
+            {/* Pillar 4: Precipitation Rate */}
+            <div className="apple-liquid-glass-well p-2.5 rounded-2xl border border-white/10 flex flex-col justify-between gap-1">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1 font-medium">
+                  <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Precip Rate</span>
+                </span>
+                {rainRate > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                )}
+              </div>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl font-bold font-mono text-white tracking-tight">
+                  {rainRate.toFixed(1)}
+                </span>
+                <span className="text-[10px] font-mono text-cyan-300">mm/h</span>
+              </div>
+              <span className="text-[9px] font-mono text-slate-400 truncate">
+                {rainRate >= 35 ? (
+                  <span className="text-rose-400 font-semibold">Heavy Torrent</span>
+                ) : rainRate > 0 ? (
+                  <span className="text-cyan-300">Active Rain</span>
+                ) : (
+                  'Zero Precip'
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* -----------------------------------------------------------------
+            4. LIVE TELEMETRY SOURCE & SYNC STATUS FOOTER
+            ----------------------------------------------------------------- */}
+        <div className="flex items-center justify-between text-[9.5px] font-mono text-slate-400 pt-1.5 border-t border-white/10 px-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-slate-300">
+              {isLive ? 'Live AWS Telemetry' : 'Calibrated Estimate'}
+            </span>
+          </div>
+          <span className="text-slate-500 truncate max-w-[140px]">
+            {source}
+          </span>
+        </div>
+
       </div>
-    </aside>
+    </motion.aside>
   );
 }

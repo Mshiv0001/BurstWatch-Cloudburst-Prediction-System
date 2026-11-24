@@ -1,10 +1,19 @@
 /**
  * High-Performance Client-Side ML Prediction Service & Cache
+ * Powered by src/cache/ enterprise caching tier.
  * Directly interacts with the FastAPI backend Dual-Engine Ensemble (LightGBM + XGBoost).
  * Zero hardcoded risk percentages: every location reflects real model inference.
  */
 
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache
+import {
+  getCachedMLPrediction,
+  setCachedMLPrediction,
+  getOrFetchMLPrediction,
+  getMLCoordKey
+} from '../cache/index.js';
+
+const CACHE_TTL_MINUTES = 30; // 30-minute standard TTL for low-churn ML predictions
+const CACHE_TTL_MS = CACHE_TTL_MINUTES * 60 * 1000;
 const predictionCache = new Map();
 const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const PROD_BACKEND_URL = (
@@ -60,8 +69,24 @@ export async function predictLocationML(lat, lon, source = 'auto') {
           body: JSON.stringify(payload),
           signal: controller.signal
         });
+        // If Vite proxy failed (502 / 504), fail over to direct port 8001
+        if (!res.ok && res.status >= 500) {
+          try {
+            const directRes = await fetch('http://localhost:8001/predict/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: controller.signal
+            });
+            if (directRes && directRes.ok) {
+              res = directRes;
+            }
+          } catch {
+            // direct port also unreachable
+          }
+        }
       } catch {
-        res = await fetch('http://localhost:8000/predict/location', {
+        res = await fetch('http://localhost:8001/predict/location', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -102,6 +127,7 @@ export async function predictLocationML(lat, lon, source = 'auto') {
     };
 
     predictionCache.set(key, { timestamp: now, data: result });
+    setCachedMLPrediction(lat, lon, result, CACHE_TTL_MINUTES);
     return result;
 
   } catch (err) {
@@ -130,6 +156,10 @@ export async function predictLocationML(lat, lon, source = 'auto') {
  */
 export function getCachedMLRisk(lat, lon) {
   if (lat == null || lon == null) return null;
+  // Check unified L1 cache first
+  const unified = getCachedMLPrediction(lat, lon, CACHE_TTL_MINUTES);
+  if (unified) return unified;
+
   const key = getCoordKey(lat, lon);
   if (predictionCache.has(key)) {
     return predictionCache.get(key).data;

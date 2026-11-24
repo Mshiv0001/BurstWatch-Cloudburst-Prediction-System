@@ -8,6 +8,13 @@ from typing import Tuple
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load backend/.env if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+except ImportError:
+    pass
+
 
 def _bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
@@ -59,6 +66,16 @@ class Settings:
     alert_webhook_url: str
     extreme_threshold_mm: float
 
+    # --- email notifications (MailAura) ---
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
+    smtp_tls: bool
+    smtp_ssl: bool
+    email_dev_mode: bool
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
@@ -89,4 +106,12 @@ class Settings:
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             alert_webhook_url=os.getenv("ALERT_WEBHOOK_URL", ""),
             extreme_threshold_mm=float(os.getenv("EXTREME_THRESHOLD_MM", "50")),
+            smtp_host=os.getenv("SMTP_HOST", ""),
+            smtp_port=int(os.getenv("SMTP_PORT", "587")),
+            smtp_user=os.getenv("SMTP_USER", ""),
+            smtp_password=os.getenv("SMTP_PASSWORD", ""),
+            smtp_from=os.getenv("SMTP_FROM", "BurstWatch Alerts <alerts@burstwatch.live>"),
+            smtp_tls=_bool("SMTP_TLS", True),
+            smtp_ssl=_bool("SMTP_SSL", False),
+            email_dev_mode=_bool("EMAIL_DEV_MODE", not bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER"))),
         )

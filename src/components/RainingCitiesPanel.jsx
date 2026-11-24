@@ -5,6 +5,7 @@ import {
   ChevronDown, 
   ChevronUp, 
   ChevronRight, 
+  ChevronLeft,
   X, 
   Search, 
   Droplets,
@@ -19,6 +20,17 @@ import { getActiveCyclones } from '../services/cycloneService';
 let globalCityDataCache = {};
 let globalHasCompletedInitialScan = false;
 let globalScannedCount = 0;
+
+const REGION_CATEGORIES = [
+  { id: 'all', label: 'All India' },
+  { id: 'raining', label: 'Raining Now', isSpecial: true },
+  { id: 'himalayan', label: 'Himalayan' },
+  { id: 'ghats', label: 'Western Ghats' },
+  { id: 'northeast', label: 'Northeast' },
+  { id: 'coastal', label: 'Coastal' },
+  { id: 'central', label: 'Central Basins' },
+  { id: 'plains', label: 'Plains & Metros' }
+];
 
 /**
  * Resolves WMO Weather interpretation code to human-readable meteorological text
@@ -95,6 +107,7 @@ export default function RainingCitiesPanel({
   const [hasStartedScan, setHasStartedScan] = useState(() => globalHasCompletedInitialScan);
 
   const abortControllerRef = useRef(null);
+  const tabsRef = useRef(null);
   const cloudburstEventRef = useRef(cloudburstEvent);
   cloudburstEventRef.current = cloudburstEvent;
 
@@ -127,7 +140,7 @@ export default function RainingCitiesPanel({
         globalScannedCount = 0;
       }
 
-      const BATCH_SIZE = 10;
+      const BATCH_SIZE = 25;
       const batches = [];
       for (let i = 0; i < MONITORED_RAIN_CITIES.length; i += BATCH_SIZE) {
         batches.push(MONITORED_RAIN_CITIES.slice(i, i + BATCH_SIZE));
@@ -150,23 +163,18 @@ export default function RainingCitiesPanel({
           const data = await res.json();
           batchResults = Array.isArray(data) ? data : [data];
         } catch (fetchErr) {
-          // Fallback to empty array if network or API error occurs
           batchResults = [];
         }
 
-        // Stream each city in this batch sequentially to present live progressive discovery
+        const batchUpdates = {};
+        const cyclonesList = getActiveCyclones();
+
         for (let j = 0; j < currentBatch.length; j++) {
-          if (isCancelled) break;
-
           const city = currentBatch[j];
-          setCurrentScanningCity(city.name);
-
           const resultObj = batchResults[j];
           const curr = resultObj?.current || {};
           const openMeteoRain = Number(curr.precipitation || curr.rain || curr.showers || 0);
 
-          // Blend with live convective radar model
-          const cyclonesList = getActiveCyclones();
           const localConvectiveRain = estimateLocalRainRate(city.lon, city.lat, {
             cyclones: cyclonesList,
             cloudburstEvent: cloudburstEventRef.current
@@ -185,21 +193,23 @@ export default function RainingCitiesPanel({
           };
 
           globalCityDataCache[city.id] = cityRecord;
-
-          if (!isCancelled) {
-            setCityDataMap((prev) => ({
-              ...prev,
-              [city.id]: cityRecord
-            }));
-
-            currentScanned++;
-            globalScannedCount = currentScanned;
-            setScannedCount(currentScanned);
-          }
-
-          // 35ms pacing between city updates for smooth real-time progressive feedback
-          await new Promise((resolve) => setTimeout(resolve, 35));
+          batchUpdates[city.id] = cityRecord;
         }
+
+        currentScanned += currentBatch.length;
+        globalScannedCount = currentScanned;
+
+        if (!isCancelled) {
+          setCurrentScanningCity(currentBatch[currentBatch.length - 1]?.name || null);
+          setCityDataMap((prev) => ({
+            ...prev,
+            ...batchUpdates
+          }));
+          setScannedCount(currentScanned);
+        }
+
+        // 18ms gentle pacing between batches for fluid 60 FPS UI responsiveness
+        await new Promise((resolve) => setTimeout(resolve, 18));
       }
 
       if (!isCancelled) {
@@ -237,13 +247,16 @@ export default function RainingCitiesPanel({
 
     if (filterMode === 'raining') {
       list = list.filter((c) => c.rainMmPerHour > 0);
+    } else if (filterMode !== 'all') {
+      list = list.filter((c) => c.region === filterMode);
     }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((c) => 
         c.name.toLowerCase().includes(q) || 
-        c.state.toLowerCase().includes(q)
+        c.state.toLowerCase().includes(q) ||
+        (c.region && c.region.toLowerCase().includes(q))
       );
     }
 
@@ -270,7 +283,7 @@ export default function RainingCitiesPanel({
   // Minimized floating glass pill
   if (isCollapsed) {
     return (
-      <div className={`select-none pointer-events-auto apple-liquid-glass px-3 py-2 rounded-2xl shadow-2xl border border-cyan-500/30 bg-slate-950/85 backdrop-blur-xl text-white flex items-center gap-2.5 cursor-pointer hover:bg-slate-900/90 transition-all ${className}`}>
+      <div className={`select-none pointer-events-auto apple-liquid-glass-pill px-4 py-2 rounded-full shadow-2xl border border-cyan-400/30 text-white flex items-center gap-3 cursor-pointer hover:bg-white/15 transition-all ${className}`}>
         <div 
           onClick={() => setIsCollapsed(false)}
           className="flex items-center gap-2 text-xs font-sans"
@@ -296,11 +309,11 @@ export default function RainingCitiesPanel({
   }
 
   return (
-    <div className={`select-none pointer-events-auto apple-liquid-glass rounded-2xl shadow-2xl border border-cyan-500/30 bg-slate-950/90 backdrop-blur-xl text-white flex flex-col w-[320px] sm:w-[350px] max-h-[440px] overflow-hidden animate-in fade-in duration-200 ${className}`}>
+    <div className={`select-none pointer-events-auto glass-panel-translucent rounded-3xl shadow-2xl border border-cyan-400/30 text-white flex flex-col w-[350px] sm:w-[390px] max-w-[calc(100vw-32px)] max-h-[440px] overflow-hidden animate-in fade-in duration-200 ${className}`}>
       {/* Header: Title, Real-Time Radar Scanner Pulse & Controls */}
       <div className="p-3 pb-2 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+          <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
             <CloudRain className="w-4 h-4" />
           </div>
           <div>
@@ -327,7 +340,7 @@ export default function RainingCitiesPanel({
             type="button"
             onClick={handleTriggerRescan}
             title="Rescan all cities"
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <RotateCw className={`w-3.5 h-3.5 ${currentScanningCity ? 'animate-spin' : ''}`} />
           </button>
@@ -335,60 +348,92 @@ export default function RainingCitiesPanel({
             type="button"
             onClick={() => setIsCollapsed(true)}
             title="Minimize"
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Filter Tabs: Raining Only vs All Monitored */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/60 border-b border-white/5 text-[10px] font-mono">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setFilterMode('raining')}
-            className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
-              filterMode === 'raining'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Raining ({rainingCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterMode('all')}
-            className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
-              filterMode === 'all'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            All Cities ({scannedCount}/{totalCitiesCount})
-          </button>
+      {/* Filter Tabs: Regional Corridors & Raining Only with Scroll Arrows & Wheel Scroll */}
+      <div className="relative flex items-center bg-white/[0.03] border-b border-white/5 select-none px-1.5 py-1">
+        <button
+          type="button"
+          onClick={() => {
+            if (tabsRef.current) tabsRef.current.scrollBy({ left: -140, behavior: 'smooth' });
+          }}
+          title="Scroll categories left"
+          className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0 cursor-pointer z-10"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+
+        <div
+          ref={tabsRef}
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+          className="flex items-center gap-1 py-1 px-1 text-[10px] font-mono overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 hover:scrollbar-thumb-cyan-400/50 scrollbar-track-transparent scroll-smooth flex-1"
+        >
+          {REGION_CATEGORIES.map((cat) => {
+            const isActive = filterMode === cat.id;
+            const count = cat.id === 'raining'
+              ? rainingCount
+              : cat.id === 'all'
+              ? totalCitiesCount
+              : MONITORED_RAIN_CITIES.filter((c) => c.region === cat.id).length;
+
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={(e) => {
+                  setFilterMode(cat.id);
+                  e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? cat.isSpecial
+                      ? 'bg-amber-500/25 text-amber-200 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                      : 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/50 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                {cat.label} ({count})
+              </button>
+            );
+          })}
         </div>
 
-        <div className="text-[9px] text-slate-400">
-          Sorted: Heaviest first
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (tabsRef.current) tabsRef.current.scrollBy({ left: 140, behavior: 'smooth' });
+          }}
+          title="Scroll categories right (Western Ghats, Northeast, Coastal, Central, Plains)"
+          className="w-6 h-6 flex items-center justify-center text-cyan-300 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0 cursor-pointer z-10"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Search Input for Quick City Discovery */}
-      <div className="relative px-3 py-1.5 border-b border-white/10 bg-slate-900/40 flex items-center">
-        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="relative px-3 py-2 border-b border-white/10 bg-white/[0.02] flex items-center">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={`Search ${totalCitiesCount} Indian cities...`}
-          className="w-full bg-slate-950/70 border border-white/10 rounded-lg pl-7 pr-7 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400/50 transition-colors font-sans"
+          className="w-full bg-slate-950/40 border border-white/12 rounded-full pl-8 pr-8 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/60 transition-colors font-sans"
         />
         {searchQuery && (
           <button
             type="button"
             onClick={() => setSearchQuery('')}
-            className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
           >
             <X className="w-3 h-3" />
           </button>
@@ -449,14 +494,14 @@ export default function RainingCitiesPanel({
                 {/* Left: Rank & City Name */}
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
-                    className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
                       idx === 0 && city.rainMmPerHour > 0
-                        ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm shadow-amber-500/20'
+                        ? 'bg-amber-400/25 text-amber-300 border border-amber-400/50 shadow-sm shadow-amber-500/20'
                         : idx === 1 && city.rainMmPerHour > 0
-                        ? 'bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 shadow-sm shadow-cyan-500/20'
+                        ? 'bg-cyan-400/25 text-cyan-300 border border-cyan-400/50 shadow-sm shadow-cyan-500/20'
                         : idx === 2 && city.rainMmPerHour > 0
-                        ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
-                        : 'bg-white/5 text-slate-400 border border-white/5'
+                        ? 'bg-emerald-400/25 text-emerald-300 border border-emerald-400/50'
+                        : 'bg-white/5 text-slate-400 border border-white/10'
                     }`}
                   >
                     #{idx + 1}
@@ -465,14 +510,26 @@ export default function RainingCitiesPanel({
                   <div className="min-w-0">
                     <div className="text-xs font-semibold text-slate-100 truncate group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
                       <span>{city.name}</span>
+                      {city.isCloudburstProne && (
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
+                          PRONE
+                        </span>
+                      )}
                       {city.humidity != null && (
                         <span className="text-[9px] font-mono font-normal text-slate-400">
                           {city.humidity}% RH
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">
-                      {city.state} · <span className="text-slate-300">{condition}</span>
+                    <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                      <span>{city.state}</span>
+                      {city.region && (
+                        <span className="text-[8px] uppercase font-mono px-1.5 py-0.2 rounded-full bg-white/5 text-slate-300 border border-white/5">
+                          {city.region}
+                        </span>
+                      )}
+                      <span>·</span>
+                      <span className="text-slate-300">{condition}</span>
                     </div>
                   </div>
                 </div>
@@ -485,7 +542,7 @@ export default function RainingCitiesPanel({
                       <span className="text-[9px] font-normal text-slate-400">mm/h</span>
                     </div>
                     <div className="flex items-center justify-end gap-1 mt-0.5">
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold border ${badge.bgClass} ${badge.textClass}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold border ${badge.bgClass} ${badge.textClass}`}>
                         {badge.label}
                       </span>
                       {city.dbz > 0 && (
@@ -505,9 +562,9 @@ export default function RainingCitiesPanel({
       </div>
 
       {/* Footer Status Bar */}
-      <div className="px-3 py-1.5 bg-slate-950 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-slate-400">
+      <div className="px-3.5 py-1.5 bg-black/25 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-slate-400">
         <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
           <span>Pan-India Doppler & Sensor Array ({totalCitiesCount})</span>
         </div>
         <span>Click city to center</span>

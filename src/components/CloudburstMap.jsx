@@ -1,32 +1,46 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { 
-  Plus, 
-  Minus, 
-  Zap, 
-  Thermometer, 
-  CloudRain, 
+import {
+  Plus,
+  Minus,
+  Zap,
+  Thermometer,
+  CloudRain,
   Wind,
-  Sparkles, 
   Volume2,
   VolumeX,
   X,
   MapPin,
-  Loader2
+  Loader2,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Compass,
+  Activity,
+  ShieldAlert,
+  Navigation
 } from 'lucide-react';
 import { STATIONS_NETWORK } from '../data/cloudburstData';
 import { getCachedMLRisk } from '../services/mlPredictionService';
 import { isIndiaSector } from '../utils/geoUtils';
-import { 
+import {
   celsiusToFahrenheit,
+  computeGlobalThermodynamicTemp,
+  computeGlobalWindSpeed,
   getWindSpeedColor,
   getWindSpeedCategory,
   getTempColorHex,
+  getThermalCategory,
   formatTemperature,
   getLiveTemperature,
   getCachedPointTemperature,
-  preloadTemperatureEngine
+  preloadTemperatureEngine,
+  getBeaufortScaleInfo,
+  estimateWindGust,
+  getWindDirectionCompass,
+  WIND_ART_PALETTES
 } from '../utils/temperatureUtils';
 import {
   getActiveCyclones,
@@ -38,12 +52,27 @@ import {
   getSurfaceFrictionMultiplier
 } from '../services/cycloneService';
 import { generateCloudburstHeatmapGeoJSON } from '../utils/heatmapGeoJson';
-import { WEATHER_LAYERS, getWeatherApiTileUrl, getWeatherApiTimestamp } from '../utils/weatherTiles';
+import { getPlanetaryIsothermsGeoJSON } from '../utils/isothermGeoJson';
+import { getPlanetaryIsotachsGeoJSON } from '../utils/isotachGeoJson';
+import {
+  WEATHER_LAYERS,
+  getWeatherApiTileUrl,
+  getWeatherApiTimestamp,
+  RADAR_SCHEMES,
+  RADAR_ART_PALETTES,
+  getRainViewerTileUrl
+} from '../utils/weatherTiles';
+import { getWindParticleStyle } from '../utils/windParticleStyles';
+import { sampleAeroSilkVector } from '../services/aeroSilkService';
 import {
   getLocalRadarDbz,
   getRadarProbeInfo,
   estimateLocalRainRate,
-  RADAR_COVERAGE_CENTERS
+  RADAR_COVERAGE_CENTERS,
+  RADAR_DBZ_STOPS,
+  RADAR_COVERAGE_DISKS_GEOJSON,
+  RADAR_RANGE_RINGS_GEOJSON,
+  generateActiveRadarReflectivityGeoJSON
 } from '../utils/radarEchoesData';
 import {
   subscribeLightningStrikes,
@@ -55,6 +84,23 @@ import { generateHazardRadiusGeoJSON } from '../services/cloudburstEventModel';
 import WORLD_COUNTRIES_DATA from '../data/worldCountries.json';
 import { WORLD_OVERVIEW_LABELS } from '../data/worldOverviewLabels';
 import { HIERARCHICAL_PLACES } from '../data/hierarchicalPlaces';
+import {
+  getLiveAirQualityNetwork,
+  getCachedAQI,
+  getAqiCategory,
+  getAqiCacheMinutesRemaining
+} from '../services/aqiService';
+import { generateAqiAtmosphericGeoJSON, getPlanetaryIsoAqiGeoJSON } from '../utils/aqiMeshGeoJson';
+import { computeInterpolatedAqi } from '../utils/aqiTiles';
+import AqiLegendBar from './AqiLegendBar';
+import TemperatureLegendBar from './TemperatureLegendBar';
+
+export const SATELLITE_TILES = [
+  'https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+  'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+  'https://mt2.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+  'https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+];
 
 const BASEMAP_STYLE = {
   version: 8,
@@ -65,6 +111,13 @@ const BASEMAP_STYLE = {
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
       attribution: '&copy; OpenStreetMap contributors'
+    },
+    'satellite-source': {
+      type: 'raster',
+      tiles: SATELLITE_TILES,
+      tileSize: 256,
+      maxzoom: 20,
+      attribution: '&copy; Google Imagery'
     }
   },
   layers: [
@@ -73,6 +126,19 @@ const BASEMAP_STYLE = {
       type: 'background',
       paint: {
         'background-color': '#060d1a'
+      }
+    },
+    {
+      id: 'base-satellite',
+      type: 'raster',
+      source: 'satellite-source',
+      layout: {
+        visibility: 'none'
+      },
+      paint: {
+        'raster-opacity': 0.0,
+        'raster-fade-duration': 0,
+        'raster-resampling': 'linear'
       }
     },
     {
@@ -97,103 +163,20 @@ function deltaLon(lon1, lon2) {
   return ((((lon1 - lon2 + 180) % 360) + 360) % 360) - 180;
 }
 
-// Globally Continuous, Infinitely Differentiable (C^inf) Atmospheric Vector Field
-// Adheres strictly to Windy/Ventusky streamline fluid flow principles:
-// 1. Zero hard-threshold boundary discontinuities (C^inf smooth Gaussian decays everywhere)
-// 2. Strict periodic zonal wavenumbers (eliminates any 180-degree antimeridian seam)
-// 3. Shortest spherical great-circle delta-longitude wrapping (no seam kinks across meridians)
-function getWindVector(lon, lat) {
-  const latRad = (lat * Math.PI) / 180.0;
-  const lonRad = (lon * Math.PI) / 180.0;
-  const cosLat = Math.cos(latRad);
-  
-  let u = 0.0;
-  let v = 0.0;
-
-  // 1. Zonal Planetary Circulation (Smooth Fourier representation)
-  // - Easterly Trade Winds in the Tropics (lat -30 to +30)
-  // - Westerly Jet Stream in Mid-Latitudes (lat 30 to 60)
-  // - Gentle Polar Easterlies at high latitudes
-  u += -3.4 * Math.cos(latRad * 3.0) + 1.1 * cosLat;
-  v += -0.85 * Math.sin(latRad * 2.0);
-
-  // 2. Subtropical Anticyclonic Ocean Gyres with smooth polar tapering (zero piecewise steps)
-  if (Math.abs(lat) < 80) {
-    const gyreFactor = Math.cos(Math.min(1.0, Math.abs(lat) / 80.0) * (Math.PI / 2.0));
-    const gyre1 = Math.sin(lonRad * 1.0 + 0.8);
-    const gyre2 = Math.sin(lonRad * 2.0 + 2.4);
-    v += (gyre1 + gyre2 * 0.6) * 1.1 * Math.cos(latRad * 1.2) * gyreFactor;
-    u += Math.cos(latRad * 2.0) * 0.8 * gyreFactor;
-  }
-
-  // 3. Divergence-Free Streamfunction Waves with integer zonal wavenumbers (strictly periodic)
-  // Planetary Rossby Wave 1 (m=3, n=2)
-  u += -1.4 * 0.08 * Math.sin(lonRad * 3.0) * Math.sin(latRad * 2.0);
-  v += -1.4 * 0.10 * Math.cos(lonRad * 3.0) * Math.cos(latRad * 2.0);
-
-  // Synoptic Rossby Wave 2 (m=5, n=3)
-  u += 0.7 * 0.12 * Math.cos(lonRad * 5.0) * Math.cos(latRad * 3.0);
-  v += 0.7 * 0.14 * Math.sin(lonRad * 5.0) * Math.sin(latRad * 3.0);
-
-  // 4. Arabian Sea & Indian Ocean Cross-Equatorial Monsoon Jet
-  // Smooth 2D Gaussian envelope centered at (Lon 70°E, Lat 9°N) with wide sigmas (zero step cutoffs)
-  const dLonMon = deltaLon(lon, 70.0);
-  const dLatMon = lat - 9.0;
-  const envMon = Math.exp(-(dLonMon * dLonMon) / (2 * 18 * 18) - (dLatMon * dLatMon) / (2 * 11 * 11));
-  u += envMon * 5.2;
-  v += envMon * (2.1 - 0.05 * dLonMon);
-
-  // 5. Bay of Bengal Cyclonic Depression (Centering at Lon 88.33°E, Lat 17.05°N)
-  // Gaussian-Rankine vortex with solid-body core and asymptotic smooth decay (zero artificial if-gate)
-  const dxBoB = deltaLon(lon, 88.33);
-  const dyBoB = lat - 17.05;
-  const rSqBoB = dxBoB * dxBoB + dyBoB * dyBoB;
-  const envBoB = Math.exp(-rSqBoB / (2 * 6.8 * 6.8));
-  const rBoB = Math.sqrt(rSqBoB);
-  const rCoreBoB = 2.4;
-  const vTanBoB = (13.5 * (rBoB / rCoreBoB)) / (1.0 + (rBoB / rCoreBoB) ** 2) * envBoB;
-  const invRBoB = 1.0 / (rBoB + 0.15);
-  u += (-dyBoB * invRBoB) * vTanBoB + (-dxBoB * invRBoB) * (vTanBoB * 0.18);
-  v += (dxBoB * invRBoB) * vTanBoB + (-dyBoB * invRBoB) * (vTanBoB * 0.18);
-
-  // 6. Sri Lanka & Gulf of Mannar Coastal Deflection (Lon 80.6°E, Lat 7.8°N)
-  const dxSL = deltaLon(lon, 80.6);
-  const dySL = lat - 7.8;
-  const rSqSL = dxSL * dxSL + dySL * dySL;
-  const envSL = Math.exp(-rSqSL / (2 * 3.5 * 3.5));
-  const invRSL = 1.0 / (Math.sqrt(rSqSL) + 0.2);
-  u += (-dySL * invRSL) * (envSL * 3.8);
-  v += (dxSL * invRSL) * (envSL * 3.8) - envSL * 0.8;
-
-  // 6b. Palk Strait & Jaffna Coastal Eddy (Lon 80.2°E, Lat 9.8°N)
-  const dxJ = deltaLon(lon, 80.2);
-  const dyJ = lat - 9.8;
-  const rSqJ = dxJ * dxJ + dyJ * dyJ;
-  const envJ = Math.exp(-rSqJ / (2 * 2.2 * 2.2));
-  const invRJ = 1.0 / (Math.sqrt(rSqJ) + 0.2);
-  u += (-dyJ * invRJ) * (envJ * 2.6);
-  v += (dxJ * invRJ) * (envJ * 2.6);
-
-  // 7. Dynamic Tropical Cyclones (Rankine-Holland vortex with hemisphere Coriolis spin & inward spiral)
-  // Naturally animates streamlines rotating around every active cyclone across the globe
-  const activeCyclones = getActiveCyclones();
-  for (let i = 0; i < activeCyclones.length; i++) {
-    const cVec = computeCycloneVelocity(lon, lat, activeCyclones[i]);
-    u += cVec.u;
-    v += cVec.v;
-  }
-
-  const mag = Math.sqrt(u * u + v * v);
-  return { u, v, mag };
+// AeroSilk™ Real-Time Atmospheric Vector Field Engine
+// Evaluates real-world GFS / ECMWF wind vector grid with continuous bilinear spatial interpolation,
+// multi-altitude pressure levels (Surface, 850 hPa, 250 hPa), and live GDACS / NOAA cyclone vortexes.
+function getWindVector(lon, lat, timeOffsetHours = 0, altitudeLevel = 'surface') {
+  const vec = sampleAeroSilkVector(lon, lat, timeOffsetHours, altitudeLevel);
+  return { u: vec.u, v: vec.v, mag: vec.speed, vorticity: vec.vorticity };
 }
 
 function getLocalTemperature(lon, lat) {
-  const cached = getCachedPointTemperature(lat, lon);
-  return cached != null ? Math.round(cached) : null;
+  return getCachedPointTemperature(lat, lon);
 }
 
-function getLocalWindSpeed(lon, lat) {
-  const vec = getWindVector(lon, lat);
+function getLocalWindSpeed(lon, lat, altitudeLevel = 'surface') {
+  const vec = getWindVector(lon, lat, 0, altitudeLevel);
   return Math.round(vec.mag * 13.5);
 }
 
@@ -435,7 +418,7 @@ function applyMapLabelsTheme(map, isSatelliteView) {
             map.setPaintProperty(id, 'text-halo-blur', 1.0);
           }
         }
-      } catch (err) {}
+      } catch (err) { }
     }
 
     if (id === 'boundary_2' || id === 'boundary_3' || id === 'boundary_disputed') {
@@ -447,7 +430,7 @@ function applyMapLabelsTheme(map, isSatelliteView) {
           map.setPaintProperty(id, 'line-color', 'hsl(248, 1%, 41%)');
           map.setPaintProperty(id, 'line-opacity', 0.8);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 }
@@ -455,19 +438,39 @@ function applyMapLabelsTheme(map, isSatelliteView) {
 /**
  * Configure MapLibre GL JS Built-in Heatmap Layer, WeatherAPI Raster Tiles & Satellite Source
  */
-function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeatmapVisible = true, heatmapGeoJSON = null, radarTimestampPath = null, cloudburstEvent = null) {
+function applyMapLayersAndHeatmap(
+  map,
+  isSatellite,
+  activeLayer = 'temp',
+  isHeatmapVisible = true,
+  heatmapGeoJSON = null,
+  radarTimestampPath = null,
+  cloudburstEvent = null,
+  radarScheme = 'nordic',
+  isRadarBoosted = true,
+  showRadarRings = true,
+  dynamicCyclones = [],
+  stations = [],
+  aqiGeoJSON = null,
+  showIsotachs = true
+) {
   if (!map || !map.getStyle()) return;
 
-  // 1. High-Resolution Global Satellite Raster Source with Google/Esri tiles
-  if (!map.getSource('esri-satellite')) {
-    map.addSource('esri-satellite', {
+  // 1. High-Resolution Global Satellite Raster Source with Google Hybrid tiles
+  if (map.getSource('esri-satellite')) {
+    if (map.getLayer('base-satellite')) {
+      try { map.removeLayer('base-satellite'); } catch (_) { }
+    }
+    try { map.removeSource('esri-satellite'); } catch (_) { }
+  }
+
+  if (!map.getSource('satellite-source')) {
+    map.addSource('satellite-source', {
       type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      ],
+      tiles: SATELLITE_TILES,
       tileSize: 256,
       maxzoom: 20,
-      attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+      attribution: '&copy; Google Imagery'
     });
   }
 
@@ -478,61 +481,81 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   );
   const beforeId = firstLabelLayer ? firstLabelLayer.id : undefined;
 
+  // 1.5 Dynamic Dark Graphite Canvas Mode for Meteorological Overlays
+  // Modulates the white OSM street raster into a high-contrast dark graphite canvas
+  if (map.getLayer('basemap')) {
+    const isDarkCanvas = !isSatellite && (activeLayer === 'temp' || activeLayer === 'wind' || activeLayer === 'precip' || activeLayer === 'aqi');
+    try {
+      map.setPaintProperty('basemap', 'raster-brightness-min', isDarkCanvas ? 0.03 : 0.0);
+      map.setPaintProperty('basemap', 'raster-brightness-max', isDarkCanvas ? 0.28 : 1.0);
+      map.setPaintProperty('basemap', 'raster-contrast', isDarkCanvas ? 0.26 : 0.0);
+      map.setPaintProperty('basemap', 'raster-saturation', isDarkCanvas ? -0.92 : 0.0);
+      map.setPaintProperty('basemap', 'raster-opacity', isSatellite ? 0.0 : 1.0);
+    } catch (e) { }
+  }
+
   // 2. Base Satellite Layer
   if (!map.getLayer('base-satellite')) {
     map.addLayer({
       id: 'base-satellite',
       type: 'raster',
-      source: 'esri-satellite',
+      source: 'satellite-source',
       layout: {
         visibility: isSatellite ? 'visible' : 'none'
       },
       paint: {
-        'raster-opacity': isSatellite ? 1.0 : 0,
-        'raster-contrast': 0.12,
-        'raster-brightness-max': 0.96
+        'raster-opacity': isSatellite ? 1.0 : 0.0,
+        'raster-fade-duration': 0,
+        'raster-resampling': 'linear'
       }
-    }, beforeId);
+    }, 'basemap');
   } else {
     map.setLayoutProperty('base-satellite', 'visibility', isSatellite ? 'visible' : 'none');
-    map.setPaintProperty('base-satellite', 'raster-opacity', isSatellite ? 1.0 : 0);
+    map.setPaintProperty('base-satellite', 'raster-opacity', isSatellite ? 1.0 : 0.0);
   }
 
-  // 3. Continuous Weather Raster Layers (Temperature, Wind Speed, Doppler Radar)
-  const weatherRasterKeys = ['temp', 'wind', 'precip'];
+  // Clean up any conflicting legacy WeatherAPI precip raster layer
+  if (map.getLayer('weatherapi-precip-layer')) {
+    map.removeLayer('weatherapi-precip-layer');
+  }
+  if (map.getSource('weatherapi-precip-source')) {
+    map.removeSource('weatherapi-precip-source');
+  }
+
+  // 3. Continuous Weather Raster Layers (Temperature, Wind Speed, Continuous AQI)
+  const weatherRasterKeys = ['temp', 'wind', 'aqi'];
   weatherRasterKeys.forEach((key) => {
     const cfg = WEATHER_LAYERS[key];
     if (!cfg) return;
 
-    // Clean up legacy procedural source if transitioning to Open-Meteo
-    if (key === 'temp' && map.getSource('weatherapi-temp-source') && cfg.sourceId !== 'weatherapi-temp-source') {
-      if (map.getLayer('weatherapi-temp-layer')) map.removeLayer('weatherapi-temp-layer');
-      map.removeSource('weatherapi-temp-source');
+    // Clean up any stale openmeteo source
+    if (map.getSource('openmeteo-temp-source')) {
+      if (map.getLayer('openmeteo-temp-layer')) map.removeLayer('openmeteo-temp-layer');
+      map.removeSource('openmeteo-temp-source');
     }
 
+    const tileUrl = getWeatherApiTileUrl(cfg.layerKey);
+
     if (!map.getSource(cfg.sourceId)) {
-      if (cfg.url) {
-        map.addSource(cfg.sourceId, {
-          type: 'raster',
-          url: cfg.url,
-          attribution: '&copy; Open-Meteo & ECMWF'
-        });
-      } else {
-        map.addSource(cfg.sourceId, {
-          type: 'raster',
-          tiles: [getWeatherApiTileUrl(cfg.layerKey)],
-          tileSize: 256,
-          minzoom: 0,
-          maxzoom: 14, // Seamless procedural thermodynamic generators support crisp tiles across all zoom levels
-          attribution: '&copy; BurstWatch'
-        });
+      map.addSource(cfg.sourceId, {
+        type: 'raster',
+        tiles: [tileUrl],
+        tileSize: cfg.tileSize || 256,
+        minzoom: 0,
+        maxzoom: 14,
+        attribution: '&copy; BurstWatch'
+      });
+    } else if (key === 'wind') {
+      const src = map.getSource(cfg.sourceId);
+      if (src && 'setTiles' in src && typeof src.setTiles === 'function') {
+        try {
+          src.setTiles([tileUrl]);
+        } catch (e) { }
       }
     }
 
-    // Live Temperature Layer: Real ECMWF IFS atmospheric model (Open-Meteo)
-    // Pre-warmed with layout visibility 'visible' and opacity 0.0 for 0ms instant display upon activation
-    const isThisRasterVisible = activeLayer === 'temp' && key === 'temp';
-    const rasterLayoutVisibility = key === 'temp' ? 'visible' : (isThisRasterVisible ? 'visible' : 'none');
+    const isThisRasterVisible = activeLayer === key;
+    const rasterLayoutVisibility = isThisRasterVisible ? 'visible' : 'none';
 
     if (!map.getLayer(cfg.layerId)) {
       map.addLayer({
@@ -543,27 +566,297 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
           visibility: rasterLayoutVisibility
         },
         paint: {
-          'raster-opacity': isThisRasterVisible ? (cfg.opacity ?? 0.72) : 0.0,
-          'raster-fade-duration': 250,
+          'raster-opacity': isThisRasterVisible ? (cfg.opacity ?? 0.88) : 0.0,
+          'raster-fade-duration': 200,
           'raster-resampling': 'linear'
         }
       }, beforeId);
     } else {
       map.setLayoutProperty(cfg.layerId, 'visibility', rasterLayoutVisibility);
       try {
-        map.setPaintProperty(cfg.layerId, 'raster-opacity', isThisRasterVisible ? (cfg.opacity ?? 0.72) : 0.0);
-        map.setPaintProperty(cfg.layerId, 'raster-fade-duration', 250);
+        map.setPaintProperty(cfg.layerId, 'raster-opacity', isThisRasterVisible ? (cfg.opacity ?? 0.88) : 0.0);
+        map.setPaintProperty(cfg.layerId, 'raster-fade-duration', 200);
         map.setPaintProperty(cfg.layerId, 'raster-resampling', 'linear');
-      } catch (e) {}
+      } catch (e) { }
     }
   });
 
-  // Clean up any isotherm contour layers to ensure 100% number-free, clean Windy aesthetic
+  // 3.5. Synoptic Labeled Isotherm Contours (Ventusky & Windy Style)
+  const isTempVisible = activeLayer === 'temp';
+  const isothermGeoJSON = getPlanetaryIsothermsGeoJSON();
+  if (!map.getSource('planetary-isotherms-source')) {
+    map.addSource('planetary-isotherms-source', {
+      type: 'geojson',
+      data: isothermGeoJSON
+    });
+  } else {
+    map.getSource('planetary-isotherms-source').setData(isothermGeoJSON);
+  }
+
+  // Soft glow aura beneath the line
+  if (!map.getLayer('planetary-isotherms-glow')) {
+    map.addLayer({
+      id: 'planetary-isotherms-glow',
+      type: 'line',
+      source: 'planetary-isotherms-source',
+      layout: {
+        'visibility': isTempVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 3.2, 1.8],
+        'line-blur': 2.0,
+        'line-opacity': ['case', ['get', 'isMajor'], 0.32, 0.16]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotherms-glow', 'visibility', isTempVisible ? 'visible' : 'none');
+  }
+
+  // Razor-sharp core line (Solid for major 10° steps, dashed for intermediate 5° steps)
+  if (!map.getLayer('planetary-isotherms-core')) {
+    map.addLayer({
+      id: 'planetary-isotherms-core',
+      type: 'line',
+      source: 'planetary-isotherms-source',
+      layout: {
+        'visibility': isTempVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 1.15, 0.70],
+        'line-dasharray': ['case', ['get', 'isMajor'], ['literal', [1, 0]], ['literal', [4, 3]]],
+        'line-opacity': ['case', ['get', 'isMajor'], 0.85, 0.50]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotherms-core', 'visibility', isTempVisible ? 'visible' : 'none');
+  }
+
+  // Inline typographic numeric labels along the contour curves (e.g. "0°", "10°", "20°", "30°")
+  if (!map.getLayer('planetary-isotherms-labels')) {
+    map.addLayer({
+      id: 'planetary-isotherms-labels',
+      type: 'symbol',
+      source: 'planetary-isotherms-source',
+      layout: {
+        'visibility': isTempVisible ? 'visible' : 'none',
+        'symbol-placement': 'line',
+        'symbol-spacing': 350,
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 9.5,
+          6, 11.5,
+          9, 13.0
+        ],
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(15, 23, 42, 0.95)',
+        'text-halo-width': 1.8,
+        'text-halo-blur': 0.8,
+        'text-opacity': 0.92
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotherms-labels', 'visibility', isTempVisible ? 'visible' : 'none');
+  }
+
+  // Clean up any stale legacy isotherm layers
   ['isotherm-contours-glow', 'isotherm-contours-line'].forEach(id => {
     if (map.getLayer(id)) map.removeLayer(id);
   });
   if (map.getSource('isotherm-contours-source')) {
     map.removeSource('isotherm-contours-source');
+  }
+
+  // 3.55 Synoptic Labeled Isotach Contours (AeroAtelier™ Wind Speed Horizons)
+  const isWindVisible = activeLayer === 'wind' && showIsotachs;
+  const isotachGeoJSON = getPlanetaryIsotachsGeoJSON('surface');
+  if (!map.getSource('planetary-isotachs-source')) {
+    map.addSource('planetary-isotachs-source', {
+      type: 'geojson',
+      data: isotachGeoJSON
+    });
+  } else {
+    map.getSource('planetary-isotachs-source').setData(isotachGeoJSON);
+  }
+
+  // Soft glow aura beneath the line
+  if (!map.getLayer('planetary-isotachs-glow')) {
+    map.addLayer({
+      id: 'planetary-isotachs-glow',
+      type: 'line',
+      source: 'planetary-isotachs-source',
+      layout: {
+        'visibility': isWindVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 3.2, 1.8],
+        'line-blur': 2.0,
+        'line-opacity': ['case', ['get', 'isMajor'], 0.35, 0.18]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotachs-glow', 'visibility', isWindVisible ? 'visible' : 'none');
+  }
+
+  // Core line (solid for major 50, 100, 140 km/h, dashed for 25, 75 km/h)
+  if (!map.getLayer('planetary-isotachs-core')) {
+    map.addLayer({
+      id: 'planetary-isotachs-core',
+      type: 'line',
+      source: 'planetary-isotachs-source',
+      layout: {
+        'visibility': isWindVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 1.15, 0.70],
+        'line-dasharray': ['case', ['get', 'isMajor'], ['literal', [1, 0]], ['literal', [4, 3]]],
+        'line-opacity': ['case', ['get', 'isMajor'], 0.85, 0.50]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotachs-core', 'visibility', isWindVisible ? 'visible' : 'none');
+  }
+
+  // Inline typographic numeric labels along the contour curves
+  if (!map.getLayer('planetary-isotachs-labels')) {
+    map.addLayer({
+      id: 'planetary-isotachs-labels',
+      type: 'symbol',
+      source: 'planetary-isotachs-source',
+      layout: {
+        'visibility': isWindVisible ? 'visible' : 'none',
+        'symbol-placement': 'line',
+        'text-field': ['get', 'label'],
+        'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 9.0,
+          6, 11.0,
+          9, 12.5
+        ],
+        'text-letter-spacing': 0.08,
+        'text-max-angle': 30,
+        'symbol-spacing': 350,
+        'text-keep-upright': true,
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#f8fafc',
+        'text-halo-color': ['get', 'halo'],
+        'text-halo-width': 2.0,
+        'text-halo-blur': 0.8,
+        'text-opacity': 0.92
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-isotachs-labels', 'visibility', isWindVisible ? 'visible' : 'none');
+  }
+
+  // 3.6. Planetary Synoptic Iso-AQI Contours (AetherAura™ Thermodynamic Style)
+  const isAqiVisible = activeLayer === 'aqi';
+  const isoAqiGeoJSON = getPlanetaryIsoAqiGeoJSON();
+  if (!map.getSource('planetary-aqi-source')) {
+    map.addSource('planetary-aqi-source', {
+      type: 'geojson',
+      data: isoAqiGeoJSON
+    });
+  } else {
+    map.getSource('planetary-aqi-source').setData(isoAqiGeoJSON);
+  }
+
+  // Soft glow aura beneath the Iso-AQI line
+  if (!map.getLayer('planetary-aqi-glow')) {
+    map.addLayer({
+      id: 'planetary-aqi-glow',
+      type: 'line',
+      source: 'planetary-aqi-source',
+      layout: {
+        'visibility': isAqiVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 3.6, 2.0],
+        'line-blur': 2.2,
+        'line-opacity': ['case', ['get', 'isMajor'], 0.38, 0.20]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-aqi-glow', 'visibility', isAqiVisible ? 'visible' : 'none');
+  }
+
+  // Razor-sharp core filament
+  if (!map.getLayer('planetary-aqi-core')) {
+    map.addLayer({
+      id: 'planetary-aqi-core',
+      type: 'line',
+      source: 'planetary-aqi-source',
+      layout: {
+        'visibility': isAqiVisible ? 'visible' : 'none',
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['case', ['get', 'isMajor'], 1.25, 0.75],
+        'line-dasharray': ['case', ['get', 'isMajor'], ['literal', [1, 0]], ['literal', [4, 3]]],
+        'line-opacity': ['case', ['get', 'isMajor'], 0.88, 0.55]
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-aqi-core', 'visibility', isAqiVisible ? 'visible' : 'none');
+  }
+
+  // Inline typographic numeric labels along the contour curves ("50", "100", "150", "200", "300")
+  if (!map.getLayer('planetary-aqi-labels')) {
+    map.addLayer({
+      id: 'planetary-aqi-labels',
+      type: 'symbol',
+      source: 'planetary-aqi-source',
+      layout: {
+        'visibility': isAqiVisible ? 'visible' : 'none',
+        'symbol-placement': 'line',
+        'symbol-spacing': 380,
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 9.5,
+          6, 11.5,
+          9, 13.0
+        ],
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(15, 23, 42, 0.95)',
+        'text-halo-width': 1.8,
+        'text-halo-blur': 0.8,
+        'text-opacity': 0.92
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('planetary-aqi-labels', 'visibility', isAqiVisible ? 'visible' : 'none');
   }
 
   // 4. Heatmap GeoJSON Source for Convective Cloudburst Hazard Plumes
@@ -751,7 +1044,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   const isRadar = activeLayer === 'precip';
 
   // A. Clean up any legacy simulated plume or dark basemap rasters
-  ['ventusky-radar-plume-layer', 'radar-dark-base-layer', 'radar-dark-ref-layer', 'radar-echo-purple', 'radar-echo-red', 'radar-echo-orange', 'radar-echo-yellow', 'radar-echo-green', 'radar-echo-cyan', 'radar-echo-blue', 'radar-disks-fill', 'radar-disks-stroke'].forEach((id) => {
+  ['ventusky-radar-plume-layer', 'radar-dark-base-layer', 'radar-dark-ref-layer', 'radar-echo-purple', 'radar-echo-red', 'radar-echo-orange', 'radar-echo-yellow', 'radar-echo-green', 'radar-echo-cyan', 'radar-echo-blue'].forEach((id) => {
     if (map.getLayer(id)) {
       map.removeLayer(id);
     }
@@ -765,17 +1058,118 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   if (map.getSource('esri-dark-gray-ref')) {
     map.removeSource('esri-dark-gray-ref');
   }
-  if (map.getSource('radar-echoes-source')) {
-    map.removeSource('radar-echoes-source');
+
+  // B. DWR 450km Range Ring Footprints & Translucent Surveillance Disks (Plan 6.2)
+  if (!map.getSource('radar-coverage-disks-source')) {
+    map.addSource('radar-coverage-disks-source', {
+      type: 'geojson',
+      data: RADAR_COVERAGE_DISKS_GEOJSON
+    });
   }
-  if (map.getSource('radar-disks-source')) {
-    map.removeSource('radar-disks-source');
+  if (!map.getLayer('radar-coverage-disks-fill')) {
+    map.addLayer({
+      id: 'radar-coverage-disks-fill',
+      type: 'fill',
+      source: 'radar-coverage-disks-source',
+      layout: { visibility: (isRadar && showRadarRings) ? 'visible' : 'none' },
+      paint: {
+        'fill-color': 'rgba(56, 189, 248, 0.05)',
+        'fill-opacity': (isRadar && showRadarRings) ? 1.0 : 0.0
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('radar-coverage-disks-fill', 'visibility', (isRadar && showRadarRings) ? 'visible' : 'none');
+    try {
+      map.setPaintProperty('radar-coverage-disks-fill', 'fill-opacity', (isRadar && showRadarRings) ? 1.0 : 0.0);
+    } catch (e) { }
   }
 
-  // C. Live RainViewer Doppler Radar Tiles (TITAN Multi-Stop High-Definition Smooth Raster)
+  if (!map.getSource('radar-range-rings-source')) {
+    map.addSource('radar-range-rings-source', {
+      type: 'geojson',
+      data: RADAR_RANGE_RINGS_GEOJSON
+    });
+  }
+  if (!map.getLayer('radar-range-rings-stroke')) {
+    map.addLayer({
+      id: 'radar-range-rings-stroke',
+      type: 'line',
+      source: 'radar-range-rings-source',
+      layout: { visibility: (isRadar && showRadarRings) ? 'visible' : 'none' },
+      paint: {
+        'line-color': ['case', ['get', 'isOuter'], 'rgba(56, 189, 248, 0.40)', 'rgba(186, 230, 253, 0.22)'],
+        'line-width': ['case', ['get', 'isOuter'], 1.1, 0.75],
+        'line-dasharray': [3, 4],
+        'line-opacity': (isRadar && showRadarRings) ? 0.90 : 0.0
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('radar-range-rings-stroke', 'visibility', (isRadar && showRadarRings) ? 'visible' : 'none');
+    try {
+      map.setPaintProperty('radar-range-rings-stroke', 'line-opacity', (isRadar && showRadarRings) ? 0.90 : 0.0);
+    } catch (e) { }
+  }
+
+  // C. Continuous Synoptic & Convective Doppler Reflectivity Echo Field (Plan 6.2)
+  const activeEchoesGeoJSON = generateActiveRadarReflectivityGeoJSON({
+    cyclones: Array.isArray(dynamicCyclones) && dynamicCyclones.length > 0 ? dynamicCyclones : getActiveCyclones(),
+    cloudburstEvent,
+    stations,
+    scheme: radarScheme
+  });
+
+  if (!map.getSource('active-radar-echoes-source')) {
+    map.addSource('active-radar-echoes-source', {
+      type: 'geojson',
+      data: activeEchoesGeoJSON
+    });
+  } else {
+    try {
+      map.getSource('active-radar-echoes-source').setData(activeEchoesGeoJSON);
+    } catch (e) { }
+  }
+
+  if (!map.getLayer('active-radar-echoes-fill')) {
+    map.addLayer({
+      id: 'active-radar-echoes-fill',
+      type: 'fill',
+      source: 'active-radar-echoes-source',
+      layout: { visibility: isRadar ? 'visible' : 'none' },
+      paint: {
+        'fill-color': ['get', 'color'],
+        'fill-opacity': isRadar ? ['*', ['get', 'opacity'], isRadarBoosted ? 0.95 : 0.70] : 0.0
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('active-radar-echoes-fill', 'visibility', isRadar ? 'visible' : 'none');
+    try {
+      map.setPaintProperty('active-radar-echoes-fill', 'fill-opacity', isRadar ? ['*', ['get', 'opacity'], isRadarBoosted ? 0.95 : 0.70] : 0.0);
+    } catch (e) { }
+  }
+
+  if (!map.getLayer('active-radar-echoes-glow')) {
+    map.addLayer({
+      id: 'active-radar-echoes-glow',
+      type: 'line',
+      source: 'active-radar-echoes-source',
+      layout: { visibility: isRadar ? 'visible' : 'none' },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 1.2,
+        'line-blur': 2.0,
+        'line-opacity': isRadar ? (isRadarBoosted ? 0.85 : 0.55) : 0.0
+      }
+    }, beforeId);
+  } else {
+    map.setLayoutProperty('active-radar-echoes-glow', 'visibility', isRadar ? 'visible' : 'none');
+    try {
+      map.setPaintProperty('active-radar-echoes-glow', 'line-opacity', isRadar ? (isRadarBoosted ? 0.85 : 0.55) : 0.0);
+    } catch (e) { }
+  }
+
+  // D. Live RainViewer Doppler Radar Tiles (Dual-Layer Volumetric Diffusion: Aura Underlay + Crystalline Core)
   if (radarTimestampPath) {
-    // RainViewer Scheme 3 (TITAN / Ventusky standard) with smooth interpolation and snow detection
-    const dopplerTileUrl = `https://tilecache.rainviewer.com${radarTimestampPath}/512/{z}/{x}/{y}/3/1_1.png`;
+    const dopplerTileUrl = getRainViewerTileUrl(radarTimestampPath, radarScheme, 512);
 
     if (!map.getSource('doppler-radar-source')) {
       map.addSource('doppler-radar-source', {
@@ -792,8 +1186,42 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         if (source && typeof source.setTiles === 'function') {
           source.setTiles([dopplerTileUrl]);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
+
+    // 1. Underlay Layer (doppler-radar-aura): Volumetric ambient bloom & chromatic luminescence
+    const auraOpacity = isRadar ? (isRadarBoosted ? 0.72 : 0.50) : 0.0;
+    const auraContrast = isRadarBoosted ? 0.22 : 0.12;
+    const auraSat = isRadarBoosted ? 0.55 : 0.30;
+
+    if (!map.getLayer('doppler-radar-aura')) {
+      map.addLayer({
+        id: 'doppler-radar-aura',
+        type: 'raster',
+        source: 'doppler-radar-source',
+        layout: { visibility: isRadar ? 'visible' : 'none' },
+        paint: {
+          'raster-opacity': auraOpacity,
+          'raster-resampling': 'linear',
+          'raster-contrast': auraContrast,
+          'raster-saturation': auraSat,
+          'raster-fade-duration': 350
+        }
+      }, beforeId);
+    } else {
+      map.setLayoutProperty('doppler-radar-aura', 'visibility', isRadar ? 'visible' : 'none');
+      try {
+        map.setPaintProperty('doppler-radar-aura', 'raster-opacity', auraOpacity);
+        map.setPaintProperty('doppler-radar-aura', 'raster-contrast', auraContrast);
+        map.setPaintProperty('doppler-radar-aura', 'raster-saturation', auraSat);
+        map.setPaintProperty('doppler-radar-aura', 'raster-fade-duration', 350);
+      } catch (e) { }
+    }
+
+    // 2. Core Layer (doppler-radar-layer): High-definition reflectivity raster
+    const coreOpacity = isRadar ? (isRadarBoosted ? 0.98 : 0.88) : 0.0;
+    const coreContrast = isRadarBoosted ? 0.35 : 0.18;
+    const coreSat = isRadarBoosted ? 0.60 : 0.35;
 
     if (!map.getLayer('doppler-radar-layer')) {
       map.addLayer({
@@ -802,20 +1230,29 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
         source: 'doppler-radar-source',
         layout: { visibility: isRadar ? 'visible' : 'none' },
         paint: {
-          'raster-opacity': isRadar ? 0.88 : 0.0,
+          'raster-opacity': coreOpacity,
           'raster-resampling': 'linear',
-          'raster-fade-duration': 250
+          'raster-fade-duration': 350,
+          'raster-contrast': coreContrast,
+          'raster-saturation': coreSat
         }
       }, beforeId);
     } else {
       map.setLayoutProperty('doppler-radar-layer', 'visibility', isRadar ? 'visible' : 'none');
       try {
-        map.setPaintProperty('doppler-radar-layer', 'raster-opacity', isRadar ? 0.88 : 0.0);
-        map.setPaintProperty('doppler-radar-layer', 'raster-fade-duration', 250);
-      } catch (e) {}
+        map.setPaintProperty('doppler-radar-layer', 'raster-opacity', coreOpacity);
+        map.setPaintProperty('doppler-radar-layer', 'raster-fade-duration', 350);
+        map.setPaintProperty('doppler-radar-layer', 'raster-contrast', coreContrast);
+        map.setPaintProperty('doppler-radar-layer', 'raster-saturation', coreSat);
+      } catch (e) { }
     }
-  } else if (map.getLayer('doppler-radar-layer')) {
-    map.setLayoutProperty('doppler-radar-layer', 'visibility', 'none');
+  } else {
+    if (map.getLayer('doppler-radar-aura')) {
+      map.setLayoutProperty('doppler-radar-aura', 'visibility', 'none');
+    }
+    if (map.getLayer('doppler-radar-layer')) {
+      map.setLayoutProperty('doppler-radar-layer', 'visibility', 'none');
+    }
   }
 
   // E. Live Real-Time Lightning Strikes Feed (Direct Blitzortung + Convective Storms)
@@ -863,6 +1300,95 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
     map.setLayoutProperty('lightning-strikes-core', 'visibility', isLightningVis ? 'visible' : 'none');
   }
 
+  // 6.45 AetherAura™ Live Air Quality (AQI) Station Nodes & Labels (Continuous raster handled via thermo-aqi://)
+  const isAqi = activeLayer === 'aqi';
+
+  // Clean up legacy circular polygon bubble layers
+  ['aqi-dispersion-outer', 'aqi-dispersion-core'].forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+
+  if (aqiGeoJSON) {
+    if (!map.getSource('aqi-atmospheric-source')) {
+      map.addSource('aqi-atmospheric-source', {
+        type: 'geojson',
+        data: aqiGeoJSON
+      });
+    } else {
+      try {
+        map.getSource('aqi-atmospheric-source').setData(aqiGeoJSON);
+      } catch (e) { }
+    }
+
+    // A. Station Gemstone Beacons (Zoom >= 4.5)
+    if (!map.getLayer('aqi-station-nodes')) {
+      map.addLayer({
+        id: 'aqi-station-nodes',
+        type: 'circle',
+        source: 'aqi-atmospheric-source',
+        filter: ['!has', 'type'],
+        minzoom: 4.5,
+        layout: { visibility: isAqi ? 'visible' : 'none' },
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            4.5, 4.0,
+            8.0, 8.0,
+            12.0, 14.0
+          ],
+          'circle-color': ['get', 'color'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+          'circle-opacity': isAqi ? 0.95 : 0.0,
+          'circle-stroke-opacity': isAqi ? 0.90 : 0.0
+        }
+      }, beforeId);
+    } else {
+      map.setLayoutProperty('aqi-station-nodes', 'visibility', isAqi ? 'visible' : 'none');
+      try {
+        map.setPaintProperty('aqi-station-nodes', 'circle-opacity', isAqi ? 0.95 : 0.0);
+        map.setPaintProperty('aqi-station-nodes', 'circle-stroke-opacity', isAqi ? 0.90 : 0.0);
+      } catch (e) { }
+    }
+
+    // B. Station Numeric AQI Labels (Zoom >= 6.5)
+    if (!map.getLayer('aqi-station-labels')) {
+      map.addLayer({
+        id: 'aqi-station-labels',
+        type: 'symbol',
+        source: 'aqi-atmospheric-source',
+        filter: ['!has', 'type'],
+        minzoom: 6.5,
+        layout: {
+          visibility: isAqi ? 'visible' : 'none',
+          'text-field': ['to-string', ['get', 'aqi']],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': [
+            'interpolate', ['linear'], ['zoom'],
+            6.5, 9.0,
+            9.0, 11.0,
+            12.0, 13.0
+          ],
+          'text-allow-overlap': true,
+          'text-ignore-placement': true
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': 'rgba(15, 23, 42, 0.95)',
+          'text-halo-width': 1.6
+        }
+      });
+    } else {
+      map.setLayoutProperty('aqi-station-labels', 'visibility', isAqi ? 'visible' : 'none');
+    }
+  } else {
+    ['aqi-station-nodes', 'aqi-station-labels'].forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', 'none');
+      }
+    });
+  }
+
   // Clean up legacy antimeridian seam layers if previously attached
   if (map.getLayer('antimeridian-seam-layer')) {
     map.removeLayer('antimeridian-seam-layer');
@@ -872,7 +1398,9 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
   }
 
   // 6.5 Progressive Multi-Tier Windy Vector Hierarchy
-  const isOverlayVisible = isSatellite || activeLayer === 'temp' || activeLayer === 'precip' || isHeatmapVisible;
+  const isOverlayVisible = isSatellite || activeLayer === 'temp' || activeLayer === 'precip' || activeLayer === 'aqi' || isHeatmapVisible;
+  // Universal national border & coastline outline across all layers and maps, except satellite map
+  const isUniversalOutlineVisible = !isSatellite;
 
   // A. Razor-Sharp Vector National Borders & Coastlines (Visible across all zooms)
   if (!map.getSource('world-countries-source')) {
@@ -890,7 +1418,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       layout: {
         'line-cap': 'round',
         'line-join': 'round',
-        visibility: isOverlayVisible ? 'visible' : 'none'
+        visibility: isUniversalOutlineVisible ? 'visible' : 'none'
       },
       paint: {
         'line-color': '#111827',
@@ -905,7 +1433,7 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       }
     });
   } else {
-    map.setLayoutProperty('windy-country-borders', 'visibility', isOverlayVisible ? 'visible' : 'none');
+    map.setLayoutProperty('windy-country-borders', 'visibility', isUniversalOutlineVisible ? 'visible' : 'none');
   }
 
   // B. Sleek Continental & Country Overview Labels (Only at global zoom 1.0 - 5.0)
@@ -1109,18 +1637,18 @@ function applyMapLayersAndHeatmap(map, isSatellite, activeLayer = 'temp', isHeat
       source: 'esri-reference-labels',
       minzoom: 6.0, // Only visible as you zoom closer! Eliminates all global clutter
       layout: {
-        visibility: isOverlayVisible ? 'visible' : 'none'
+        visibility: isUniversalOutlineVisible ? 'visible' : 'none'
       },
       paint: {
-        'raster-opacity': isOverlayVisible ? 1.0 : 0.0,
+        'raster-opacity': isUniversalOutlineVisible ? 1.0 : 0.0,
         'raster-fade-duration': 250
       }
     });
   } else {
-    map.setLayoutProperty('overlay-labels-and-boundaries', 'visibility', isOverlayVisible ? 'visible' : 'none');
+    map.setLayoutProperty('overlay-labels-and-boundaries', 'visibility', isUniversalOutlineVisible ? 'visible' : 'none');
     try {
-      map.setPaintProperty('overlay-labels-and-boundaries', 'raster-opacity', isOverlayVisible ? 1.0 : 0.0);
-    } catch (e) {}
+      map.setPaintProperty('overlay-labels-and-boundaries', 'raster-opacity', isUniversalOutlineVisible ? 1.0 : 0.0);
+    } catch (e) { }
   }
 
   // 7. Refresh place label typography
@@ -1143,19 +1671,24 @@ export default function CloudburstMap({
   mapView = 'liberty',
   isHomeView = false,
   isAnalyticsOpen = false,
+  isMeteoPanelOpen = false,
   showParticles = true,
   onToggleParticles,
   windParticleMode = 'normal',
   onWindParticleModeChange,
   showTemperature = true,
   tempUnit = 'C',
+  onToggleTempUnit = null,
+  windUnit: externalWindUnit,
+  onWindUnitChange,
   humidity = 90,
   pressureDrop = 30,
   temperature = 18,
   windSpeed = 45,
   tcwv = 52,
   cloudburstEvent = null,
-  onFocusEpicenter = null
+  onFocusEpicenter = null,
+  onHoverTemp = null
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -1175,6 +1708,22 @@ export default function CloudburstMap({
   const [isTempLoading, setIsTempLoading] = useState(false);
   const weatherTileTimestampRef = useRef(getWeatherApiTimestamp());
 
+  const [internalWindUnit, setInternalWindUnit] = useState('km/h');
+  const windUnit = externalWindUnit || internalWindUnit;
+  const setWindUnit = useCallback((val) => {
+    setInternalWindUnit(val);
+    onWindUnitChange?.(val);
+  }, [onWindUnitChange]);
+
+  const [showIsotachs, setShowIsotachs] = useState(true);
+
+  const windUnitRef = useRef(windUnit);
+  windUnitRef.current = windUnit;
+
+  useEffect(() => {
+    windUnitRef.current = windUnit;
+  }, [windUnit]);
+
   useEffect(() => {
     if (activeLayer) {
       setSelectedWeatherLayer(activeLayer);
@@ -1188,15 +1737,11 @@ export default function CloudburstMap({
     }
     if (layerKey === 'wind') {
       onToggleParticles?.(true);
-      onWindParticleModeChange?.('strong');
-    } else if (layerKey === 'temp') {
-      preloadTemperatureEngine();
-      if (mapRef.current) {
-        const isLoaded = mapRef.current.isSourceLoaded('openmeteo-temp-source');
-        if (!isLoaded) {
-          setIsTempLoading(true);
-        }
+      if (windModeRef.current === 'off') {
+        onWindParticleModeChange?.('silk');
       }
+    } else if (layerKey === 'temp') {
+      setIsTempLoading(false);
     }
   }, [onChangeActiveLayer, onToggleParticles, onWindParticleModeChange]);
 
@@ -1262,7 +1807,7 @@ export default function CloudburstMap({
         const pt = map.project([lng, lat]);
         setClickedPinScreenPos({ x: pt.x, y: pt.y });
         clickedPinScreenPosRef.current = { x: pt.x, y: pt.y };
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const zoom = map ? Math.round(map.getZoom()) : 4;
@@ -1276,9 +1821,72 @@ export default function CloudburstMap({
   // Muted Thunder Synthesizer state
   const [isThunderMuted, setIsThunderMuted] = useState(() => thunderSynth.isMuted());
 
-  // RainViewer live Doppler radar state
+  // RainViewer live Doppler radar state & playback
   const [radarFrames, setRadarFrames] = useState([]);
   const [radarStatus, setRadarStatus] = useState('loading');
+  const [radarScheme, setRadarScheme] = useState('nordic');
+  const [radarMistDensity, setRadarMistDensity] = useState(1.0); // 0.5 Whisper, 1.0 Balanced, 1.8 Torrent
+  const [hoveredRadarStation, setHoveredRadarStation] = useState(null);
+  const [radarFrameIndex, setRadarFrameIndex] = useState(-1);
+  const [isRadarPlaying, setIsRadarPlaying] = useState(false);
+  const [radarPlaybackSpeed, setRadarPlaybackSpeed] = useState(1);
+  const [isRadarBoosted, setIsRadarBoosted] = useState(true);
+  const [showRadarRings, setShowRadarRings] = useState(true);
+  const isRadarBoostedRef = useRef(isRadarBoosted);
+  isRadarBoostedRef.current = isRadarBoosted;
+  const showRadarRingsRef = useRef(showRadarRings);
+  showRadarRingsRef.current = showRadarRings;
+
+  // AetherAura™ Live Air Quality (AQI) State with 30-min Sliding Window Cache
+  const [aqiDataMap, setAqiDataMap] = useState(() => {
+    const cached = getCachedAQI();
+    return cached?.data || null;
+  });
+  const [isAqiLoading, setIsAqiLoading] = useState(false);
+  const [aqiMinutesRemaining, setAqiMinutesRemaining] = useState(() => getAqiCacheMinutesRemaining());
+  const [selectedAqiStation, setSelectedAqiStation] = useState(null);
+  const [aqiCategoryFilter, setAqiCategoryFilter] = useState(null);
+
+  const aqiGeoJSON = useMemo(() => {
+    if (!aqiDataMap) return null;
+    return generateAqiAtmosphericGeoJSON(aqiDataMap);
+  }, [aqiDataMap]);
+
+  // Live AQI synchronization (30-min sliding window with strict cache eviction)
+  useEffect(() => {
+    let isMounted = true;
+    const syncAqi = async (force = false) => {
+      setIsAqiLoading(true);
+      try {
+        const data = await getLiveAirQualityNetwork(null, force);
+        if (isMounted && data) {
+          setAqiDataMap(data);
+          setAqiMinutesRemaining(getAqiCacheMinutesRemaining());
+        }
+      } catch (err) {
+        console.warn('[AQI] Sync failed:', err);
+      } finally {
+        if (isMounted) setIsAqiLoading(false);
+      }
+    };
+
+    if (selectedWeatherLayer === 'aqi' && !aqiDataMap) {
+      syncAqi(false);
+    }
+
+    const timer = setInterval(() => {
+      const remaining = getAqiCacheMinutesRemaining();
+      setAqiMinutesRemaining(remaining);
+      if (remaining <= 0 && selectedWeatherLayer === 'aqi') {
+        syncAqi(true);
+      }
+    }, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [selectedWeatherLayer, stations, aqiDataMap]);
 
   // Fetch the latest RainViewer radar frames and refresh every 10 minutes
   useEffect(() => {
@@ -1324,11 +1932,62 @@ export default function CloudburstMap({
     };
   }, []);
 
-  const currentRadarFrame = radarFrames.length > 0 ? radarFrames[radarFrames.length - 1] : null;
+  const effectiveFrameIndex = radarFrames.length > 0
+    ? (radarFrameIndex >= 0 && radarFrameIndex < radarFrames.length
+      ? radarFrameIndex
+      : radarFrames.length - 1)
+    : 0;
+  const currentRadarFrame = radarFrames.length > 0 ? radarFrames[effectiveFrameIndex] : null;
+  const isLatestRadarFrame = radarFrames.length > 0 && effectiveFrameIndex === radarFrames.length - 1;
   const radarTimestampPath = currentRadarFrame?.path || null;
   const radarTimestampTime = currentRadarFrame?.time
     ? new Date(currentRadarFrame.time * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : null;
+  const minutesAgo = currentRadarFrame?.time
+    ? Math.max(0, Math.round((Date.now() / 1000 - currentRadarFrame.time) / 60))
+    : 0;
+
+  // Radar playback timeline animation loop
+  useEffect(() => {
+    if (!isRadarPlaying || radarFrames.length <= 1 || selectedWeatherLayer !== 'precip') {
+      return;
+    }
+
+    const frameDelayMs = Math.round(750 / radarPlaybackSpeed);
+    const dwellOnLiveMs = 1400; // brief pause on live frame before restarting loop
+
+    const isCurrentAtEnd = effectiveFrameIndex === radarFrames.length - 1;
+    const timer = setTimeout(() => {
+      setRadarFrameIndex((prev) => {
+        const curr = prev === -1 ? radarFrames.length - 1 : prev;
+        const next = curr + 1;
+        if (next >= radarFrames.length) {
+          return 0;
+        }
+        return next;
+      });
+    }, isCurrentAtEnd ? dwellOnLiveMs : frameDelayMs);
+
+    return () => clearTimeout(timer);
+  }, [isRadarPlaying, effectiveFrameIndex, radarFrames.length, radarPlaybackSpeed, selectedWeatherLayer]);
+
+  const handleCycleRadarScheme = () => {
+    const schemeOrder = RADAR_ART_PALETTES.map((p) => p.id);
+    const nextIdx = (schemeOrder.indexOf(radarScheme) + 1) % schemeOrder.length;
+    setRadarScheme(schemeOrder[nextIdx]);
+  };
+
+  const handleCycleRadarSpeed = () => {
+    const speeds = [0.5, 1, 2];
+    const nextIdx = (speeds.indexOf(radarPlaybackSpeed) + 1) % speeds.length;
+    setRadarPlaybackSpeed(speeds[nextIdx]);
+  };
+
+  const handleCycleMistDensity = () => {
+    const densities = [0.5, 1.0, 1.8];
+    const nextIdx = (densities.indexOf(radarMistDensity) + 1) % densities.length;
+    setRadarMistDensity(densities[nextIdx]);
+  };
 
   // Ambient procedural rain sound drone
   useEffect(() => {
@@ -1342,8 +2001,8 @@ export default function CloudburstMap({
     };
   }, [selectedWeatherLayer, isThunderMuted]);
 
-  // Streamline particle buffers optimized for 120 FPS high-refresh monitors (up to 4200 particles)
-  const MAX_PARTICLES = 4200;
+  // AeroSilk™ Streamline particle buffers optimized for 120 FPS high-refresh monitors (5,500 filaments)
+  const MAX_PARTICLES = 5500;
   const particlesRef = useRef({
     x: new Float32Array(MAX_PARTICLES),
     y: new Float32Array(MAX_PARTICLES),
@@ -1354,12 +2013,39 @@ export default function CloudburstMap({
     speed: new Float32Array(MAX_PARTICLES)
   });
 
-  // Dedicated falling rain veil particle buffer for Rain Radar
-  const MAX_RAIN_PARTICLES = 700;
+  // Dedicated Liquid Silk™ falling rain particle buffer for Rain Radar
+  const MAX_RAIN_PARTICLES = 850;
   const rainParticlesRef = useRef({
     x: new Float32Array(MAX_RAIN_PARTICLES),
     y: new Float32Array(MAX_RAIN_PARTICLES),
-    speed: new Float32Array(MAX_RAIN_PARTICLES)
+    speed: new Float32Array(MAX_RAIN_PARTICLES),
+    mass: new Float32Array(MAX_RAIN_PARTICLES),
+    swayOffset: new Float32Array(MAX_RAIN_PARTICLES)
+  });
+
+  // Swirling Aerosol Mist Buffer (Plan 5.2)
+  const MAX_MIST_PARTICLES = 160;
+  const mistParticlesRef = useRef({
+    x: new Float32Array(MAX_MIST_PARTICLES),
+    y: new Float32Array(MAX_MIST_PARTICLES),
+    radius: new Float32Array(MAX_MIST_PARTICLES),
+    alpha: new Float32Array(MAX_MIST_PARTICLES),
+    vx: new Float32Array(MAX_MIST_PARTICLES),
+    vy: new Float32Array(MAX_MIST_PARTICLES),
+    life: new Float32Array(MAX_MIST_PARTICLES),
+    maxLife: new Float32Array(MAX_MIST_PARTICLES)
+  });
+
+  // Concentric Ground Impact Splash Ripples Buffer (Ring buffer)
+  const MAX_RIPPLES = 80;
+  const ripplesRef = useRef({
+    x: new Float32Array(MAX_RIPPLES),
+    y: new Float32Array(MAX_RIPPLES),
+    radius: new Float32Array(MAX_RIPPLES),
+    maxRadius: new Float32Array(MAX_RIPPLES),
+    alpha: new Float32Array(MAX_RIPPLES),
+    active: new Uint8Array(MAX_RIPPLES),
+    head: 0
   });
 
   // Dynamically compute the GeoJSON FeatureCollection for MapLibre's built-in heatmap renderer
@@ -1382,7 +2068,7 @@ export default function CloudburstMap({
       if (map.getStyle()) {
         map.setProjection({ type: 'mercator' });
       }
-    } catch (err) {}
+    } catch (err) { }
     map.setMaxPitch(0);
     map.setPitch(0);
     map.setBearing(0);
@@ -1469,7 +2155,7 @@ export default function CloudburstMap({
         return;
       }
 
-      if (event.sourceId === 'esri-satellite' && mapViewRef.current === 'satellite') {
+      if ((event.sourceId === 'esri-satellite' || event.sourceId === 'satellite-source') && mapViewRef.current === 'satellite') {
         setTileError({
           scope: 'map',
           mapView: 'satellite',
@@ -1505,7 +2191,22 @@ export default function CloudburstMap({
       const isSat = mapViewRef.current === 'satellite';
       const isHeatmapVis = showTemperature;
 
-      applyMapLayersAndHeatmap(map, isSat, selectedWeatherLayer, isHeatmapVis, heatmapGeoJSON, radarTimestampPath, cloudburstEvent);
+      applyMapLayersAndHeatmap(
+        map,
+        isSat,
+        selectedWeatherLayer,
+        isHeatmapVis,
+        heatmapGeoJSON,
+        radarTimestampPath,
+        cloudburstEvent,
+        radarScheme,
+        isRadarBoostedRef.current,
+        showRadarRingsRef.current,
+        getActiveCyclones(),
+        stations,
+        aqiGeoJSON,
+        showIsotachs
+      );
       apply3DState(is3DRef.current, false);
       renderStationMarkers(map);
     };
@@ -1535,19 +2236,7 @@ export default function CloudburstMap({
       map.on('resize', handleResize);
       handleScaleUpdate();
 
-      // Open-Meteo temperature tile loading status monitor
-      const handleSourceData = (e) => {
-        if (e.sourceId === 'openmeteo-temp-source' && e.isSourceLoaded) {
-          setIsTempLoading(false);
-        }
-      };
-      map.on('sourcedata', handleSourceData);
-
-      map.once('idle', () => {
-        if (map.isSourceLoaded('openmeteo-temp-source')) {
-          setIsTempLoading(false);
-        }
-      });
+      setIsTempLoading(false);
     });
 
     map.on('style.load', onStyleReady);
@@ -1601,7 +2290,7 @@ export default function CloudburstMap({
       setTimeout(() => {
         try {
           marker.remove();
-        } catch (e) {}
+        } catch (e) { }
       }, 1900);
     });
 
@@ -1619,8 +2308,36 @@ export default function CloudburstMap({
     const isSat = mapView === 'satellite';
     const isHeatmapVis = showTemperature;
 
-    applyMapLayersAndHeatmap(map, isSat, selectedWeatherLayer, isHeatmapVis, heatmapGeoJSON, radarTimestampPath, cloudburstEvent);
-  }, [heatmapGeoJSON, showTemperature, mapView, selectedWeatherLayer, radarTimestampPath, cloudburstEvent]);
+    applyMapLayersAndHeatmap(
+      map,
+      isSat,
+      selectedWeatherLayer,
+      isHeatmapVis,
+      heatmapGeoJSON,
+      radarTimestampPath,
+      cloudburstEvent,
+      radarScheme,
+      isRadarBoosted,
+      showRadarRings,
+      getActiveCyclones(),
+      stations,
+      aqiGeoJSON,
+      showIsotachs
+    );
+  }, [
+    heatmapGeoJSON,
+    showTemperature,
+    mapView,
+    selectedWeatherLayer,
+    radarTimestampPath,
+    cloudburstEvent,
+    radarScheme,
+    isRadarBoosted,
+    showRadarRings,
+    stations,
+    aqiGeoJSON,
+    showIsotachs
+  ]);
 
   useEffect(() => {
     const refreshForecastTiles = () => {
@@ -1700,7 +2417,7 @@ export default function CloudburstMap({
         cX = scale * (centerLng / 360 + 0.5);
         const latRad = (centerLat * Math.PI) / 180;
         cY = scale * (0.5 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / (2 * Math.PI));
-      } catch (e) {}
+      } catch (e) { }
     };
 
     // Closed-form Web Mercator unprojection (Zero-overhead, immune to antimeridian seam bugs)
@@ -1728,6 +2445,7 @@ export default function CloudburstMap({
         canvas.width = rect.width;
         canvas.height = rect.height;
 
+        const isGrand = windParticleMode === 'grand';
         for (let i = 0; i < count; i++) {
           const rx = Math.random() * canvas.width;
           const ry = Math.random() * canvas.height;
@@ -1735,8 +2453,9 @@ export default function CloudburstMap({
           p.y[i] = ry;
           p.prevX[i] = rx;
           p.prevY[i] = ry;
-          p.age[i] = Math.floor(Math.random() * 80);
-          p.maxAge[i] = 70 + Math.floor(Math.random() * 80);
+          const maxAge = isGrand ? (160 + Math.floor(Math.random() * 120)) : (70 + Math.floor(Math.random() * 80));
+          p.age[i] = Math.floor(Math.random() * maxAge);
+          p.maxAge[i] = maxAge;
           p.speed[i] = 0.85 + Math.random() * 0.30;
         }
 
@@ -1745,6 +2464,20 @@ export default function CloudburstMap({
           rainP.x[i] = Math.random() * canvas.width;
           rainP.y[i] = Math.random() * canvas.height;
           rainP.speed[i] = 0.85 + Math.random() * 0.35;
+          rainP.mass[i] = 0.8 + Math.random() * 0.4;
+          rainP.swayOffset[i] = Math.random() * Math.PI * 2;
+        }
+
+        const mistP = mistParticlesRef.current;
+        for (let i = 0; i < MAX_MIST_PARTICLES; i++) {
+          mistP.x[i] = Math.random() * canvas.width;
+          mistP.y[i] = Math.random() * canvas.height;
+          mistP.radius[i] = 16 + Math.random() * 20;
+          mistP.alpha[i] = 0.05 + Math.random() * 0.06;
+          mistP.vx[i] = (Math.random() - 0.48) * 0.45;
+          mistP.vy[i] = 0.2 + Math.random() * 0.5;
+          mistP.life[i] = Math.floor(Math.random() * 150);
+          mistP.maxLife[i] = 130 + Math.random() * 160;
         }
       }
     };
@@ -1770,44 +2503,110 @@ export default function CloudburstMap({
 
     const render = () => {
       const mode = windModeRef.current || 'normal';
-      const isVisualWeatherLayer = selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp' || selectedWeatherLayer === 'precip';
+      const isVisualWeatherLayer = selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp' || selectedWeatherLayer === 'precip' || selectedWeatherLayer === 'aqi';
       if (!isRunning || ((!showParticles || mode === 'off') && !isVisualWeatherLayer)) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         return;
       }
 
-      // Dedicated Rain Veil & IMD Doppler Radar Station Sweep Animation Loop
+      // Dedicated Liquid Silk™ Rain Engine & Celestial Astrolabe Radar Station Loop (Plan 5.2 & 5.3)
       if (selectedWeatherLayer === 'precip') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.globalCompositeOperation = 'source-over';
 
         const rainP = rainParticlesRef.current;
         const width = canvas.width;
         const height = canvas.height;
+        const now = Date.now();
 
-        // 1. Render Slanted Rain Veil Filaments (translucent crystal rain filaments drifting along RK2 wind vectors)
-        ctx.beginPath();
-        ctx.lineWidth = 0.85;
-        ctx.strokeStyle = 'rgba(186, 230, 253, 0.32)';
+        // 1. Swirling Aerosol Mist Fog Layer (Plan 5.2 & 6.3: High-visibility volumetric mist)
+        if (radarMistDensity > 0.05) {
+          const mistP = mistParticlesRef.current;
+          const activeMistCount = Math.min(MAX_MIST_PARTICLES, Math.floor(MAX_MIST_PARTICLES * Math.min(1.5, radarMistDensity)));
+          for (let i = 0; i < activeMistCount; i++) {
+            mistP.life[i]++;
+            if (mistP.life[i] >= mistP.maxLife[i]) {
+              mistP.x[i] = Math.random() * width;
+              mistP.y[i] = Math.random() * height;
+              const mPos = screenToLngLat(mistP.x[i], mistP.y[i]);
+              const mRain = getLocalPrecipitation(mPos.lng, mPos.lat);
+              if (mRain < 0.05 && Math.random() > 0.35) {
+                continue;
+              }
+              mistP.radius[i] = 18 + Math.random() * 24;
+              mistP.alpha[i] = (0.08 + Math.random() * 0.10) * radarMistDensity;
+              mistP.vx[i] = (Math.random() - 0.48) * 0.55;
+              mistP.vy[i] = 0.25 + Math.random() * 0.6;
+              mistP.life[i] = 0;
+              mistP.maxLife[i] = 130 + Math.random() * 160;
+            }
+
+            mistP.x[i] += mistP.vx[i];
+            mistP.y[i] += mistP.vy[i];
+
+            const halfLife = mistP.maxLife[i] * 0.5;
+            const currentAlpha = mistP.alpha[i] * (1 - Math.abs(mistP.life[i] - halfLife) / halfLife);
+
+            if (currentAlpha > 0.005) {
+              const mGrad = ctx.createRadialGradient(
+                mistP.x[i], mistP.y[i], 0,
+                mistP.x[i], mistP.y[i], mistP.radius[i]
+              );
+              mGrad.addColorStop(0, `rgba(235, 248, 255, ${currentAlpha * 1.35})`);
+              mGrad.addColorStop(0.45, `rgba(186, 230, 253, ${currentAlpha * 0.70})`);
+              mGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+
+              ctx.beginPath();
+              ctx.arc(mistP.x[i], mistP.y[i], mistP.radius[i], 0, Math.PI * 2);
+              ctx.fillStyle = mGrad;
+              ctx.fill();
+            }
+          }
+        }
+
+        // 2. Concentric Ground Impact Splash Ripples (Plan 5.2 & 6.3)
+        const rip = ripplesRef.current;
+        for (let i = 0; i < MAX_RIPPLES; i++) {
+          if (rip.active[i]) {
+            rip.radius[i] += 0.58;
+            rip.alpha[i] *= 0.92;
+            if (rip.radius[i] >= rip.maxRadius[i] || rip.alpha[i] < 0.015) {
+              rip.active[i] = 0;
+            } else {
+              ctx.beginPath();
+              ctx.arc(rip.x[i], rip.y[i], rip.radius[i], 0, Math.PI * 2);
+              ctx.strokeStyle = `rgba(186, 230, 253, ${rip.alpha[i] * 1.3})`;
+              ctx.lineWidth = 1.15;
+              ctx.stroke();
+            }
+          }
+        }
+
+        // 3. Render Liquid Silk™ Tapered Luminous Droplets (Plan 5.2 & 6.3)
         ctx.lineCap = 'round';
 
         for (let i = 0; i < MAX_RAIN_PARTICLES; i++) {
           const rx = rainP.x[i];
           const ry = rainP.y[i];
 
-          // Sample local wind drift
+          // Sample local geographic coordinate
           const pos = screenToLngLat(rx, ry);
+          const localPrecip = getLocalPrecipitation(pos.lng, pos.lat);
+          const hasRain = localPrecip > 0.05;
+
+          // Sample local wind drift
           const cosLat = Math.max(0.18, Math.cos((pos.lat * Math.PI) / 180));
           const wind = getWindVector(pos.lng, pos.lat);
           const uNorm = wind.u / cosLat;
 
-          // Slanted velocity: downwards + horizontal wind drift
-          const vy = 8.5 + rainP.speed[i] * 3.5;
-          const vx = uNorm * 0.32;
+          // Sinusoidal wind sway & aerodynamic mass turbulence
+          const sway = Math.sin(now * 0.0035 + (rainP.swayOffset ? rainP.swayOffset[i] : i)) * 0.45;
+          const vy = 8.5 + rainP.speed[i] * (hasRain ? 6.0 : 2.5);
+          const vx = (uNorm * 0.42) + sway;
 
-          const streakLen = 14.0 + rainP.speed[i] * 8.0;
+          const streakLen = (hasRain ? 20.0 : 8.0) + rainP.speed[i] * (hasRain ? 14.0 : 5.0);
           const norm = Math.hypot(vx, vy);
           const dirX = vx / norm;
           const dirY = vy / norm;
@@ -1815,32 +2614,71 @@ export default function CloudburstMap({
           const tailX = rx - dirX * streakLen;
           const tailY = ry - dirY * streakLen;
 
-          ctx.moveTo(tailX, tailY);
-          ctx.lineTo(rx, ry);
+          if (hasRain) {
+            // Tapered luminous gradient from dissolving tail to illuminated head
+            const headAlpha = Math.min(0.95, 0.45 + localPrecip * 0.04);
+            const tailAlpha = 0.05;
+
+            const strokeGrad = ctx.createLinearGradient(tailX, tailY, rx, ry);
+            strokeGrad.addColorStop(0, `rgba(186, 230, 253, ${tailAlpha})`);
+            strokeGrad.addColorStop(0.60, `rgba(186, 230, 253, ${headAlpha * 0.65})`);
+            strokeGrad.addColorStop(1, `rgba(240, 249, 255, ${headAlpha})`);
+
+            ctx.beginPath();
+            ctx.lineWidth = localPrecip > 20 ? 2.2 : 1.45;
+            ctx.strokeStyle = strokeGrad;
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(rx, ry);
+            ctx.stroke();
+
+            // Luminous head bead in brilliant white
+            ctx.beginPath();
+            ctx.arc(rx, ry, localPrecip > 20 ? 1.8 : 1.35, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${headAlpha})`;
+            ctx.fill();
+
+            // Spawn ground splash ripples when hitting bottom region
+            if (ry > height * 0.45 && Math.random() < 0.12) {
+              const ripIdx = rip.head;
+              rip.x[ripIdx] = rx;
+              rip.y[ripIdx] = ry;
+              rip.radius[ripIdx] = 1.5;
+              rip.maxRadius[ripIdx] = 10.0 + Math.random() * 12.0;
+              rip.alpha[ripIdx] = Math.min(0.70, 0.30 + localPrecip * 0.03);
+              rip.active[ripIdx] = 1;
+              rip.head = (ripIdx + 1) % MAX_RIPPLES;
+            }
+          } else {
+            // Perceptible ambient celestial drift in clear sectors
+            ctx.beginPath();
+            ctx.lineWidth = 0.75;
+            ctx.strokeStyle = 'rgba(186, 230, 253, 0.20)';
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(rx, ry);
+            ctx.stroke();
+          }
 
           // Advance particle
           rainP.x[i] += vx;
           rainP.y[i] += vy;
 
           // Wrap around top or screen edges
-          if (rainP.y[i] > height + 30 || rainP.x[i] < -30 || rainP.x[i] > width + 30) {
+          if (rainP.y[i] > height + 35 || rainP.x[i] < -35 || rainP.x[i] > width + 35) {
             rainP.x[i] = Math.random() * width;
             rainP.y[i] = -15 - Math.random() * 40;
             rainP.speed[i] = 0.85 + Math.random() * 0.35;
           }
         }
-        ctx.stroke();
 
-        // 2. Render Innovative Micro-Doppler Radar Station Beacons
-        const now = Date.now();
-        const sweepAngle = (now / 2200) * (Math.PI * 2);
-        const pulsePhase = (now % 1800) / 1800;
-        const pulseRadius = 3 + pulsePhase * 18;
-        const pulseAlpha = Math.max(0, 1 - pulsePhase) * 0.45;
+        // 4. Render Celestial Astrolabe Beacons for RADAR_COVERAGE_CENTERS (Plan 5.3)
+        const sweepAngle = (now / 3200) * (Math.PI * 2);
+        const pulsePhase = (now % 2200) / 2200;
+        const pulseRadius = 3 + pulsePhase * 24;
+        const pulseAlpha = Math.max(0, 1 - pulsePhase) * 0.40;
 
-        // Dynamic scale based on zoom level: compact 14px to 18px radius
+        // Dynamic scale based on zoom level: compact 14px to 22px radius
         const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 5;
-        const sweepRadius = Math.max(13, Math.min(19, 13 + (currentZoom - 3) * 1.5));
+        const sweepRadius = Math.max(15, Math.min(22, 14 + (currentZoom - 3) * 1.6));
 
         RADAR_COVERAGE_CENTERS.forEach((station) => {
           let sx, sy;
@@ -1856,33 +2694,53 @@ export default function CloudburstMap({
             sy = wy - cY + height * 0.5;
           }
 
-          if (sx < -40 || sx > width + 40 || sy < -40 || sy > height + 40) return;
+          if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) return;
 
-          // A. Expanding Sonar Wave Ripple
+          // A. Breathing Sonar Pulse Ring
           ctx.beginPath();
-          ctx.arc(sx, sy, Math.min(sweepRadius * 1.35, pulseRadius), 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(56, 189, 248, ${pulseAlpha})`;
-          ctx.lineWidth = 0.85;
+          ctx.arc(sx, sy, Math.min(sweepRadius * 1.45, pulseRadius), 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(186, 230, 253, ${pulseAlpha})`;
+          ctx.lineWidth = 0.75;
           ctx.stroke();
 
-          // B. Micro Outer Perimeter Ring
+          // B. Concentric Astrolabe Hairline Rings
+          // Outer ring (pale cyan)
           ctx.beginPath();
           ctx.arc(sx, sy, sweepRadius, 0, Math.PI * 2);
-          ctx.lineWidth = 0.9;
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 0.85;
+          ctx.strokeStyle = 'rgba(186, 230, 253, 0.45)';
           ctx.stroke();
 
-          // C. Subtle 4-axis Micro Ticks at the ring boundary
+          // Middle ring (pale gold)
           ctx.beginPath();
-          ctx.strokeStyle = 'rgba(125, 211, 252, 0.60)';
-          ctx.lineWidth = 0.8;
-          ctx.moveTo(sx - sweepRadius - 2, sy); ctx.lineTo(sx - sweepRadius + 2, sy);
-          ctx.moveTo(sx + sweepRadius - 2, sy); ctx.lineTo(sx + sweepRadius + 2, sy);
-          ctx.moveTo(sx, sy - sweepRadius - 2); ctx.lineTo(sx, sy - sweepRadius + 2);
-          ctx.moveTo(sx, sy + sweepRadius - 2); ctx.lineTo(sx, sy + sweepRadius + 2);
+          ctx.arc(sx, sy, sweepRadius * 0.65, 0, Math.PI * 2);
+          ctx.lineWidth = 0.65;
+          ctx.strokeStyle = 'rgba(253, 230, 138, 0.35)';
           ctx.stroke();
 
-          // D. Rotating Phosphor Sweep Sector (45-degree micro-fan)
+          // Inner ring
+          ctx.beginPath();
+          ctx.arc(sx, sy, sweepRadius * 0.35, 0, Math.PI * 2);
+          ctx.lineWidth = 0.55;
+          ctx.strokeStyle = 'rgba(186, 230, 253, 0.25)';
+          ctx.stroke();
+
+          // C. 8-Point Nautical Compass Ticks
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(253, 230, 138, 0.60)';
+          ctx.lineWidth = 0.75;
+          for (let a = 0; a < 8; a++) {
+            const ang = (a * Math.PI) / 4;
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
+            const r1 = sweepRadius - (a % 2 === 0 ? 3.5 : 2.0);
+            const r2 = sweepRadius + (a % 2 === 0 ? 3.5 : 2.0);
+            ctx.moveTo(sx + cosA * r1, sy + sinA * r1);
+            ctx.lineTo(sx + cosA * r2, sy + sinA * r2);
+          }
+          ctx.stroke();
+
+          // D. Rotating Phosphor Sweep Fan (45-degree smooth gradient)
           const arcSpread = 0.75;
           ctx.save();
           ctx.beginPath();
@@ -1891,138 +2749,93 @@ export default function CloudburstMap({
           ctx.closePath();
 
           const grad = ctx.createRadialGradient(sx, sy, 1, sx, sy, sweepRadius);
-          grad.addColorStop(0, 'rgba(56, 189, 248, 0.50)');
-          grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.22)');
-          grad.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+          grad.addColorStop(0, 'rgba(56, 189, 248, 0.45)');
+          grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.18)');
+          grad.addColorStop(1, 'rgba(56, 189, 248, 0.01)');
           ctx.fillStyle = grad;
           ctx.fill();
 
-          // E. Crisp Leading Micro-Needle
+          // E. Crisp Leading Astrolabe Pointer
           ctx.beginPath();
           ctx.moveTo(sx, sy);
           ctx.lineTo(
             sx + Math.cos(sweepAngle) * sweepRadius,
             sy + Math.sin(sweepAngle) * sweepRadius
           );
-          ctx.lineWidth = 1.15;
-          ctx.strokeStyle = 'rgba(224, 242, 254, 0.95)';
+          ctx.lineWidth = 1.1;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
           ctx.stroke();
           ctx.restore();
 
-          // F. Jeweled Pinpoint Center Core
+          // F. Pulsing Celestial Center Star
+          const starPhase = Math.sin(now * 0.005 + station.lon) * 0.5 + 0.5;
           ctx.beginPath();
-          ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+          ctx.arc(sx, sy, 1.8 + starPhase * 0.8, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(sx, sy, 3.2, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.75)';
+          ctx.arc(sx, sy, 3.5 + starPhase * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(253, 230, 138, 0.45)';
           ctx.fill();
 
-          // G. Clean Micro Typography (Station name)
+          // G. Astrolabe Typography (Callsign + City)
           const cityName = station.name.replace(' (DWR)', '');
-          ctx.font = '600 8.5px monospace';
-          ctx.fillStyle = 'rgba(224, 242, 254, 0.75)';
+          ctx.font = '600 8.5px var(--font-mono, monospace)';
+          ctx.fillStyle = 'rgba(224, 242, 254, 0.82)';
           ctx.textAlign = 'center';
-          ctx.fillText(cityName, sx, sy + sweepRadius + 9);
+          ctx.fillText(cityName, sx, sy + sweepRadius + 10);
         });
 
         animFrameRef.current = requestAnimationFrame(render);
         return;
       }
 
-      // Luminous Big-Ribbon Atmospheric Wind Streamlines in Fast Motion
-      // High-momentum fluid dynamics, wide silky strokes and long continuous vapor banners
+      // AeroSilk™ Atmospheric Fluid Particle Engine (Real NWP Vectors & Sub-Pixel Geometry)
       const isDarkBg = mapViewRef.current === 'satellite' || selectedWeatherLayerRef.current === 'temp';
-      let activeCount = 2400;
-      let speedMult = 0.44;
-      let fadeRate = 0.028; // Lower fade leaves long, thick, continuous silky ribbons
-      let strokeCalm, strokeFine, strokeMid, strokeStrong;
-      let widthCalm = 1.30;
-      let widthFine = 1.95;
-      let widthMid = 3.10;
-      let widthStrong = 4.60;
+      const styleConfig = getWindParticleStyle(mode);
 
-      if (mode === 'strong') {
-        activeCount = 3000;
-        speedMult = 0.48;
-        fadeRate = 0.028;
-        widthCalm = 1.50;
-        widthFine = 2.25;
-        widthMid = 3.40;
-        widthStrong = 5.00;
-        if (isDarkBg) {
-          strokeCalm = 'rgba(205, 235, 255, 0.25)';
-          strokeFine = 'rgba(215, 240, 255, 0.54)';
-          strokeMid = 'rgba(240, 250, 255, 0.88)';
-          strokeStrong = 'rgba(255, 255, 255, 1.0)';
-        } else {
-          strokeCalm = 'rgba(28, 55, 85, 0.22)';
-          strokeFine = 'rgba(25, 52, 80, 0.54)';
-          strokeMid = 'rgba(12, 34, 60, 0.88)';
-          strokeStrong = 'rgba(4, 16, 32, 1.0)';
-        }
-      } else if (mode === 'dark') {
-        activeCount = 2400;
-        speedMult = 0.44;
-        fadeRate = 0.028;
-        widthCalm = 1.35;
-        widthFine = 2.00;
-        widthMid = 3.10;
-        widthStrong = 4.60;
-        strokeCalm = 'rgba(45, 60, 78, 0.22)';
-        strokeFine = 'rgba(38, 52, 68, 0.48)';
-        strokeMid = 'rgba(18, 30, 44, 0.82)';
-        strokeStrong = 'rgba(6, 12, 22, 1.0)';
-      } else if (mode === 'fast') {
-        // Fast Motion with Big Ribbons
-        activeCount = 2600;
-        speedMult = 0.58;
-        fadeRate = 0.026;
-        widthCalm = 1.60;
-        widthFine = 2.50;
-        widthMid = 3.80;
-        widthStrong = 5.60;
-        if (isDarkBg) {
-          strokeCalm = 'rgba(200, 235, 255, 0.25)';
-          strokeFine = 'rgba(215, 242, 255, 0.52)';
-          strokeMid = 'rgba(240, 252, 255, 0.88)';
-          strokeStrong = 'rgba(255, 255, 255, 1.0)';
-        } else {
-          strokeCalm = 'rgba(28, 55, 85, 0.22)';
-          strokeFine = 'rgba(24, 50, 78, 0.52)';
-          strokeMid = 'rgba(12, 34, 60, 0.88)';
-          strokeStrong = 'rgba(4, 16, 32, 1.0)';
-        }
-      } else {
-        // 'normal' upgraded with prominent ribbons and energetic fast flow
-        if (isDarkBg) {
-          strokeCalm = 'rgba(195, 230, 255, 0.20)';
-          strokeFine = 'rgba(210, 238, 255, 0.45)';
-          strokeMid = 'rgba(235, 248, 255, 0.80)';
-          strokeStrong = 'rgba(255, 255, 255, 0.98)';
-        } else {
-          strokeCalm = 'rgba(32, 60, 90, 0.20)';
-          strokeFine = 'rgba(28, 56, 84, 0.48)';
-          strokeMid = 'rgba(16, 40, 68, 0.82)';
-          strokeStrong = 'rgba(8, 24, 46, 0.98)';
-        }
-      }
+      let activeCount = Math.min(count, styleConfig.activeCount || 5500);
+      let speedMult = styleConfig.speedMult || 0.17;
+      let fadeRate = styleConfig.fadeRate || 0.08;
+      let blendMode = styleConfig.blendMode || 'source-over';
+      const styleColors = styleConfig.getColors ? styleConfig.getColors(isDarkBg) : null;
 
-      // Enhanced intensity and fast-motion trail persistence for active Wind Speed layer
+      let widthCalm = styleConfig.lineWidths?.mist || 0.65;
+      let widthFine = styleConfig.lineWidths?.fine || 0.80;
+      let widthMid = styleConfig.lineWidths?.mid || 1.05;
+      let widthStrong = styleConfig.lineWidths?.strong || 1.35;
+
+      let strokeCalm = styleColors?.mist || 'rgba(215, 240, 255, 0.35)';
+      let strokeFine = styleColors?.fine || 'rgba(235, 248, 255, 0.65)';
+      let strokeMid = styleColors?.mid || 'rgba(248, 252, 255, 0.88)';
+      let strokeStrong = styleColors?.strong || 'rgba(255, 255, 255, 1.0)';
+
+      // Active Wind Speed layer overrides for high-contrast velocity representation
       const isWindLayer = selectedWeatherLayer === 'wind';
+      const isTempLayer = selectedWeatherLayer === 'temp';
+      const isAqiLayer = selectedWeatherLayer === 'aqi';
       if (isWindLayer) {
-        activeCount = 2800;
-        speedMult = 0.54;
-        fadeRate = 0.026;
+        activeCount = Math.min(count, 5500);
+        speedMult = 0.20;
+        fadeRate = 0.08;
+        blendMode = 'source-over';
+      } else if (isTempLayer) {
+        activeCount = Math.min(count, 5200);
+        fadeRate = 0.08;
+        blendMode = 'source-over';
+      } else if (isAqiLayer) {
+        activeCount = Math.min(count, 4800);
+        speedMult = 0.16;
+        fadeRate = 0.09;
+        blendMode = 'source-over';
       }
 
-      // Authentic Ventusky/Windy Ghost Trail Persistence
+      // AeroSilk™ Exponential Ghost Trail Persistence
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = `rgba(0, 0, 0, ${fadeRate})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalCompositeOperation = blendMode;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
@@ -2033,6 +2846,11 @@ export default function CloudburstMap({
       const tierModerate = []; // 22-48 km/h (Emerald Green)
       const tierBrisk = [];    // 48-78 km/h (Solar Amber)
       const tierStorm = [];    // >= 78 km/h (Neon Magenta/Crimson)
+
+      const tierThermalCryo = [];      // < 2°C (Glacial Frost - Luminous Ice Cyan)
+      const tierThermalTemperate = []; // 2°C - 22°C (Living Biosphere - Ethereal Mint Dew Green)
+      const tierThermalWarm = [];      // 22°C - 32°C (Subtropical Warmth - Golden Amber)
+      const tierThermalHeat = [];      // >= 32°C (Thermal Dome - Solar Terracotta Coral)
 
       const tierCalmMist = []; // < 1.4 km/h normalized (ethereal ambient mist)
       const tierFine = [];     // 1.4 - 2.4 (delicate flow filaments)
@@ -2047,8 +2865,8 @@ export default function CloudburstMap({
         // 1. Initial State (Stage 0)
         const pos0 = screenToLngLat(currX, currY);
         const cosLat0 = Math.max(0.18, Math.cos((pos0.lat * Math.PI) / 180));
-        
-        const k1 = getWindVector(pos0.lng, pos0.lat);
+
+        const k1 = getWindVector(pos0.lng, pos0.lat, 0, 'surface');
         const uNorm1 = k1.u / cosLat0;
         const mag1 = Math.sqrt(uNorm1 * uNorm1 + k1.v * k1.v);
 
@@ -2065,7 +2883,7 @@ export default function CloudburstMap({
         const posMid = screenToLngLat(midX, midY);
         const cosLatMid = Math.max(0.18, Math.cos((posMid.lat * Math.PI) / 180));
 
-        const k2 = getWindVector(posMid.lng, posMid.lat);
+        const k2 = getWindVector(posMid.lng, posMid.lat, 0, 'surface');
         const uNorm2 = k2.u / cosLatMid;
         const mag2 = Math.sqrt(uNorm2 * uNorm2 + k2.v * k2.v);
 
@@ -2089,6 +2907,13 @@ export default function CloudburstMap({
         let finalNextY = nextY;
         let finalMidX = midX;
         let finalMidY = midY;
+
+        // Dynamic Vorticity Curvature Perturbation (Curling Van Gogh brushstrokes in vortexes & lee eddies)
+        const curl = k2.vorticity || 0;
+        const vortSens = styleConfig.vorticitySensitivity || (isWindLayer ? 5.5 : 2.5);
+        const curlPerturb = Math.min(10.0, curl * vortSens);
+        finalMidX += -stepY * curlPerturb;
+        finalMidY += stepX * curlPerturb;
 
         if (stepDist < 1.15) {
           const scale = 1.15 / Math.max(0.001, stepDist);
@@ -2115,13 +2940,53 @@ export default function CloudburstMap({
               } else {
                 tierCalm.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY);
               }
+            } else if (isTempLayer) {
+              // Authentic Windy Streamlines: Ethereal silver-white ribbons layered by atmospheric velocity
+              if (mag2 >= 3.6) {
+                tierThermalHeat.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Jetstream corridor
+              } else if (mag2 >= 2.0) {
+                tierThermalWarm.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Moderate flow
+              } else if (mag2 >= 1.0) {
+                tierThermalTemperate.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Gentle flow
+              } else {
+                tierThermalCryo.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Ambient drift
+              }
+            } else if (isAqiLayer) {
+              // AetherAura™ Atmospheric Particulate Haze Streamlines
+              if (mag2 >= 2.8) {
+                tierThermalHeat.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY);
+              } else if (mag2 >= 1.6) {
+                tierThermalWarm.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY);
+              } else if (mag2 >= 0.8) {
+                tierThermalTemperate.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY);
+              } else {
+                tierThermalCryo.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY);
+              }
+            } else if (styleConfig.geometry === 'thermal') {
+              // Mode 4: Thermal Advection (Cold polar blast vs warm tropical air mass transport)
+              const parcelTemp = computeGlobalThermodynamicTemp(posMid.lng, posMid.lat);
+              if (parcelTemp >= 32.0) {
+                tierThermalHeat.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Tropical Heat Dome / Monsoon Surge
+              } else if (parcelTemp >= 22.0) {
+                tierThermalWarm.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Subtropical Warm Advection
+              } else if (parcelTemp >= 5.0) {
+                tierThermalTemperate.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Temperate Biosphere
+              } else {
+                tierThermalCryo.push(currX, currY, finalMidX, finalMidY, finalNextX, finalNextY); // Cryogenic Polar Blast
+              }
             } else {
               let targetTier = null;
-              if (mag2 >= 4.2 && alpha > 0.30) {
+              // Vorticity Bloom: For Grand Ribbons mode, dynamic cyclonic vorticity
+              // enhances velocity tiering so curling vortices and inflow corridors bloom with higher luminance
+              const effectiveMag = (styleConfig.geometry === 'grand')
+                ? (mag2 + (k2.vorticity || 0) * 2.2)
+                : mag2;
+
+              if (effectiveMag >= 4.2 && alpha > 0.30) {
                 targetTier = tierStrong;
-              } else if (mag2 >= 2.4 && alpha > 0.20) {
+              } else if (effectiveMag >= 2.4 && alpha > 0.20) {
                 targetTier = tierMid;
-              } else if (mag2 >= 1.4 && alpha > 0.12) {
+              } else if (effectiveMag >= 1.4 && alpha > 0.12) {
                 targetTier = tierFine;
               } else if (alpha > 0.25) {
                 // Calm air / terrain lee: only drawn when alpha is established, rendered as ultra-delicate mist
@@ -2154,67 +3019,183 @@ export default function CloudburstMap({
           p.prevX[i] = spawnX;
           p.prevY[i] = spawnY;
           p.age[i] = 0;
-          p.maxAge[i] = 70 + Math.floor(Math.random() * 80);
+          p.maxAge[i] = (styleConfig.geometry === 'grand')
+            ? (160 + Math.floor(Math.random() * 120))
+            : (70 + Math.floor(Math.random() * 80));
           p.speed[i] = 0.85 + Math.random() * 0.30;
         }
       }
 
       if (isWindLayer) {
-        // Speed-Coded Streamlines (Smooth Curvilinear Bézier Ribbons - Big & Bold)
-        const calmColor = isDarkBg ? 'rgba(186, 248, 255, 0.88)' : 'rgba(2, 132, 199, 0.92)';
-        const modColor = isDarkBg ? 'rgba(52, 211, 153, 0.94)' : 'rgba(5, 150, 105, 0.94)';
-        const briskColor = isDarkBg ? 'rgba(252, 211, 77, 0.98)' : 'rgba(217, 119, 6, 0.98)';
-        const stormColor = isDarkBg ? 'rgba(244, 63, 94, 1.0)' : 'rgba(225, 29, 72, 1.0)';
+        // --- Single Canonical Wind Speed Streamlines ---
+        // Calibrated against Oklab velocity field: Oceanic Cyan -> Living Jade -> Starry Amber -> Flame Coral
+        const tiers = [
+          { data: tierCalm, color: 'rgba(6, 182, 212, 0.85)', w: 0.75 },
+          { data: tierModerate, color: 'rgba(16, 185, 129, 0.90)', w: 0.95 },
+          { data: tierBrisk, color: 'rgba(245, 158, 11, 0.95)', w: 1.25 },
+          { data: tierStorm, color: 'rgba(244, 63, 94, 1.0)', w: 1.65 }
+        ];
 
-        // 1. Calm / Gentle (< 22 km/h) - Wide Silk Ribbon
-        if (tierCalm.length > 0) {
+        tiers.forEach(({ data, color, w }) => {
+          if (data.length === 0) return;
           ctx.beginPath();
-          ctx.lineWidth = 2.40;
-          ctx.strokeStyle = calmColor;
-          for (let j = 0; j < tierCalm.length; j += 6) {
-            ctx.moveTo(tierCalm[j], tierCalm[j + 1]);
-            ctx.quadraticCurveTo(tierCalm[j + 2], tierCalm[j + 3], tierCalm[j + 4], tierCalm[j + 5]);
+          ctx.lineWidth = w;
+          ctx.strokeStyle = color;
+          for (let j = 0; j < data.length; j += 6) {
+            ctx.moveTo(data[j], data[j + 1]);
+            ctx.quadraticCurveTo(data[j + 2], data[j + 3], data[j + 4], data[j + 5]);
+          }
+          ctx.stroke();
+        });
+      } else if (isTempLayer) {
+        // Authentic Ventusky/Windy Silver-White Advection Ribbons (Zero chromatic clash with temperature field)
+        // 1. Ambient Drift (< 1.0) - Soft translucent silver mist
+        if (tierThermalCryo.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.70;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+          for (let j = 0; j < tierThermalCryo.length; j += 6) {
+            ctx.moveTo(tierThermalCryo[j], tierThermalCryo[j + 1]);
+            ctx.quadraticCurveTo(tierThermalCryo[j + 2], tierThermalCryo[j + 3], tierThermalCryo[j + 4], tierThermalCryo[j + 5]);
           }
           ctx.stroke();
         }
 
-        // 2. Moderate (22-48 km/h) - Broad Flow Ribbon
-        if (tierModerate.length > 0) {
+        // 2. Gentle Flow (1.0 - 2.0) - Translucent silver filament
+        if (tierThermalTemperate.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 3.60;
-          ctx.strokeStyle = modColor;
-          for (let j = 0; j < tierModerate.length; j += 6) {
-            ctx.moveTo(tierModerate[j], tierModerate[j + 1]);
-            ctx.quadraticCurveTo(tierModerate[j + 2], tierModerate[j + 3], tierModerate[j + 4], tierModerate[j + 5]);
+          ctx.lineWidth = 0.85;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.44)';
+          for (let j = 0; j < tierThermalTemperate.length; j += 6) {
+            ctx.moveTo(tierThermalTemperate[j], tierThermalTemperate[j + 1]);
+            ctx.quadraticCurveTo(tierThermalTemperate[j + 2], tierThermalTemperate[j + 3], tierThermalTemperate[j + 4], tierThermalTemperate[j + 5]);
           }
           ctx.stroke();
         }
 
-        // 3. Fresh / Strong (48-78 km/h) - Power Corridor Ribbon
-        if (tierBrisk.length > 0) {
+        // 3. Moderate Corridors (2.0 - 3.6) - Crisp silver silk
+        if (tierThermalWarm.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 5.00;
-          ctx.strokeStyle = briskColor;
-          for (let j = 0; j < tierBrisk.length; j += 6) {
-            ctx.moveTo(tierBrisk[j], tierBrisk[j + 1]);
-            ctx.quadraticCurveTo(tierBrisk[j + 2], tierBrisk[j + 3], tierBrisk[j + 4], tierBrisk[j + 5]);
+          ctx.lineWidth = 1.05;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+          for (let j = 0; j < tierThermalWarm.length; j += 6) {
+            ctx.moveTo(tierThermalWarm[j], tierThermalWarm[j + 1]);
+            ctx.quadraticCurveTo(tierThermalWarm[j + 2], tierThermalWarm[j + 3], tierThermalWarm[j + 4], tierThermalWarm[j + 5]);
           }
           ctx.stroke();
         }
 
-        // 4. Gale / Storm / Cyclone (>= 78 km/h) - Grand Jetstream Banner
-        if (tierStorm.length > 0) {
+        // 4. Jetstream & Gale Corridors (>= 3.6) - Luminous radiant silver
+        if (tierThermalHeat.length > 0) {
           ctx.beginPath();
-          ctx.lineWidth = 6.80;
-          ctx.strokeStyle = stormColor;
-          for (let j = 0; j < tierStorm.length; j += 6) {
-            ctx.moveTo(tierStorm[j], tierStorm[j + 1]);
-            ctx.quadraticCurveTo(tierStorm[j + 2], tierStorm[j + 3], tierStorm[j + 4], tierStorm[j + 5]);
+          ctx.lineWidth = 1.35;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          for (let j = 0; j < tierThermalHeat.length; j += 6) {
+            ctx.moveTo(tierThermalHeat[j], tierThermalHeat[j + 1]);
+            ctx.quadraticCurveTo(tierThermalHeat[j + 2], tierThermalHeat[j + 3], tierThermalHeat[j + 4], tierThermalHeat[j + 5]);
+          }
+          ctx.stroke();
+        }
+      } else if (isAqiLayer) {
+        // AetherAura™ Micro-Aerosol Particulate Streamlines (Mint -> Amber -> Coral -> Crimson)
+        if (tierThermalCryo.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.70;
+          ctx.strokeStyle = 'rgba(16, 185, 129, 0.40)'; // Good: Mint
+          for (let j = 0; j < tierThermalCryo.length; j += 6) {
+            ctx.moveTo(tierThermalCryo[j], tierThermalCryo[j + 1]);
+            ctx.quadraticCurveTo(tierThermalCryo[j + 2], tierThermalCryo[j + 3], tierThermalCryo[j + 4], tierThermalCryo[j + 5]);
+          }
+          ctx.stroke();
+        }
+        if (tierThermalTemperate.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.90;
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)'; // Satisfactory: Amber
+          for (let j = 0; j < tierThermalTemperate.length; j += 6) {
+            ctx.moveTo(tierThermalTemperate[j], tierThermalTemperate[j + 1]);
+            ctx.quadraticCurveTo(tierThermalTemperate[j + 2], tierThermalTemperate[j + 3], tierThermalTemperate[j + 4], tierThermalTemperate[j + 5]);
+          }
+          ctx.stroke();
+        }
+        if (tierThermalWarm.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.15;
+          ctx.strokeStyle = 'rgba(249, 115, 22, 0.75)'; // Moderate: Coral
+          for (let j = 0; j < tierThermalWarm.length; j += 6) {
+            ctx.moveTo(tierThermalWarm[j], tierThermalWarm[j + 1]);
+            ctx.quadraticCurveTo(tierThermalWarm[j + 2], tierThermalWarm[j + 3], tierThermalWarm[j + 4], tierThermalWarm[j + 5]);
+          }
+          ctx.stroke();
+        }
+        if (tierThermalHeat.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.45;
+          ctx.strokeStyle = 'rgba(225, 29, 72, 0.90)'; // Poor/Severe: Crimson
+          for (let j = 0; j < tierThermalHeat.length; j += 6) {
+            ctx.moveTo(tierThermalHeat[j], tierThermalHeat[j + 1]);
+            ctx.quadraticCurveTo(tierThermalHeat[j + 2], tierThermalHeat[j + 3], tierThermalHeat[j + 4], tierThermalHeat[j + 5]);
+          }
+          ctx.stroke();
+        }
+      } else if (styleConfig.geometry === 'thermal') {
+        // Mode 4: Thermal Advection (Cold polar blast vs warm tropical air mass transport)
+        const cryoColor = styleColors?.cryo || 'rgba(56, 189, 248, 0.88)';
+        const temperateColor = styleColors?.temperate || 'rgba(52, 211, 153, 0.90)';
+        const warmColor = styleColors?.warm || 'rgba(251, 191, 36, 0.94)';
+        const heatColor = styleColors?.heat || 'rgba(244, 63, 94, 1.0)';
+
+        // 1. Polar Cold Advection (<5°C) - Glacial Ice Cyan
+        if (tierThermalCryo.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.70;
+          ctx.strokeStyle = cryoColor;
+          for (let j = 0; j < tierThermalCryo.length; j += 6) {
+            ctx.moveTo(tierThermalCryo[j], tierThermalCryo[j + 1]);
+            ctx.quadraticCurveTo(tierThermalCryo[j + 2], tierThermalCryo[j + 3], tierThermalCryo[j + 4], tierThermalCryo[j + 5]);
+          }
+          ctx.stroke();
+        }
+
+        // 2. Temperate Biosphere (5-22°C) - Emerald Jade
+        if (tierThermalTemperate.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.85;
+          ctx.strokeStyle = temperateColor;
+          for (let j = 0; j < tierThermalTemperate.length; j += 6) {
+            ctx.moveTo(tierThermalTemperate[j], tierThermalTemperate[j + 1]);
+            ctx.quadraticCurveTo(tierThermalTemperate[j + 2], tierThermalTemperate[j + 3], tierThermalTemperate[j + 4], tierThermalTemperate[j + 5]);
+          }
+          ctx.stroke();
+        }
+
+        // 3. Subtropical Warm Advection (22-32°C) - Golden Solar Amber
+        if (tierThermalWarm.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.10;
+          ctx.strokeStyle = warmColor;
+          for (let j = 0; j < tierThermalWarm.length; j += 6) {
+            ctx.moveTo(tierThermalWarm[j], tierThermalWarm[j + 1]);
+            ctx.quadraticCurveTo(tierThermalWarm[j + 2], tierThermalWarm[j + 3], tierThermalWarm[j + 4], tierThermalWarm[j + 5]);
+          }
+          ctx.stroke();
+        }
+
+        // 4. Monsoon / Tropical Heat (>32°C) - Terracotta Coral
+        if (tierThermalHeat.length > 0) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.45;
+          ctx.strokeStyle = heatColor;
+          for (let j = 0; j < tierThermalHeat.length; j += 6) {
+            ctx.moveTo(tierThermalHeat[j], tierThermalHeat[j + 1]);
+            ctx.quadraticCurveTo(tierThermalHeat[j + 2], tierThermalHeat[j + 3], tierThermalHeat[j + 4], tierThermalHeat[j + 5]);
           }
           ctx.stroke();
         }
       } else {
-        // Multi-Depth Silk Ribbons:
+        // AeroSilk™ Multi-Depth Silk Ribbons (Ventusky Pure Silk, Windy Dynamic Flow, Aero-Bioluminescence)
+        ctx.setLineDash([]);
+
         // 0. Calm Mist: Ethereal ambient mist in stagnant / calm zones (eliminates pepper dots)
         if (tierCalmMist.length > 0) {
           ctx.beginPath();
@@ -2239,7 +3220,7 @@ export default function CloudburstMap({
           ctx.stroke();
         }
 
-        // 2. Streamlines: Defined fluid flow corridors (soft pearl white)
+        // 2. Streamlines: Defined fluid flow corridors (soft pearl white / gold / violet)
         if (tierMid.length > 0) {
           ctx.beginPath();
           ctx.lineWidth = widthMid;
@@ -2309,6 +3290,7 @@ export default function CloudburstMap({
 
       if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
         setHoverCoords(null);
+        if (onHoverTemp) onHoverTemp(null);
         return;
       }
 
@@ -2320,9 +3302,28 @@ export default function CloudburstMap({
           x,
           y
         });
-      } catch (err) {}
+        if (onHoverTemp && (activeLayer === 'temp' || selectedWeatherLayer === 'temp')) {
+          const t = getCachedPointTemperature(lngLat.lat, lngLat.lng);
+          onHoverTemp(t);
+        }
+        if (selectedWeatherLayer === 'precip') {
+          let foundStation = null;
+          for (let i = 0; i < RADAR_COVERAGE_CENTERS.length; i++) {
+            const st = RADAR_COVERAGE_CENTERS[i];
+            const p = map.project([st.lon, st.lat]);
+            const dist = Math.hypot(x - p.x, y - p.y);
+            if (dist < 26) {
+              foundStation = { station: st, x: p.x, y: p.y };
+              break;
+            }
+          }
+          setHoveredRadarStation(foundStation);
+        } else {
+          setHoveredRadarStation(null);
+        }
+      } catch (err) { }
     });
-  }, []);
+  }, [onHoverTemp, activeLayer, selectedWeatherLayer]);
 
   // Update hover coordinates when user scrolls mouse wheel over the map
   const handleWheel = useCallback((e) => {
@@ -2342,13 +3343,19 @@ export default function CloudburstMap({
           x,
           y
         });
-      } catch (err) {}
+        if (onHoverTemp && (activeLayer === 'temp' || selectedWeatherLayer === 'temp')) {
+          const t = getCachedPointTemperature(lngLat.lat, lngLat.lng);
+          onHoverTemp(t);
+        }
+      } catch (err) { }
     }
-  }, []);
+  }, [onHoverTemp, activeLayer, selectedWeatherLayer]);
 
   const handleMouseLeave = useCallback(() => {
     setHoverCoords(null);
-  }, []);
+    setHoveredRadarStation(null);
+    if (onHoverTemp) onHoverTemp(null);
+  }, [onHoverTemp]);
 
   // Active Tropical Cyclone Systems
   useEffect(() => {
@@ -2359,7 +3366,7 @@ export default function CloudburstMap({
     cycloneMarkersRef.current = [];
 
     // Fetch live cyclones on mount
-    fetchLiveCyclones().catch(() => {});
+    fetchLiveCyclones().catch(() => { });
 
     const updateCycloneMarkers = (cyclones) => {
       cycloneMarkersRef.current.forEach(m => m.remove());
@@ -2418,7 +3425,7 @@ export default function CloudburstMap({
         const pt = map.project([clickedPinRef.current.lon, clickedPinRef.current.lat]);
         setClickedPinScreenPos({ x: pt.x, y: pt.y });
         clickedPinScreenPosRef.current = { x: pt.x, y: pt.y };
-      } catch (err) {}
+      } catch (err) { }
     };
 
     map.on('move', onMapChange);
@@ -2442,6 +3449,50 @@ export default function CloudburstMap({
 
       const sectorName = getSectorName(lng, lat);
       const isIndia = isIndiaSector(lng, lat);
+
+      // AQI station selection on click (Planetary Global Coverage)
+      if (selectedWeatherLayerRef.current === 'aqi') {
+        const entries = aqiDataMap ? Object.values(aqiDataMap) : [];
+        let nearest = null;
+        let minDist = Infinity;
+        for (let i = 0; i < entries.length; i++) {
+          const st = entries[i];
+          const dist = Math.hypot(st.lat - lat, st.lon - lng);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = st;
+          }
+        }
+        if (nearest && minDist < 2.5) {
+          setSelectedAqiStation(nearest);
+        } else {
+          const aqiVal = computeInterpolatedAqi(lng, lat);
+          const cat = getAqiCategory(aqiVal);
+          const pm25 = parseFloat((aqiVal * 0.44).toFixed(1));
+          const pm10 = parseFloat((aqiVal * 0.75).toFixed(1));
+          setSelectedAqiStation({
+            stationId: `probe-${lng.toFixed(2)}-${lat.toFixed(2)}`,
+            name: `${sectorName} (Probe Point)`,
+            state: isIndia ? 'India' : 'Global Ocean / Sector',
+            country: isIndia ? 'India' : 'Global',
+            lat,
+            lon: lng,
+            aqi: aqiVal,
+            category: cat.category,
+            color: cat.color,
+            pm2_5: pm25,
+            pm10: pm10,
+            no2: 14.5,
+            o3: 38.0,
+            dominantPollutant: pm25 > 50 ? 'PM2.5' : 'Ozone',
+            healthAdvice: cat.healthAdvice,
+            maskRecommended: cat.maskRecommended,
+            time: new Date().toISOString(),
+            isEstimated: true
+          });
+        }
+      }
+
       if (onSelectStation) {
         onSelectStation({
           id: `coord-${lng.toFixed(2)}-${lat.toFixed(2)}`,
@@ -2514,7 +3565,7 @@ export default function CloudburstMap({
   };
 
   return (
-    <div 
+    <div
       className="relative w-full h-full overflow-hidden bg-[#02040a] select-none"
       onMouseMove={handleMouseMove}
       onWheel={handleWheel}
@@ -2522,25 +3573,25 @@ export default function CloudburstMap({
 
 
       {/* 1. MapLibre GL JS WebGL Canvas Container */}
-      <div 
-        ref={mapContainerRef} 
+      <div
+        ref={mapContainerRef}
         onMouseMove={handleMouseMove}
         onWheel={handleWheel}
         onMouseLeave={handleMouseLeave}
-        className="relative w-full h-full z-[1]" 
+        className="relative w-full h-full z-[1]"
       />
 
       {tileError && (
         (tileError.scope === 'base' ||
           (tileError.scope === 'map' && tileError.mapView === mapView) ||
           (tileError.scope === 'layer' && tileError.layer === selectedWeatherLayer)) && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="absolute top-14 left-1/2 z-40 -translate-x-1/2 rounded-full border border-amber-300/30 bg-slate-950/90 px-3 py-1.5 text-center text-[11px] font-medium text-amber-100 shadow-xl"
-        >
-          {tileError.message}
-        </div>
+          <div
+            role="status"
+            aria-live="polite"
+            className="absolute top-14 left-1/2 z-40 -translate-x-1/2 rounded-full border border-amber-300/30 bg-slate-950/90 px-3 py-1.5 text-center text-[11px] font-medium text-amber-100 shadow-xl"
+          >
+            {tileError.message}
+          </div>
         )
       )}
 
@@ -2549,40 +3600,171 @@ export default function CloudburstMap({
         ref={particleCanvasRef}
         className="pointer-events-none absolute inset-0 z-[10] w-full h-full transition-opacity duration-150"
         style={{
-          opacity: ((showParticles && windParticleMode !== 'off') || selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp' || selectedWeatherLayer === 'precip')
+          opacity: ((showParticles && windParticleMode !== 'off') || selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'temp' || selectedWeatherLayer === 'precip' || selectedWeatherLayer === 'aqi')
             ? 1
             : 0,
           pointerEvents: 'none'
         }}
       />
 
-      {/* 2.2 Hover Cursor Indicator (Shows coordinates & live radar reflectivity probe) */}
+      {/* 2.2 Windy-Style Interactive Hover Weather Probe & Target Reticle */}
       {hoverCoords && (
         <div
-          className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-[calc(100%+8px)] transition-transform duration-75 select-none"
+          className="pointer-events-none absolute z-[25] -translate-x-1/2 -translate-y-full transition-transform duration-75 select-none"
           style={{
             left: `${hoverCoords.x}px`,
             top: `${hoverCoords.y}px`
           }}
         >
-          <div className="apple-liquid-glass px-2.5 py-1 rounded-lg shadow-lg border border-white/20 bg-slate-950/85 backdrop-blur-md text-slate-200 text-[10px] font-mono tracking-tight flex items-center gap-1.5 whitespace-nowrap">
-            <span>
-              {Math.abs(hoverCoords.lat).toFixed(2)}°{hoverCoords.lat >= 0 ? 'N' : 'S'}, {Math.abs(hoverCoords.lon).toFixed(2)}°{hoverCoords.lon >= 0 ? 'E' : 'W'}
-            </span>
-            {selectedWeatherLayer === 'precip' && (() => {
-              const rainRate = estimateLocalRainRate(hoverCoords.lon, hoverCoords.lat, { cyclones: getActiveCyclones(), cloudburstEvent });
-              const dbz = getLocalRadarDbz(hoverCoords.lon, hoverCoords.lat, rainRate);
-              const probe = getRadarProbeInfo(dbz, rainRate);
-              return (
-                <span className="flex items-center gap-1.5 pl-1.5 border-l border-white/15">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: probe.color }} />
-                  <span style={{ color: probe.color }} className="font-semibold">{probe.label}</span>
-                  {probe.dbz > 0 && <span className="text-slate-400">({probe.dbz} dBZ)</span>}
+          {selectedWeatherLayer === 'wind' ? (() => {
+            const vec = getWindVector(hoverCoords.lon, hoverCoords.lat, 0, 'surface');
+            const speedKmh = Math.round(vec.mag * 13.5);
+            const isKt = windUnit === 'kt';
+            const displaySpeed = isKt ? Math.round(speedKmh * 0.539957) : speedKmh;
+            const speedUnitLabel = isKt ? 'kt' : 'km/h';
+            const compass = getWindDirectionCompass(vec.u, vec.v);
+            const beaufort = getBeaufortScaleInfo(speedKmh);
+            const gustKmh = estimateWindGust(speedKmh, false);
+            const displayGust = isKt ? Math.round(gustKmh * 0.539957) : gustKmh;
+            const color = getWindSpeedColor(speedKmh);
+
+            return (
+              <div className="flex flex-col items-center mb-1">
+                <div
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.5)] text-slate-200"
+                  style={{ boxShadow: `0 4px 18px ${color}33` }}
+                >
+                  {/* Rotating Aerodynamic Wind Arrow */}
+                  <div
+                    className="w-5 h-5 rounded-full flex items-center justify-center bg-white/10 border border-white/20 shadow-sm shrink-0"
+                    title={`Direction: ${compass.cardinal} (${compass.degrees}°)`}
+                  >
+                    <Navigation
+                      className="w-3 h-3 transition-transform duration-75 text-cyan-300"
+                      style={{
+                        transform: `rotate(${compass.degrees}deg)`,
+                        color: color
+                      }}
+                    />
+                  </div>
+
+                  {/* Wind Speed & Unit */}
+                  <div className="flex items-center gap-1.5">
+                    <span style={{ color }} className="text-sm font-bold tracking-tight">
+                      {displaySpeed} {speedUnitLabel}
+                    </span>
+                  </div>
+
+                  <div className="h-3.5 w-px bg-white/20" />
+
+                  {/* Direction & Beaufort Badge */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono text-slate-300">
+                      {compass.cardinal} {compass.degrees}°
+                    </span>
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[9px] font-sans font-medium bg-white/10 whitespace-nowrap"
+                      style={{ color }}
+                    >
+                      F{beaufort.force} · {beaufort.name}
+                    </span>
+                  </div>
+
+                  <div className="h-3.5 w-px bg-white/20" />
+
+                  {/* Estimated Gust */}
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Gust: {displayGust}
+                  </span>
+                </div>
+
+                {/* Pointer Arrow */}
+                <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[5px] border-t-slate-950/90" />
+
+                {/* Target Crosshair Dot with Chromatic Velocity Aura */}
+                <div
+                  className="w-2.5 h-2.5 rounded-full border border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.9)] -mb-1 pointer-events-none"
+                  style={{ backgroundColor: color }}
+                />
+              </div>
+            );
+          })() : selectedWeatherLayer === 'aqi' ? (() => {
+            const aqiVal = computeInterpolatedAqi(hoverCoords.lon, hoverCoords.lat);
+            const cat = getAqiCategory(aqiVal);
+            return (
+              <div className="flex flex-col items-center mb-1">
+                <div
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.5)] text-slate-200"
+                  style={{ boxShadow: `0 4px 20px ${cat.glowColor}` }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full ring-2 ring-white/30 animate-pulse" style={{ backgroundColor: cat.color }} />
+                    <span style={{ color: cat.color }} className="text-sm font-bold tracking-tight">AQI {aqiVal}</span>
+                  </div>
+                  <div className="h-3.5 w-px bg-white/20" />
+                  <span className="text-[11px] font-semibold" style={{ color: cat.color }}>{cat.label}</span>
+                  <div className="h-3.5 w-px bg-white/20" />
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {Math.abs(hoverCoords.lat).toFixed(1)}°{hoverCoords.lat >= 0 ? 'N' : 'S'}, {Math.abs(hoverCoords.lon).toFixed(1)}°{hoverCoords.lon >= 0 ? 'E' : 'W'}
+                  </span>
+                </div>
+                {/* Pointer Arrow */}
+                <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[5px] border-t-slate-950/90" />
+                {/* Target Crosshair Dot with Chromatic Glow */}
+                <div
+                  className="w-2 h-2 rounded-full border border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.9)] -mb-1 pointer-events-none"
+                  style={{ backgroundColor: cat.color }}
+                />
+              </div>
+            );
+          })() : selectedWeatherLayer === 'temp' ? (() => {
+            const tempVal = getLocalTemperature(hoverCoords.lon, hoverCoords.lat);
+            const color = getTempColorHex(tempVal);
+            const cat = getThermalCategory(tempVal);
+            const windKmh = computeGlobalWindSpeed(hoverCoords.lon, hoverCoords.lat);
+            const displayTemp = tempUnit === 'F'
+              ? `${Math.round((tempVal * 9) / 5 + 32)}°F`
+              : `${Math.round(tempVal * 10) / 10}°C`;
+            return (
+              <div className="flex flex-col items-center mb-1">
+                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.5)] text-slate-200">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full ring-2 ring-white/30 animate-pulse" style={{ backgroundColor: color }} />
+                    <span style={{ color }} className="text-sm font-bold tracking-tight">{displayTemp}</span>
+                  </div>
+                  <div className="h-3.5 w-px bg-white/20" />
+                  <span className="text-[11px] font-medium text-slate-300">{cat.label}</span>
+                  <div className="h-3.5 w-px bg-white/20" />
+                  <span className="text-[10px] font-mono text-slate-400">{windKmh} km/h</span>
+                </div>
+                {/* Pointer Arrow */}
+                <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[5px] border-t-slate-950/90" />
+                {/* Target Crosshair Dot */}
+                <div className="w-2 h-2 rounded-full border border-white/90 bg-white/40 shadow-[0_0_6px_rgba(255,255,255,0.9)] -mb-1 pointer-events-none" />
+              </div>
+            );
+          })() : (
+            <div className="flex flex-col items-center mb-1">
+              <div className="apple-liquid-glass px-2.5 py-1 rounded-lg shadow-lg border border-white/20 bg-slate-950/85 backdrop-blur-md text-slate-200 text-[10px] font-mono tracking-tight flex items-center gap-1.5 whitespace-nowrap">
+                <span>
+                  {Math.abs(hoverCoords.lat).toFixed(2)}°{hoverCoords.lat >= 0 ? 'N' : 'S'}, {Math.abs(hoverCoords.lon).toFixed(2)}°{hoverCoords.lon >= 0 ? 'E' : 'W'}
                 </span>
-              );
-            })()}
-          </div>
-          <div className="w-0 h-0 border-x-4 border-x-transparent border-t-[5px] border-t-slate-900/80 mx-auto" />
+                {selectedWeatherLayer === 'precip' && (() => {
+                  const rainRate = estimateLocalRainRate(hoverCoords.lon, hoverCoords.lat, { cyclones: getActiveCyclones(), cloudburstEvent });
+                  const dbz = getLocalRadarDbz(hoverCoords.lon, hoverCoords.lat, rainRate);
+                  const probe = getRadarProbeInfo(dbz, rainRate, radarScheme);
+                  return (
+                    <span className="flex items-center gap-1.5 pl-1.5 border-l border-white/15">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: probe.color }} />
+                      <span style={{ color: probe.color }} className="font-semibold">{probe.label}</span>
+                      {probe.dbz > 0 && <span className="text-slate-400">({probe.dbz} dBZ)</span>}
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="w-0 h-0 border-x-4 border-x-transparent border-t-[5px] border-t-slate-900/80 mx-auto" />
+            </div>
+          )}
         </div>
       )}
 
@@ -2647,75 +3829,262 @@ export default function CloudburstMap({
         </div>
       )}
 
-      {/* 2.5 Weather Overlay Layer Floating Pill Bar */}
-      <div className={`absolute bottom-20 z-20 flex items-center gap-1 apple-liquid-glass px-2.5 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none transition-all duration-300 max-w-[calc(100vw-32px)] overflow-x-auto scrollbar-none ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
-        <span className="px-1 text-[10px] font-mono font-bold text-amber-300 flex items-center gap-1 select-none shrink-0">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden md:inline">Weather:</span>
-        </span>
+      {/* 2.35 Celestial Astrolabe Station Inspection Card (Plan 5.3) */}
+      {selectedWeatherLayer === 'precip' && hoveredRadarStation && (
+        <div
+          className="absolute z-30 pointer-events-none apple-liquid-glass px-3.5 py-2.5 rounded-xl border border-cyan-400/30 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 min-w-[210px]"
+          style={{
+            left: Math.min(window.innerWidth - 240, Math.max(16, hoveredRadarStation.x - 105)),
+            top: Math.max(16, hoveredRadarStation.y - 130)
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[12px] font-bold text-white font-mono">
+                {hoveredRadarStation.station.name}
+              </span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+              {hoveredRadarStation.station.callsign}
+            </span>
+          </div>
 
-        {[
-          { id: 'temp', label: 'Temperature', icon: Thermometer },
-          { id: 'convective', label: 'Cloudburst', icon: Zap },
-          { id: 'precip', label: 'Rain Radar', icon: CloudRain },
-          { id: 'wind', label: 'Wind Speed', icon: Wind },
-        ].map((item) => {
-          const Icon = item.icon;
-          const isActive = selectedWeatherLayer === item.id;
-          const isItemLoading = item.id === 'temp' && isActive && isTempLoading;
-          return (
+          <div className="space-y-1 text-[10px] font-mono text-slate-300">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Radar Type:</span>
+              <span className="text-cyan-200 font-semibold">{hoveredRadarStation.station.band}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Scan Radius:</span>
+              <span className="text-emerald-300 font-semibold">{hoveredRadarStation.station.radius} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Elevation:</span>
+              <span className="text-amber-200">{hoveredRadarStation.station.elev}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Wavelength:</span>
+              <span className="text-indigo-200">{hoveredRadarStation.station.wavelength}</span>
+            </div>
+            <div className="flex justify-between border-t border-white/5 pt-1 mt-1 text-[9px]">
+              <span className="text-slate-400">Polarization:</span>
+              <span className="text-emerald-400 font-bold">Dual-Pol (Z, ZDR)</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2.4 PluviaAtelier™ Floating Radar Playback Dock */}
+      {selectedWeatherLayer === 'precip' && (
+        <div className={`absolute bottom-32 z-20 flex flex-col items-end gap-2 transition-all duration-300 max-w-[calc(100vw-32px)] ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
+          {/* Main Floating Glass Dock Bar */}
+          <div className="flex items-center gap-2 apple-liquid-glass px-3 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none overflow-x-auto scrollbar-none">
+            {/* Play / Pause Toggle Button with Animated Progress Indicator */}
             <button
-              key={item.id}
               type="button"
-              onClick={() => handleSelectWeatherLayer(item.id)}
-              onPointerEnter={() => {
-                if (item.id === 'temp') preloadTemperatureEngine();
-              }}
-              onFocus={() => {
-                if (item.id === 'temp') preloadTemperatureEngine();
-              }}
-              title={`Toggle ${item.label} Overlay`}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer shrink-0 ${
-                isActive
-                  ? 'apple-liquid-glass-amber text-amber-200 border border-amber-400/50 shadow-md scale-105'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10'
-              }`}
+              onClick={() => setIsRadarPlaying(!isRadarPlaying)}
+              title={isRadarPlaying ? 'Pause Radar Loop' : 'Play Radar Loop'}
+              className="relative w-6 h-6 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-white border border-cyan-400/40 flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-sm shrink-0"
             >
-              {isItemLoading ? (
-                <Loader2 className="w-3 h-3 text-amber-300 animate-spin" />
+              {isRadarPlaying ? (
+                <>
+                  <span className="absolute -inset-0.5 rounded-full border border-cyan-400/60 animate-ping opacity-75" />
+                  <Pause className="w-3 h-3 fill-current" />
+                </>
               ) : (
-                <Icon className="w-3 h-3" />
+                <Play className="w-3 h-3 fill-current ml-0.5" />
               )}
-              <span>{item.label}</span>
             </button>
-          );
-        })}
 
-        {selectedWeatherLayer !== 'none' && (
-          <button
-            type="button"
-            onClick={() => handleSelectWeatherLayer('none')}
-            title="Hide all weather overlay layers"
-            aria-label="Hide all weather overlay layers"
-            className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        )}
-        {selectedWeatherLayer === 'convective' && mapView !== 'satellite' && (
-          <span
-            title="Illustrative model output, not an official forecast or warning"
-            className="shrink-0 rounded-full border border-amber-300/30 px-2 py-1 text-[9px] font-semibold text-amber-100"
-          >
-            Illustrative model · not an official forecast
-          </span>
-        )}
-      </div>
+            {/* Step Back Button */}
+            <button
+              type="button"
+              disabled={effectiveFrameIndex <= 0}
+              onClick={() => {
+                setIsRadarPlaying(false);
+                setRadarFrameIndex(Math.max(0, effectiveFrameIndex - 1));
+              }}
+              title="Step to Previous 10m Frame"
+              className="p-1 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer shrink-0"
+            >
+              <SkipBack className="w-3 h-3" />
+            </button>
 
+            {/* Frame Scrubber Slider */}
+            <div className="flex items-center gap-1.5 min-w-[90px] sm:min-w-[120px]">
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, radarFrames.length - 1)}
+                value={effectiveFrameIndex}
+                onChange={(e) => {
+                  setIsRadarPlaying(false);
+                  setRadarFrameIndex(Number(e.target.value));
+                }}
+                title="Scrub Doppler Radar Timeline"
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              />
+            </div>
 
+            {/* Step Forward Button */}
+            <button
+              type="button"
+              disabled={effectiveFrameIndex >= radarFrames.length - 1}
+              onClick={() => {
+                setIsRadarPlaying(false);
+                setRadarFrameIndex(Math.min(radarFrames.length - 1, effectiveFrameIndex + 1));
+              }}
+              title="Step to Next 10m Frame"
+              className="p-1 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer shrink-0"
+            >
+              <SkipForward className="w-3 h-3" />
+            </button>
+
+            {/* Timestamp & Live Badge */}
+            <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10 shrink-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-white tracking-tight">
+                {radarTimestampTime || 'Scanning...'}
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono tabular-nums font-bold border flex items-center gap-1 ${isLatestRadarFrame
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isLatestRadarFrame ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {isLatestRadarFrame ? 'LIVE' : `-${minutesAgo}m`}
+              </span>
+            </div>
+
+            {/* DWR 450km Range Rings Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowRadarRings(!showRadarRings)}
+              title={showRadarRings ? "IMD DWR 450km Range Rings & Astrolabes Visible" : "DWR Range Rings Hidden"}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9.5px] font-mono transition-all cursor-pointer shrink-0 ${showRadarRings
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.25)]'
+                : 'bg-white/5 text-slate-400 hover:text-white border-white/10'
+                }`}
+            >
+              <Compass className="w-3 h-3 text-cyan-400" />
+              <span className="hidden sm:inline">Rings</span>
+            </button>
+
+            {/* Ambient Rain Soundscape Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextMuted = !isThunderMuted;
+                thunderSynth.setMuted(nextMuted);
+                setIsThunderMuted(nextMuted);
+              }}
+              title={isThunderMuted ? "Enable Ambient Rain Soundscape (Binaural Pink Noise & Droplet Clicks)" : "Mute Rain Soundscape"}
+              className={`p-1.5 rounded-full border transition-all cursor-pointer shrink-0 ${!isThunderMuted
+                ? 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.3)]'
+                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                }`}
+            >
+              {!isThunderMuted ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2.47 AetherAura™ Liquid Glass AQI Station Telemetry Modal */}
+      {selectedWeatherLayer === 'aqi' && selectedAqiStation && (
+        <div className="absolute top-20 right-4 z-30 pointer-events-auto glass-panel-translucent p-4 rounded-3xl shadow-2xl border border-white/15 text-white max-w-[320px] w-full animate-fade-in select-none">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2 mb-2 pb-2 border-b border-white/10">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <Wind className="w-4 h-4 text-cyan-400 shrink-0" />
+                <h4 className="font-bold text-sm text-white tracking-tight truncate">{selectedAqiStation.name}</h4>
+              </div>
+              <p className="text-[10px] font-mono text-slate-400">
+                {selectedAqiStation.state || 'Sector'} • {selectedAqiStation.lat.toFixed(2)}°, {selectedAqiStation.lon.toFixed(2)}°
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedAqiStation(null)}
+              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* AQI Score & Category Pill */}
+          <div className="flex items-center justify-between gap-3 mb-2.5 apple-liquid-glass-well p-2.5 rounded-2xl border border-white/10">
+            <div>
+              <span className="text-[10px] font-mono text-slate-400 block uppercase tracking-wider">Air Quality Index</span>
+              <span className="text-2xl font-black font-mono tracking-tight" style={{ color: selectedAqiStation.color }}>
+                {selectedAqiStation.aqi}
+              </span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono border"
+                style={{
+                  backgroundColor: `${selectedAqiStation.color}25`,
+                  borderColor: `${selectedAqiStation.color}60`,
+                  color: selectedAqiStation.color
+                }}
+              >
+                {selectedAqiStation.category}
+              </span>
+              <span className="text-[9px] font-mono text-slate-400 mt-1">
+                Dominant: <strong className="text-white">{selectedAqiStation.dominantPollutant}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Health Advisory & Mask Guidance */}
+          <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-2xl bg-white/[0.04] border border-white/10 text-[10.5px] leading-relaxed text-slate-300">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p>{selectedAqiStation.healthAdvice}</p>
+              {selectedAqiStation.maskRecommended && (
+                <p className="text-amber-300 font-semibold mt-1 flex items-center gap-1">
+                  <span>😷</span> N95 / FFP2 mask advised outdoors
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Pollutant Breakdown Gauges */}
+          <div className="grid grid-cols-2 gap-1.5 mb-2.5 text-[10px] font-mono">
+            <div className="apple-liquid-glass-well p-2 rounded-xl border border-white/10">
+              <span className="text-slate-400 block">PM2.5 (Fine)</span>
+              <span className="font-bold text-white text-xs">{selectedAqiStation.pm2_5} <span className="text-[8px] text-slate-400 font-normal">μg/m³</span></span>
+            </div>
+            <div className="apple-liquid-glass-well p-2 rounded-xl border border-white/10">
+              <span className="text-slate-400 block">PM10 (Coarse)</span>
+              <span className="font-bold text-white text-xs">{selectedAqiStation.pm10} <span className="text-[8px] text-slate-400 font-normal">μg/m³</span></span>
+            </div>
+            <div className="apple-liquid-glass-well p-2 rounded-xl border border-white/10">
+              <span className="text-slate-400 block">NO₂ (Dioxide)</span>
+              <span className="font-bold text-white text-xs">{selectedAqiStation.no2} <span className="text-[8px] text-slate-400 font-normal">μg/m³</span></span>
+            </div>
+            <div className="apple-liquid-glass-well p-2 rounded-xl border border-white/10">
+              <span className="text-slate-400 block">O₃ (Ozone)</span>
+              <span className="font-bold text-white text-xs">{selectedAqiStation.o3} <span className="text-[8px] text-slate-400 font-normal">μg/m³</span></span>
+            </div>
+          </div>
+
+          {/* Sync Freshness Footer */}
+          <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-1.5 border-t border-white/10">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              {selectedAqiStation.isEstimated ? 'Regional Baseline' : 'Copernicus CAMS Live'}
+            </span>
+            <span>Next sync in {aqiMinutesRemaining}m</span>
+          </div>
+        </div>
+      )}
 
       {/* 5. Clean Basic Map Navigation Controls */}
-      <div className={`absolute bottom-8 z-20 flex flex-col gap-1.5 apple-liquid-glass p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 ${isAnalyticsOpen ? 'right-[360px]' : 'right-4'}`}>
+      <div className={`absolute bottom-20 z-20 flex flex-col gap-1.5 glass-panel-translucent p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 ${isAnalyticsOpen ? 'right-[396px]' : 'right-4'}`}>
         <button
           onClick={handleZoomIn}
           title="Zoom In"
@@ -2741,11 +4110,10 @@ export default function CloudburstMap({
             }
           }}
           title={isThunderMuted ? "Enable Muted Thunder Audio" : "Mute Thunder Audio (Currently Active)"}
-          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
-            isThunderMuted 
-              ? 'text-slate-400 hover:text-white hover:bg-white/15' 
-              : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
-          }`}
+          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${isThunderMuted
+            ? 'text-slate-400 hover:text-white hover:bg-white/15'
+            : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+            }`}
         >
           {isThunderMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
         </button>
@@ -2767,21 +4135,140 @@ export default function CloudburstMap({
         </button>
       </div>
 
-      {/* Bottom Left Dynamic Scale Indicator */}
-      <button
-        type="button"
-        onClick={() => setScaleUnit((u) => (u === 'metric' ? 'imperial' : 'metric'))}
-        title={`Click to toggle units (${scaleUnit === 'metric' ? 'Metric: km' : 'Imperial: mi'})`}
-        className="absolute bottom-8 left-4 z-20 flex flex-col gap-1 text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-3 py-1 rounded-full shadow-xl pointer-events-auto select-none border border-white/20 cursor-pointer hover:bg-white/20 transition-all active:scale-95"
-      >
-        <div className="flex items-center gap-2">
-          <span
-            style={{ width: `${scaleInfo.widthPx}px` }}
-            className="h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
-          />
-          <span className="font-semibold whitespace-nowrap">{scaleInfo.label}</span>
+      {/* 2.5 Unified Lower Command Bar: Scale (Left) + Legend (Center) + Weather Selector (Right) */}
+      <div className={`absolute bottom-6 z-20 flex items-center justify-between gap-2 sm:gap-3 pointer-events-none select-none transition-all duration-300 ${isMeteoPanelOpen ? 'left-[400px]' : 'left-4'
+        } ${isAnalyticsOpen ? 'right-[396px]' : 'right-4'
+        }`}>
+        {/* 1. Left: Dynamic Map Scale Indicator */}
+        <div className="pointer-events-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setScaleUnit((u) => (u === 'metric' ? 'imperial' : 'metric'))}
+            title={`Click to toggle units (${scaleUnit === 'metric' ? 'Metric: km' : 'Imperial: mi'})`}
+            className="flex items-center gap-1.5 sm:gap-2 text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-2.5 py-1.5 sm:px-3 rounded-full shadow-xl cursor-pointer hover:bg-white/20 transition-all active:scale-95 border border-white/20 shrink-0"
+          >
+            <span
+              style={{ width: `${scaleInfo.widthPx}px` }}
+              className="h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
+            />
+            <span className="font-semibold whitespace-nowrap">{scaleInfo.label}</span>
+          </button>
         </div>
-      </button>
+
+        {/* 2. Center: Active Weather Variable Legend Bar */}
+        <div className="pointer-events-auto shrink-0 flex items-center justify-center">
+          {selectedWeatherLayer === 'aqi' ? (
+            <AqiLegendBar
+              minutesRemaining={aqiMinutesRemaining}
+              isLoading={isAqiLoading}
+              activeFilter={aqiCategoryFilter}
+              onSelectCategory={setAqiCategoryFilter}
+              hoveredAqi={hoverCoords ? computeInterpolatedAqi(hoverCoords.lon, hoverCoords.lat) : null}
+              onForceRefresh={async () => {
+                setIsAqiLoading(true);
+                try {
+                  const fresh = await getLiveAirQualityNetwork(null, true);
+                  setAqiDataMap(fresh);
+                  setAqiMinutesRemaining(getAqiCacheMinutesRemaining());
+                } catch (e) {
+                  console.warn(e);
+                } finally {
+                  setIsAqiLoading(false);
+                }
+              }}
+            />
+          ) : selectedWeatherLayer === 'precip' ? (
+            (() => {
+              const activePalette = RADAR_ART_PALETTES.find((p) => p.id === radarScheme) || RADAR_ART_PALETTES[0];
+              const stops = activePalette.stops || RADAR_DBZ_STOPS;
+              const gradientCss = `linear-gradient(to right, ${stops.map((s, idx) => `${s.color} ${(idx / (stops.length - 1)) * 100}%`).join(', ')})`;
+
+              return (
+                <div className="flex items-center gap-2 sm:gap-3 glass-panel-translucent px-3 sm:px-4 py-1.5 rounded-full shadow-2xl border border-white/20 select-none overflow-x-auto scrollbar-none">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-white shrink-0">
+                    <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="hidden sm:inline">Rain Intensity:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[9.5px] font-sans font-medium text-cyan-300">Light</span>
+                    <div
+                      className="relative w-20 sm:w-32 h-2.5 rounded-full shadow-inner border border-black/40 ring-1 ring-white/15 overflow-hidden"
+                      style={{ background: gradientCss }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-black/30 pointer-events-none" />
+                    </div>
+                    <span className="text-[9.5px] font-sans font-bold text-rose-300">Torrent</span>
+                  </div>
+                  <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-white/10 text-[9.5px] font-mono tabular-nums shrink-0">
+                    {stops.map((st) => (
+                      <div key={st.dbz} className="flex items-center gap-1" title={`${st.desc} (${st.label} dBZ)`}>
+                        <span className="w-2.5 h-2.5 rounded-full shadow-sm ring-1 ring-white/25 shrink-0" style={{ backgroundColor: st.color }} />
+                        <span className="text-slate-200 font-semibold">{st.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
+          ) : (selectedWeatherLayer === 'temp' || selectedWeatherLayer === 'wind' || selectedWeatherLayer === 'convective') ? (
+            <TemperatureLegendBar
+              activeLayer={selectedWeatherLayer}
+              tempUnit={tempUnit}
+              onToggleTempUnit={onToggleTempUnit}
+              windUnit={windUnit}
+              onToggleWindUnit={() => setWindUnit((prev) => (prev === 'km/h' ? 'kt' : 'km/h'))}
+              hoveredTemp={hoverCoords ? getCachedPointTemperature(hoverCoords.lat, hoverCoords.lon) : null}
+            />
+          ) : null}
+        </div>
+
+        {/* 3. Right: Weather Overlay Layer Floating Pill Bar */}
+        <div className="pointer-events-auto shrink-0">
+          <div className="flex items-center gap-1 glass-panel-translucent px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full shadow-2xl border border-white/20 select-none overflow-x-auto scrollbar-none">
+            <span className="px-1 text-[10px] font-mono font-bold text-amber-300 select-none shrink-0 hidden xl:inline">
+              Weather:
+            </span>
+
+            {[
+              { id: 'temp', label: 'Temperature', short: 'Temp', icon: Thermometer },
+              { id: 'convective', label: 'Cloudburst', short: 'Cloudburst', icon: Zap },
+              { id: 'precip', label: 'Rain Radar', short: 'Radar', icon: CloudRain },
+              { id: 'wind', label: 'Wind Speed', short: 'Wind', icon: Wind },
+              { id: 'aqi', label: 'Air Quality', short: 'AQI', icon: Activity },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = selectedWeatherLayer === item.id;
+              const isItemLoading = (item.id === 'temp' && isActive && isTempLoading) || (item.id === 'aqi' && isActive && isAqiLoading);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectWeatherLayer(isActive ? 'none' : item.id)}
+                  onPointerEnter={() => {
+                    if (item.id === 'temp') preloadTemperatureEngine();
+                  }}
+                  onFocus={() => {
+                    if (item.id === 'temp') preloadTemperatureEngine();
+                  }}
+                  title={`Toggle ${item.label} Overlay`}
+                  className={`flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10px] font-bold transition-all cursor-pointer shrink-0 ${isActive
+                    ? 'apple-liquid-glass-cyan text-cyan-200 border border-cyan-400/50 shadow-md scale-105'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    }`}
+                >
+                  {isItemLoading ? (
+                    <Loader2 className="w-3 h-3 text-cyan-300 animate-spin" />
+                  ) : (
+                    <Icon className="w-3 h-3" />
+                  )}
+                  <span className="hidden md:inline">{item.label}</span>
+                  <span className="md:hidden">{item.short}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

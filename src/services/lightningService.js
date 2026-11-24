@@ -68,6 +68,9 @@ class MutedThunderSynthesizer {
 
   setMuted(muted) {
     this.muted = Boolean(muted);
+    if (this.muted) {
+      this.stopRainDrone();
+    }
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem('burstwatch_thunder_muted', this.muted ? 'true' : 'false');
     }
@@ -189,13 +192,18 @@ class MutedThunderSynthesizer {
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(650, ctx.currentTime);
+      filter.frequency.setValueAtTime(750, ctx.currentTime);
+
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.setValueAtTime(140, ctx.currentTime);
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
       gain.gain.setTargetAtTime(Math.min(0.18, 0.04 + intensity * 0.10), ctx.currentTime, 1.0);
 
-      whiteNoise.connect(filter);
+      whiteNoise.connect(highpass);
+      highpass.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
 
@@ -203,22 +211,63 @@ class MutedThunderSynthesizer {
       this.rainNode = whiteNoise;
       this.rainGain = gain;
       this.rainFilter = filter;
+      this.rainHighpass = highpass;
+
+      // Micro-droplet generative click schedule
+      this.startDropletClicks();
     } catch (e) {}
   }
 
+  startDropletClicks() {
+    if (this.dropletInterval) clearInterval(this.dropletInterval);
+    this.dropletInterval = setInterval(() => {
+      if (this.muted || !this.rainNode || !this.ctx) return;
+      try {
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        const freq = 1600 + Math.random() * 1200;
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.025);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.006 + Math.random() * 0.005, t + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+        osc.connect(g);
+        g.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.028);
+      } catch {
+        // Ignore audio playback error
+      }
+    }, 320);
+  }
+
   stopRainDrone() {
+    if (this.dropletInterval) {
+      clearInterval(this.dropletInterval);
+      this.dropletInterval = null;
+    }
     if (this.rainGain && this.ctx) {
       try {
         this.rainGain.gain.setTargetAtTime(0.001, this.ctx.currentTime, 0.3);
         setTimeout(() => {
           if (this.rainNode) {
-            try { this.rainNode.stop(); this.rainNode.disconnect(); } catch (e) {}
+            try { 
+              this.rainNode.stop(); 
+              this.rainNode.disconnect(); 
+            } catch {
+              // Ignore cleanup error
+            }
             this.rainNode = null;
             this.rainGain = null;
             this.rainFilter = null;
+            this.rainHighpass = null;
           }
         }, 400);
-      } catch (e) {}
+      } catch {
+        // Ignore stop error
+      }
     }
   }
 }

@@ -104,7 +104,7 @@ export default function CloudburstEventCard({
                   ML Backend Unreachable
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  http://localhost:8000
+                  http://localhost:8001
                 </span>
               </div>
               <button
@@ -131,7 +131,7 @@ export default function CloudburstEventCard({
                   The dashboard is connected directly to the Dual-Engine ML service (LightGBM + XGBoost). Zero hardcoded preset scenarios are in use.
                 </p>
                 <div className="mt-2.5 p-2 rounded-lg bg-black/60 border border-white/10 font-mono text-[10px] text-rose-300 break-all">
-                  {event.error || 'Connection refused at http://localhost:8000'}
+                  {event.error || 'Connection refused at http://localhost:8001'}
                 </div>
               </div>
 
@@ -142,7 +142,7 @@ export default function CloudburstEventCard({
                   To start the backend ML service:
                 </span>
                 <code className="bg-black/60 border border-white/10 p-1.5 rounded text-[10px] font-mono text-cyan-300 select-all">
-                  uvicorn app.main:create_app --factory --port 8000
+                  uvicorn app.main:create_app --factory --port 8001
                 </code>
               </div>
 
