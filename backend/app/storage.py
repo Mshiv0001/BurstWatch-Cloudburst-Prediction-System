@@ -60,11 +60,17 @@ CREATE TABLE IF NOT EXISTS subscribers (
     verification_code TEXT,
     token_expires_at TEXT,
     attempts INTEGER NOT NULL DEFAULT 0,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
     unsubscribe_token TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL,
     verified_at TEXT,
+    last_login_at TEXT,
     last_alert_sent_at TEXT,
-    location_pref TEXT DEFAULT 'ALL'
+    location_pref TEXT DEFAULT 'ALL',
+    auth_provider TEXT DEFAULT 'email',
+    name TEXT DEFAULT '',
+    picture TEXT DEFAULT '',
+    min_threshold_mm REAL DEFAULT 50.0
 );
 CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers(email);
 CREATE INDEX IF NOT EXISTS idx_subscribers_status ON subscribers(status);
@@ -84,6 +90,20 @@ class Store:
         with self._conn() as c:
             c.execute("PRAGMA journal_mode=WAL")
             c.executescript(SCHEMA)
+            # Safe non-destructive column migration for existing tables
+            cols = {row["name"] for row in c.execute("PRAGMA table_info(subscribers)").fetchall()}
+            if "auth_provider" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN auth_provider TEXT DEFAULT 'email'")
+            if "name" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN name TEXT DEFAULT ''")
+            if "picture" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN picture TEXT DEFAULT ''")
+            if "failed_attempts" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0")
+            if "last_login_at" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN last_login_at TEXT")
+            if "min_threshold_mm" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN min_threshold_mm REAL DEFAULT 50.0")
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:

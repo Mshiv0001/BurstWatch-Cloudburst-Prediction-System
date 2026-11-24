@@ -75,6 +75,7 @@ class Settings:
     smtp_tls: bool
     smtp_ssl: bool
     email_dev_mode: bool
+    jwt_secret: str = "burstwatch-session-secret-key-2026"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -114,4 +115,5 @@ class Settings:
             smtp_tls=_bool("SMTP_TLS", True),
             smtp_ssl=_bool("SMTP_SSL", False),
             email_dev_mode=_bool("EMAIL_DEV_MODE", not bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER"))),
+            jwt_secret=os.getenv("JWT_SECRET", "burstwatch-session-secret-key-2026"),
         )

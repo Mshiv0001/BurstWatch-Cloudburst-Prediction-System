@@ -61,8 +61,14 @@ class SubscriberUnsubscribeRequest(BaseModel):
 
 
 class SubscriberGoogleAuthRequest(BaseModel):
-    credential: str = Field(..., min_length=10, description="Google OAuth2 ID token JWT")
+    credential: str = Field(..., min_length=5, description="Google OAuth2 ID token JWT or simulated developer credential")
     location_pref: Optional[str] = Field("ALL", description="Location preference")
+
+
+class SubscriberPreferencesRequest(BaseModel):
+    email: Optional[str] = None
+    location_pref: Optional[str] = None
+    min_threshold_mm: Optional[float] = Field(None, ge=10.0, le=300.0)
 
 
 class EmailBroadcastRequest(BaseModel):

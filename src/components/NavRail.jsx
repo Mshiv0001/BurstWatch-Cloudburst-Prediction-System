@@ -73,7 +73,7 @@ export default function NavRail({
               title={item.label}
               className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
                 isActive
-                  ? 'apple-liquid-glass-cyan text-cyan-200 border border-cyan-400/50 shadow-[0_0_12px_rgba(56,189,248,0.35)] scale-105'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-transparent'
                   : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
               }`}
             >
@@ -109,7 +109,7 @@ export default function NavRail({
               title={layer.label}
               className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
                 isActive
-                  ? 'apple-liquid-glass-cyan text-cyan-200 border border-cyan-400/50 shadow-[0_0_12px_rgba(56,189,248,0.35)] scale-105'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-transparent'
                   : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
               }`}
             >
@@ -140,10 +140,10 @@ export default function NavRail({
           whileTap={{ scale: 0.94 }}
           onClick={onToggleSatellite}
           title={isSatellite ? "Satellite View Active (Click to switch to Default Map)" : "Switch to High-Resolution Satellite Imagery"}
-          className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
+          className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
             isSatellite
-              ? 'apple-liquid-glass-emerald text-emerald-300 border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.35)] scale-105'
-              : 'text-slate-400 hover:text-white hover:bg-white/15 border-transparent'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-transparent'
+              : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
           }`}
         >
           <Satellite className={`w-4.5 h-4.5 ${isSatellite ? 'text-emerald-300 animate-pulse' : ''}`} />
@@ -165,10 +165,10 @@ export default function NavRail({
           whileTap={{ scale: 0.94 }}
           onClick={onOpenEmailModal}
           title={isEmailSubscribed ? "Email Weather Alerts Active (Click to manage)" : "Subscribe to Real-Time Weather Alerts"}
-          className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
+          className={`relative group w-10 h-10 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
             isEmailSubscribed
-              ? 'apple-liquid-glass-emerald text-emerald-300 border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.35)] scale-105'
-              : 'text-slate-400 hover:text-white hover:bg-white/15 border-transparent'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-transparent'
+              : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
           }`}
         >
           <Bell className={`w-4.5 h-4.5 ${isEmailSubscribed ? 'text-emerald-300 animate-pulse' : ''}`} />
