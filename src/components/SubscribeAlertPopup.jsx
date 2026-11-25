@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BellRing, Sparkles, X, ArrowRight } from 'lucide-react';
+import { BellRing, X, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DISMISSED_KEY = 'burstwatch_subscribe_popup_dismissed';
@@ -75,12 +75,9 @@ export default function SubscribeAlertPopup({
                 <BellRing className="w-4.5 h-4.5 animate-pulse" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight">
-                    Subscribe to Alert Service
-                  </h4>
-                  <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />
-                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight">
+                  Subscribe to Alert Service
+                </h4>
                 <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
                   Get instant email &amp; cloudburst threshold alerts tailored to your region.
                 </p>

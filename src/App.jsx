@@ -93,6 +93,7 @@ export default function App() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isPermissionPromptOpen, setIsPermissionPromptOpen] = useState(false);
   const [isAlertsPanelOpen, setIsAlertsPanelOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => getLocalSubscription());
   const [isEmailSubscribed, setIsEmailSubscribed] = useState(() => getLocalSubscription().isVerified);
@@ -655,6 +656,14 @@ export default function App() {
           <NavRail
             activeNav={activeNav}
             onSelectNav={handleSelectNav}
+            openNavIds={[
+              ...(!isRankingsOpen && !isAnalyticsOpen && !isMeteoPanelOpen ? ['home'] : []),
+              ...(activeNav === 'dashboard' && isAnalyticsOpen ? ['dashboard'] : []),
+              ...(isRankingsOpen ? ['rankings'] : []),
+              ...(isAnalyticsOpen ? ['analytics'] : []),
+              ...(isMeteoPanelOpen ? ['meteo'] : []),
+            ]}
+            isAlertsOpen={isAlertsPanelOpen || isEmailModalOpen}
             activeLayer={activeLayer}
             onChangeActiveLayer={(layer) => {
               setActiveLayer(layer);
@@ -678,6 +687,9 @@ export default function App() {
             isEmailSubscribed={isEmailSubscribed}
             userProfile={userProfile}
             isMlLive={activeCloudburstEvent?.isLive === true}
+            isMlStale={activeCloudburstEvent?.isStale === true}
+            mlStaleMinutes={activeCloudburstEvent?.staleMinutes ?? null}
+            mlStaleReason={activeCloudburstEvent?.staleReason ?? null}
             isMlRetrying={isMlRetrying}
             onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
             mlError={activeCloudburstEvent?.error}
@@ -780,12 +792,16 @@ export default function App() {
       />
 
       {/* 4. Native Browser Location & Notification Permission Prompt */}
-      <PermissionPrompt onLocationAcquired={(coords) => setUserLocation(coords)} />
+      <PermissionPrompt
+        onLocationAcquired={(coords) => setUserLocation(coords)}
+        onVisibilityChange={setIsPermissionPromptOpen}
+        hasLeftDrawerOpen={!isHomeView && (isMeteoPanelOpen || activeLayer === 'precip')}
+      />
 
       {/* 4b. Notification Service Subscription Popup */}
       <SubscribeAlertPopup
         isSubscribed={isEmailSubscribed}
-        isModalOpen={isAlertsPanelOpen || isEmailModalOpen || showIntro}
+        isModalOpen={isAlertsPanelOpen || isEmailModalOpen || showIntro || isPermissionPromptOpen}
         hasLeftDrawerOpen={!isHomeView && (isMeteoPanelOpen || activeLayer === 'precip')}
         onSubscribeClick={() => setIsAlertsPanelOpen(true)}
       />

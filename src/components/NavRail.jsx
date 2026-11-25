@@ -32,6 +32,8 @@ import FpsCounter from './FpsCounter';
 export default function NavRail({
   activeNav = 'dashboard',
   onSelectNav,
+  openNavIds = null,
+  isAlertsOpen = false,
   activeLayer = 'convective',
   onChangeActiveLayer,
   isSatellite = false,
@@ -40,6 +42,9 @@ export default function NavRail({
   isEmailSubscribed = false,
   userProfile = null,
   isMlLive = false,
+  isMlStale = false,
+  mlStaleMinutes = null,
+  mlStaleReason = null,
   isMlRetrying = false,
   onRefreshMlStatus = null,
   mlError = null
@@ -72,7 +77,9 @@ export default function NavRail({
       <div className="flex flex-col items-center gap-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeNav === item.id;
+          const isActive = Array.isArray(openNavIds)
+            ? openNavIds.includes(item.id)
+            : activeNav === item.id;
           return (
             <motion.button
               key={item.id}
@@ -89,11 +96,7 @@ export default function NavRail({
                 }`}
             >
               {isActive && (
-                <motion.span
-                  layoutId="navRailActiveNavPill"
-                  transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                  className="absolute inset-0 rounded-full bg-cyan-500/20 border border-cyan-400/35 shadow-[0_0_12px_rgba(34,211,238,0.22)]"
-                />
+                <span className="absolute inset-0 rounded-full bg-cyan-500/25 border border-cyan-400/45 shadow-[0_0_12px_rgba(34,211,238,0.28)]" />
               )}
               <Icon className="relative z-10 w-4 h-4" />
 
@@ -193,9 +196,12 @@ export default function NavRail({
           whileTap={{ scale: 0.94 }}
           onClick={onOpenEmailModal}
           title={isEmailSubscribed ? `Email Weather Alerts Active (${userProfile?.email || 'Verified'})` : "Subscribe to Real-Time Weather Alerts"}
-          className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${isEmailSubscribed
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
+          className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
+            isAlertsOpen
+              ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/45 shadow-[0_0_12px_rgba(34,211,238,0.28)]'
+              : isEmailSubscribed
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/15 border border-transparent'
             }`}
         >
           {userProfile?.picture ? (
@@ -235,26 +241,46 @@ export default function NavRail({
           onClick={onRefreshMlStatus}
           disabled={isMlRetrying}
           title={
-            isMlLive
+            isMlLive && !isMlStale
               ? 'Physics-Informed Dual-Engine ML Model: LIVE (Click to refresh status)'
-              : `Dual-Engine ML Model: OFFLINE (${mlError || 'Cannot reach localhost:8001'}) - Click to retry`
+              : isMlStale
+                ? `Dual-Engine ML Model: STALE — forecast from ${mlStaleMinutes ?? '?'} min ago (${mlStaleReason || 'API quota limit'}) - Click to retry`
+                : `Dual-Engine ML Model: OFFLINE (${mlError || 'ML service unreachable'}) - Click to retry`
           }
           className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer select-none border border-transparent ${isMlRetrying
               ? 'bg-white/10 text-slate-200'
-              : isMlLive
+              : isMlLive && !isMlStale
                 ? 'bg-emerald-500/20 text-emerald-300'
-                : 'bg-rose-500/20 text-rose-300'
+                : isMlStale
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-rose-500/20 text-rose-300'
             }`}
         >
           {isMlRetrying ? (
             <RefreshCw className="w-4 h-4 animate-spin text-slate-200" />
           ) : (
-            <Cpu className={`w-4 h-4 ${isMlLive ? 'text-emerald-300' : 'text-rose-300'}`} />
+            <Cpu className={`w-4 h-4 ${
+              isMlLive && !isMlStale
+                ? 'text-emerald-300'
+                : isMlStale
+                  ? 'text-amber-300'
+                  : 'text-rose-300'
+            }`} />
+          )}
+
+          {isMlStale && !isMlRetrying && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 ring-1 ring-black/40" />
           )}
 
           {/* Tooltip */}
           <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full apple-liquid-glass text-white text-[11px] font-medium tracking-normal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity border border-white/20 shadow-2xl z-50">
-            {isMlRetrying ? 'Checking ML Engine...' : isMlLive ? 'ML LIVE (Click to refresh)' : 'ML OFFLINE (Click to retry)'}
+            {isMlRetrying
+              ? 'Checking ML Engine...'
+              : isMlLive && !isMlStale
+                ? 'ML LIVE (Click to refresh)'
+                : isMlStale
+                  ? `ML STALE — forecast from ${mlStaleMinutes ?? '?'} min ago (API quota limit). Click to retry.`
+                  : 'ML OFFLINE (Click to retry)'}
           </span>
         </motion.button>
 

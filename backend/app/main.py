@@ -253,14 +253,15 @@ def create_app(settings: Optional[Settings] = None,
             result = svc.predict_location(
                 payload.latitude, payload.longitude, payload.feature_date, payload.source
             )
-            app_cache.set("predict_location", cache_key, result, ttl_seconds=600.0)
+            if not result.get("stale", False):
+                app_cache.set("predict_location", cache_key, result, ttl_seconds=900.0)
             return result
         except InsufficientDataError as exc:
             raise HTTPException(422, str(exc))
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except WeatherError as exc:
-            logger.error("Weather provider error for requested coordinates: %s", exc)
+            logger.warning("No stale prediction available for 429/weather fallback: %s", exc)
             raise HTTPException(502, "Weather data unavailable.")
 
     @app.get("/metrics/live", tags=["evaluation"])

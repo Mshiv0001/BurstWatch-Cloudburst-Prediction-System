@@ -96,7 +96,7 @@ export default function GoogleAuthButton({
       className="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 border border-white/20 text-slate-900 text-xs font-bold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md active:scale-98 disabled:opacity-50"
     >
       {GOOGLE_G_ICON}
-      <span>Continue with Google (Demo — set VITE_GOOGLE_CLIENT_ID)</span>
+      <span>Continue with Google</span>
     </button>
   );
 }

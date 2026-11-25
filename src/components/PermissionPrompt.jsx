@@ -9,9 +9,13 @@ import {
 
 const DISMISSED_KEY = 'burstwatch_alert_permission_dismissed';
 
-export default function PermissionPrompt({ onLocationAcquired }) {
+export default function PermissionPrompt({ onLocationAcquired, onVisibilityChange, hasLeftDrawerOpen = false }) {
   const [isVisible, setIsVisible] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle' | 'requesting' | 'granted'
+
+  useEffect(() => {
+    onVisibilityChange?.(isVisible);
+  }, [isVisible, onVisibilityChange]);
 
   useEffect(() => {
     // Check if user has already dismissed or handled permission
@@ -64,7 +68,9 @@ export default function PermissionPrompt({ onLocationAcquired }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
         transition={{ duration: 0.3 }}
-        className="fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-24 left-[62px] right-2.5 sm:right-auto sm:left-24 z-40 sm:max-w-sm sm:w-full select-none"
+        className={`fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-24 left-[62px] right-2.5 sm:right-auto z-40 sm:max-w-sm sm:w-full select-none transition-all duration-300 ${
+          hasLeftDrawerOpen ? 'sm:left-20 lg:left-[428px]' : 'sm:left-20'
+        }`}
       >
         <div className="apple-liquid-glass rounded-3xl p-5 shadow-2xl text-slate-100 flex flex-col gap-3.5 relative border border-white/20">
           <button

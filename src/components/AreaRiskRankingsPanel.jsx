@@ -290,11 +290,7 @@ export default function AreaRiskRankingsPanel({
               <span>Model is offline, cannot calculate risk percentage</span>
             </div>
             <p className="text-[10.5px] text-slate-300 mt-1 leading-snug">
-              Prediction engine at{' '}
-              <code className="font-mono text-cyan-300 text-[10px] bg-black/40 px-1.5 py-0.5 rounded-full border border-white/10">
-                http://localhost:8001
-              </code>{' '}
-              is offline. No synthetic or fake percentages are shown.
+              The ML prediction service is currently unreachable. No synthetic or fake percentages are shown.
             </p>
           </div>
         ) : topScoredArea && (

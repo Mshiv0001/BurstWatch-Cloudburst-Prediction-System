@@ -108,8 +108,12 @@ export async function predictLocationML(lat, lon, source = 'auto') {
         : prob * 100
     );
 
+    const isStale = Boolean(data.stale);
     const result = {
-      isLive: true,
+      isLive: !isStale,
+      isStale,
+      staleMinutes: data.stale_minutes ?? null,
+      staleReason: data.stale_reason ?? null,
       probability: prob,
       riskPercent,
       cri: data.convective_risk_index_cri ?? 0,
@@ -126,8 +130,10 @@ export async function predictLocationML(lat, lon, source = 'auto') {
       timestamp: now
     };
 
-    predictionCache.set(key, { timestamp: now, data: result });
-    setCachedMLPrediction(lat, lon, result, CACHE_TTL_MINUTES);
+    if (!isStale) {
+      predictionCache.set(key, { timestamp: now, data: result });
+      setCachedMLPrediction(lat, lon, result, CACHE_TTL_MINUTES);
+    }
     return result;
 
   } catch (err) {

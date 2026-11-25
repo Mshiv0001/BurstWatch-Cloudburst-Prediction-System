@@ -77,6 +77,17 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(r.status_code, 502)
         self.assertIn("Weather data unavailable", r.json()["detail"])
 
+    def test_location_prediction_serves_stale_when_weather_fails_with_prior_prediction(self):
+        self.client.post("/predictions/run", json={}, headers=self.h)
+        self.svc.weather = FakeWeather(None, fail=True)
+        r = self.client.post("/predict/location", json={"latitude": 30.3, "longitude": 78.0})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["stale"])
+        self.assertIsNotNone(body["stale_minutes"])
+        self.assertGreaterEqual(body["stale_minutes"], 0)
+        self.assertIn("stale_reason", body)
+
     def test_outcome_and_metrics(self):
         self.client.post("/predictions/run", json={}, headers=self.h)
         r = self.client.put("/outcomes/2026-07-16", json={"observed_max_rainfall_mm": 72}, headers=self.h)

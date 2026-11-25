@@ -12,7 +12,7 @@ from .config import Settings
 from .features import FeaturePlan, compute_daily_features
 from .model_service import ModelService
 from .storage import Store, utcnow
-from .weather import OpenMeteoClient
+from .weather import OpenMeteoClient, WeatherError
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,34 @@ class ForecastService:
             if day > today:
                 raise ValueError(f"feature_date {day} is in the future (today is {today}).")
 
-            feats, used, terrain = self._features_for(day, source, lat=latitude, lon=longitude)
+            try:
+                feats, used, terrain = self._features_for(day, source, lat=latitude, lon=longitude)
+            except WeatherError as exc:
+                cached_pred = self.store.latest_prediction()
+                if cached_pred:
+                    age_minutes = 0
+                    created_raw = cached_pred.get("created_at")
+                    if isinstance(created_raw, str):
+                        try:
+                            created_dt = dt.datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+                            if created_dt.tzinfo is None:
+                                created_dt = created_dt.replace(tzinfo=dt.timezone.utc)
+                            age_minutes = max(
+                                0,
+                                int((dt.datetime.now(dt.timezone.utc) - created_dt).total_seconds() / 60),
+                            )
+                        except ValueError:
+                            age_minutes = 0
+                    return {
+                        **cached_pred,
+                        "coordinates": [latitude, longitude],
+                        "location": {"latitude": latitude, "longitude": longitude},
+                        "stale": True,
+                        "stale_minutes": age_minutes,
+                        "stale_reason": str(exc),
+                    }
+                raise
+
             result = self.model.predict(feats)
             warns = list(result.get("warnings", []))
             if (latitude, longitude) != (self.settings.latitude, self.settings.longitude):
@@ -109,6 +136,9 @@ class ForecastService:
                 "target_date": (day + dt.timedelta(days=1)).isoformat(),
                 "data_source": used,
                 "warnings": warns,
+                "stale": False,
+                "stale_minutes": None,
+                "stale_reason": None,
             }
 
     def run_job(self) -> None:

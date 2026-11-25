@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from time import monotonic
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -40,6 +41,10 @@ class OpenMeteoClient:
         self._sleep = sleep
         self._terrain_cache_path = Path(self.s.db_path).parent / "cache" / "terrain_cache.json"
         system_cache.register_disk_namespace("terrain", self._terrain_cache_path, ttl_seconds=86400.0)
+        self._quota_reset_at: float = 0.0
+        self._QUOTA_BACKOFF_SECONDS = 60
+        self._forecast_ns = "forecast_hourly"
+        self._forecast_stale_ns = "forecast_hourly_stale"
 
     def choose_source(self, day: dt.date, source: str, today: dt.date) -> str:
         if source in ("forecast", "archive"):
@@ -95,9 +100,22 @@ class OpenMeteoClient:
         used = self.choose_source(day, source, today)
         url = self.s.openmeteo_forecast_url if used == "forecast" else self.s.openmeteo_archive_url
 
+        eff_lat = self.s.latitude if latitude is None else latitude
+        eff_lon = self.s.longitude if longitude is None else longitude
+
+        # Build cache key and check fresh (15m) + stale (6h) caches
+        cache_key = f"{eff_lat:.4f}_{eff_lon:.4f}_{day.isoformat()}_{used}"
+        fresh_entry = system_cache.get(self._forecast_ns, cache_key)
+        stale_entry = system_cache.get(self._forecast_stale_ns, cache_key)
+
+        # Fresh cache hit when not under quota backoff
+        if monotonic() >= self._quota_reset_at and fresh_entry is not None:
+            cached_df, cached_source = fresh_entry
+            return cached_df, cached_source
+
         params = {
-            "latitude": self.s.latitude if latitude is None else latitude,
-            "longitude": self.s.longitude if longitude is None else longitude,
+            "latitude": eff_lat,
+            "longitude": eff_lon,
             "hourly": ",".join(self.variables),
             "start_date": day.isoformat(),
             "end_date": day.isoformat(),
@@ -112,6 +130,9 @@ class OpenMeteoClient:
             params["apikey"] = self.s.openmeteo_api_key
 
         try:
+            if monotonic() < self._quota_reset_at:
+                raise WeatherError("Open-Meteo IP quota exceeded (HTTP 429) — quota backoff active")
+
             payload = self._get_json(url, params)
             hourly = payload.get("hourly") or {}
             times = hourly.get("time")
@@ -123,15 +144,27 @@ class OpenMeteoClient:
             absent = [v for v in self.variables if v not in df.columns]
             if absent:
                 logger.warning("Open-Meteo (%s) did not return: %s", used, absent)
+
+            # Successful fetch: store in fresh (15m) + stale (6h) caches and reset quota backoff
+            system_cache.set(self._forecast_ns, cache_key, (df, used), ttl_seconds=900.0)
+            system_cache.set(self._forecast_stale_ns, cache_key, (df, used), ttl_seconds=21600.0)
+            self._quota_reset_at = 0.0
             return df, used
         except Exception as exc:
+            # 1st fallback: stale cached forecast (best quality)
+            fallback_entry = stale_entry or fresh_entry
+            if fallback_entry is not None:
+                cached_df, cached_source = fallback_entry
+                logger.warning(
+                    "Weather fetch failed (%s); serving stale forecast cache for %s", exc, cache_key
+                )
+                return cached_df, f"stale_cache ({cached_source})"
+
             if not getattr(self.s, "enable_weather_fallback", False):
                 if isinstance(exc, WeatherError):
                     raise
                 raise WeatherError(str(exc)) from exc
             logger.warning("Weather fetch failed (%s); generating physics-calibrated fallback profile", exc)
-            eff_lat = self.s.latitude if latitude is None else latitude
-            eff_lon = self.s.longitude if longitude is None else longitude
             elev = 1200.0
             if hasattr(self, "fetch_terrain_params"):
                 elev = self.fetch_terrain_params(eff_lat, eff_lon).get("elevation_m", 1200.0)
@@ -181,6 +214,11 @@ class OpenMeteoClient:
                     except ValueError as exc:
                         raise WeatherError(f"Invalid JSON from Open-Meteo: {exc}") from exc
                 if resp.status_code == 429:
+                    self._quota_reset_at = monotonic() + self._QUOTA_BACKOFF_SECONDS
+                    logger.warning(
+                        "Open-Meteo returned HTTP 429 (IP quota exceeded); backoff for %ds",
+                        self._QUOTA_BACKOFF_SECONDS,
+                    )
                     raise WeatherError("Open-Meteo IP quota exceeded (HTTP 429)")
                 if resp.status_code not in (500, 502, 503, 504):
                     reason = ""

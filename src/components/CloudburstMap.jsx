@@ -1425,20 +1425,21 @@ function applyMapLayersAndHeatmap(
         visibility: 'visible'
       },
       paint: {
-        'line-color': '#090d16',
+        'line-color': '#f8fafc',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          1, 1.75,
-          2, 2.05,
-          5, 2.55,
-          8, 3.25
+          1, 1.8,
+          2, 2.1,
+          5, 2.6,
+          8, 3.3
         ],
-        'line-opacity': isDarkOrWeather ? 0.65 : 0.0
+        'line-opacity': isDarkOrWeather ? 0.32 : 0.0
       }
     });
   } else {
     map.setLayoutProperty('windy-country-borders-casing', 'visibility', 'visible');
-    map.setPaintProperty('windy-country-borders-casing', 'line-opacity', isDarkOrWeather ? 0.65 : 0.0);
+    map.setPaintProperty('windy-country-borders-casing', 'line-color', '#f8fafc');
+    map.setPaintProperty('windy-country-borders-casing', 'line-opacity', isDarkOrWeather ? 0.32 : 0.0);
   }
 
   if (!map.getLayer('windy-country-borders')) {
@@ -1452,21 +1453,21 @@ function applyMapLayersAndHeatmap(
         visibility: 'visible'
       },
       paint: {
-        'line-color': isDarkOrWeather ? '#e2e8f0' : '#1e293b',
+        'line-color': '#05080f',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          1, 0.75,
-          2, 0.95,
-          5, 1.35,
-          8, 1.95
+          1, 0.85,
+          2, 1.05,
+          5, 1.45,
+          8, 2.05
         ],
-        'line-opacity': isDarkOrWeather ? 0.82 : 0.72
+        'line-opacity': 0.90
       }
     });
   } else {
     map.setLayoutProperty('windy-country-borders', 'visibility', 'visible');
-    map.setPaintProperty('windy-country-borders', 'line-color', isDarkOrWeather ? '#e2e8f0' : '#1e293b');
-    map.setPaintProperty('windy-country-borders', 'line-opacity', isDarkOrWeather ? 0.82 : 0.72);
+    map.setPaintProperty('windy-country-borders', 'line-color', '#05080f');
+    map.setPaintProperty('windy-country-borders', 'line-opacity', 0.90);
   }
 
   // B. Sleek Continental & Country Overview Labels (Only at global zoom 1.0 - 5.0)

@@ -209,8 +209,12 @@ export async function getCloudburstEventData(station = null, forceRefresh = fals
       ? Number(data.predicted_rain_mm) 
       : (prob >= 0.25 ? Math.round(35 + (prob - 0.25) * 160) : 0.0);
 
+    const isStale = Boolean(data.stale);
     const eventResult = {
       isLive: true,
+      isStale,
+      staleMinutes: data.stale_minutes ?? null,
+      staleReason: data.stale_reason ?? null,
       id: data.id ? `PRED-${data.id}` : `ML-${Date.now().toString().slice(-4)}`,
       title: data.risk_label || (isCritical ? 'High Convective Cloudburst Warning' : isWarning ? 'Elevated Convective Alert' : 'Normal / Low Convective Risk'),
       status: isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'NORMAL',
@@ -257,7 +261,9 @@ export async function getCloudburstEventData(station = null, forceRefresh = fals
       error: null
     };
 
-    setCachedMeteo(cacheKey, eventResult);
+    if (!isStale) {
+      setCachedMeteo(cacheKey, eventResult);
+    }
     return eventResult;
 
   } catch (err) {

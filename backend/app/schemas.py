@@ -31,6 +31,18 @@ class LocationPredictionRequest(BaseModel):
     source: Literal["auto", "forecast", "archive"] = "auto"
 
 
+class LocationPredictionResponse(BaseModel):
+    """Extended prediction response with cache and staleness metadata."""
+    cached: bool = False
+    cache_age_seconds: int = 0
+    stale: bool = False
+    stale_minutes: Optional[int] = None
+    stale_reason: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+
 class OutcomeRequest(BaseModel):
     observed_max_rainfall_mm: float = Field(
         ge=0, description="Observed maximum daily rainfall (mm) across the region on the target date, "
