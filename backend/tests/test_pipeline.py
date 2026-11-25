@@ -70,8 +70,10 @@ class WeatherClientTests(unittest.TestCase):
             return r
 
     def client(self, responses):
+        from app.cache import system_cache
         from app.features import build_feature_plan, hourly_variables
         from tests.helpers import FEATURES
+        system_cache.clear()
         sess = self.Session(responses)
         with tempfile.TemporaryDirectory() as d:
             st = make_settings(d, http_retries=2)
