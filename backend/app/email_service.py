@@ -14,6 +14,8 @@ from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid, parseaddr
 from typing import Any, Dict, List, Optional
 
+import requests
+
 from .config import Settings
 
 logger = logging.getLogger("cloudburst.email")
@@ -22,7 +24,12 @@ logger = logging.getLogger("cloudburst.email")
 class EmailService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.is_dev_mode = bool(settings.email_dev_mode or not settings.smtp_host)
+        has_transport = bool(
+            getattr(settings, "brevo_api_key", "")
+            or getattr(settings, "resend_api_key", "")
+            or settings.smtp_host
+        )
+        self.is_dev_mode = bool(settings.email_dev_mode or not has_transport)
 
     def _get_unsubscribe_url(self, unsubscribe_token: str) -> str:
         """Return a public HTTPS/HTTP unsubscribe URL only when PUBLIC_BASE_URL is a non-localhost origin."""
@@ -203,6 +210,78 @@ class EmailService:
             logger.error("SMTP Delivery error (%s:%s): %s", self.settings.smtp_host, self.settings.smtp_port, exc)
             return False, "SMTP delivery failed."
 
+    def _dispatch_brevo(self, to_email: str, subject: str, text_content: str, html_content: str,
+                        headers: Optional[Dict[str, str]] = None) -> tuple[bool, str]:
+        """Send via Brevo transactional HTTPS API (port 443, works on Render free tier)."""
+        from_name, from_addr = parseaddr(self.settings.smtp_from)
+        payload: Dict[str, Any] = {
+            "sender": {"name": from_name or "BurstWatch Alerts", "email": from_addr or self.settings.smtp_user},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html_content,
+            "textContent": text_content,
+        }
+        if headers:
+            payload["headers"] = headers
+        try:
+            resp = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": self.settings.brevo_api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json=payload,
+                timeout=12,
+            )
+            if 200 <= resp.status_code < 300:
+                logger.info("Email successfully dispatched via Brevo HTTPS API to %s", to_email)
+                return True, "Email sent successfully"
+            logger.error("Brevo API error (%s): %s", resp.status_code, resp.text[:300])
+            return False, "Email API delivery failed."
+        except Exception as exc:
+            logger.error("Brevo HTTPS API error: %s", exc)
+            return False, "Email API delivery failed."
+
+    def _dispatch_resend(self, to_email: str, subject: str, text_content: str, html_content: str,
+                         headers: Optional[Dict[str, str]] = None) -> tuple[bool, str]:
+        """Send via Resend transactional HTTPS API (port 443, works on Render free tier)."""
+        payload: Dict[str, Any] = {
+            "from": self.settings.smtp_from,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content,
+        }
+        if headers:
+            payload["headers"] = headers
+        try:
+            resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {self.settings.resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=12,
+            )
+            if 200 <= resp.status_code < 300:
+                logger.info("Email successfully dispatched via Resend HTTPS API to %s", to_email)
+                return True, "Email sent successfully"
+            logger.error("Resend API error (%s): %s", resp.status_code, resp.text[:300])
+            return False, "Email API delivery failed."
+        except Exception as exc:
+            logger.error("Resend HTTPS API error: %s", exc)
+            return False, "Email API delivery failed."
+
+    def _dispatch_email(self, to_email: str, subject: str, text_content: str, html_content: str,
+                        headers: Optional[Dict[str, str]] = None) -> tuple[bool, str]:
+        if getattr(self.settings, "brevo_api_key", ""):
+            return self._dispatch_brevo(to_email, subject, text_content, html_content, headers=headers)
+        if getattr(self.settings, "resend_api_key", ""):
+            return self._dispatch_resend(to_email, subject, text_content, html_content, headers=headers)
+        return self._dispatch_smtp(to_email, subject, text_content, html_content, headers=headers)
+
     def send_verification_email(self, to_email: str, code: str, expires_minutes: int = 15) -> Dict[str, Any]:
         """Dispatch a 6-digit verification code to the recipient."""
         subject = f"BurstWatch Verification Code: {code}"
@@ -233,7 +312,7 @@ class EmailService:
                 "message": "Verification code logged to server console (dev mode)",
             }
         else:
-            ok, err_msg = self._dispatch_smtp(to_email, subject, text_content, html_content)
+            ok, err_msg = self._dispatch_email(to_email, subject, text_content, html_content)
             return {
                 "success": ok,
                 "dev_mode": False,
@@ -280,7 +359,7 @@ class EmailService:
             print(banner)
             return {"success": True, "dev_mode": True, "recipient": to_email}
         else:
-            ok, err_msg = self._dispatch_smtp(to_email, subject, text_content, html_content, headers=rfc8058_headers)
+            ok, err_msg = self._dispatch_email(to_email, subject, text_content, html_content, headers=rfc8058_headers)
             return {"success": ok, "dev_mode": False, "recipient": to_email, "error": err_msg if not ok else None}
 
     def broadcast_weather_alert(self, subscribers: List[Dict[str, Any]], alert_data: Dict[str, Any]) -> Dict[str, Any]:

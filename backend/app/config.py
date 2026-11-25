@@ -77,6 +77,8 @@ class Settings:
     smtp_tls: bool
     smtp_ssl: bool
     email_dev_mode: bool
+    brevo_api_key: str = ""
+    resend_api_key: str = ""
     jwt_secret: str = field(default_factory=lambda: secrets.token_urlsafe(32))
     enable_weather_fallback: bool = False
     google_client_id: str = ""
@@ -120,7 +122,16 @@ class Settings:
             smtp_from=os.getenv("SMTP_FROM", "BurstWatch Alerts <alerts@burstwatch.live>"),
             smtp_tls=_bool("SMTP_TLS", True),
             smtp_ssl=_bool("SMTP_SSL", False),
-            email_dev_mode=_bool("EMAIL_DEV_MODE", not bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER"))),
+            email_dev_mode=_bool(
+                "EMAIL_DEV_MODE",
+                not bool(
+                    os.getenv("BREVO_API_KEY", "").strip()
+                    or os.getenv("RESEND_API_KEY", "").strip()
+                    or (os.getenv("SMTP_HOST") and os.getenv("SMTP_USER"))
+                ),
+            ),
+            brevo_api_key=os.getenv("BREVO_API_KEY", "").strip(),
+            resend_api_key=os.getenv("RESEND_API_KEY", "").strip(),
             jwt_secret=os.getenv("JWT_SECRET", "").strip() or secrets.token_urlsafe(32),
             enable_weather_fallback=_bool("ENABLE_WEATHER_FALLBACK", False),
             google_client_id=os.getenv("GOOGLE_CLIENT_ID", "").strip(),
