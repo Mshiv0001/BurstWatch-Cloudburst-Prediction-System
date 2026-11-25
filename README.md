@@ -1,7 +1,8 @@
 # BurstWatch
 
-BurstWatch is a React and Vite dashboard for cloudburst-risk monitoring and
-weather visualization.
+BurstWatch is a React and Vite dashboard for real-time cloudburst-risk monitoring, live Doppler rain radar, wind streamlines, air quality (AQI), and extreme weather visualization.
+
+**Live App:** https://burstwatch-cloudburst-prediction.vercel.app/
 
 ## Requirements
 
