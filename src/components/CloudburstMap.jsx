@@ -113,6 +113,28 @@ const LIBERTY_LAYER_PREFIX = 'liberty-';
 let libertyStyleCache = null;
 let libertyStylePromise = null;
 
+// Rich dark-green satellite-biome palette overrides for VersaTiles Colorful
+const VERSATILES_DARK_GREEN_PAINT = {
+  background: { 'background-color': '#3a5a40' },
+  'landcover-land-forest': { 'fill-color': '#234f36' },
+  'landcover-land-grass': { 'fill-color': '#2f6342' },
+  'landcover-land-vegetation': { 'fill-color': '#386b49' },
+  'landcover-land-agriculture': { 'fill-color': '#42734f' },
+  'landcover-land-wetland': { 'fill-color': '#2b5e57' },
+  'landcover-land-residential': { 'fill-color': '#4e6353' },
+  'landcover-land-rock': { 'fill-color': '#525e54' },
+  'landcover-land-glacier': { 'fill-color': '#ffffff' },
+  'land-forest': { 'fill-color': '#234f36' },
+  'land-grass': { 'fill-color': '#2f6342' },
+  'land-vegetation': { 'fill-color': '#386b49' },
+  'land-agriculture': { 'fill-color': '#42734f' },
+  'land-park': { 'fill-color': '#2f6342' },
+  'land-garden': { 'fill-color': '#2f6342' },
+  'land-glacier': { 'fill-color': '#ffffff' },
+  'landcover-water-area': { 'fill-color': '#1d5fa3' },
+  'water-ocean': { 'fill-color': '#1d5fa3' },
+};
+
 function fetchLibertyVectorStyle() {
   if (libertyStyleCache) return Promise.resolve(libertyStyleCache);
   if (!libertyStylePromise) {
@@ -122,7 +144,12 @@ function fetchLibertyVectorStyle() {
         if (data?.sources && Array.isArray(data?.layers)) {
           libertyStyleCache = {
             sources: data.sources,
-            layers: data.layers.filter((l) => l.type !== 'symbol'),
+            layers: data.layers
+              .filter((l) => l.type !== 'symbol')
+              .map((l) => {
+                const override = VERSATILES_DARK_GREEN_PAINT[l.id];
+                return override ? { ...l, paint: { ...(l.paint || {}), ...override } } : l;
+              }),
           };
         }
         return libertyStyleCache;
