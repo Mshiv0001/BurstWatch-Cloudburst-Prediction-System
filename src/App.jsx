@@ -94,6 +94,7 @@ export default function App() {
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPermissionPromptOpen, setIsPermissionPromptOpen] = useState(false);
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
   const [isAlertsPanelOpen, setIsAlertsPanelOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => getLocalSubscription());
   const [isEmailSubscribed, setIsEmailSubscribed] = useState(() => getLocalSubscription().isVerified);
@@ -472,6 +473,9 @@ export default function App() {
   // NavRail click handler
   const handleSelectNav = (navId) => {
     setActiveNav(navId);
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      setIsNavExpanded(false);
+    }
     const isNarrow = typeof window !== 'undefined' && window.innerWidth < 1024;
     if (navId === 'home') {
       setIsMeteoPanelOpen(false);
@@ -656,6 +660,15 @@ export default function App() {
           <NavRail
             activeNav={activeNav}
             onSelectNav={handleSelectNav}
+            isExpanded={isNavExpanded}
+            onToggleExpand={(next) => {
+              setIsNavExpanded(next);
+              if (next && typeof window !== 'undefined' && window.innerWidth < 640) {
+                setIsMeteoPanelOpen(false);
+                setIsRankingsOpen(false);
+                setIsAnalyticsOpen(false);
+              }
+            }}
             openNavIds={[
               ...(!isRankingsOpen && !isAnalyticsOpen && !isMeteoPanelOpen ? ['home'] : []),
               ...(activeNav === 'dashboard' && isAnalyticsOpen ? ['dashboard'] : []),
@@ -700,7 +713,7 @@ export default function App() {
         {isRankingsOpen && (
           <div
             id="area-risk-rankings-container"
-            className={`absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:left-auto z-20 pointer-events-auto transition-all flex justify-end ${!isHomeView && isAnalyticsOpen ? 'sm:right-4 xl:right-[372px]' : 'sm:right-4'
+            className={`absolute top-[calc(6.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[70px] right-2.5 sm:left-auto z-20 pointer-events-auto transition-all flex justify-end ${!isHomeView && isAnalyticsOpen ? 'sm:right-4 xl:right-[372px]' : 'sm:right-4'
               }`}
           >
             <AreaRiskRankingsPanel
@@ -716,7 +729,12 @@ export default function App() {
 
         {/* Floating Left Panel: Current Weather Data */}
         {!isHomeView && isMeteoPanelOpen && (
-          <div id="live-meteo-panel-container" className="absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:right-auto sm:left-20 z-25 pointer-events-auto transition-all">
+          <div
+            id="live-meteo-panel-container"
+            className={`absolute top-[calc(6.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[70px] right-2.5 sm:right-auto z-25 pointer-events-auto transition-all duration-300 ${
+              isNavExpanded ? 'sm:left-[224px]' : 'sm:left-20'
+            }`}
+          >
             <LiveMeteoPanel
               liveData={liveMeteoData}
               station={selectedStation}
@@ -734,9 +752,11 @@ export default function App() {
 
         {/* Floating Real-Time Raining Cities Ranked Panel (Rain Radar Layer) */}
         {!isHomeView && (
-          <div className={`absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-20 transition-all duration-300 max-w-[calc(100vw-72px)] ${activeLayer === 'precip'
-            ? (isMeteoPanelOpen ? 'opacity-100 visible pointer-events-auto hidden 2xl:block 2xl:left-[432px]' : 'opacity-100 visible pointer-events-auto left-[62px] right-2.5 sm:right-auto sm:left-20')
-            : 'opacity-0 invisible pointer-events-none left-[62px] right-2.5 sm:right-auto sm:left-20'
+          <div className={`absolute top-[calc(6.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-20 transition-all duration-300 max-w-[calc(100vw-80px)] ${activeLayer === 'precip'
+            ? (isMeteoPanelOpen
+              ? `opacity-100 visible pointer-events-auto hidden 2xl:block ${isNavExpanded ? '2xl:left-[576px]' : '2xl:left-[432px]'}`
+              : `opacity-100 visible pointer-events-auto left-[70px] right-2.5 sm:right-auto ${isNavExpanded ? 'sm:left-[224px]' : 'sm:left-20'}`)
+            : `opacity-0 invisible pointer-events-none left-[70px] right-2.5 sm:right-auto ${isNavExpanded ? 'sm:left-[224px]' : 'sm:left-20'}`
             }`}>
             <RainingCitiesPanel
               isActive={activeLayer === 'precip'}
@@ -757,7 +777,7 @@ export default function App() {
 
         {/* Floating Right Column: Convective Grid Panel */}
         {!isHomeView && isAnalyticsOpen && (
-          <div id="threat-analytics-panel-container" className="absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:left-auto sm:right-4 z-20 pointer-events-auto flex justify-end max-h-[calc(100dvh-11.5rem)] md:max-h-[calc(100dvh-9.5rem)] overflow-y-auto scrollbar-none pr-0.5">
+          <div id="threat-analytics-panel-container" className="absolute top-[calc(6.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[70px] right-2.5 sm:left-auto sm:right-4 z-20 pointer-events-auto flex justify-end max-h-[calc(100dvh-13.5rem)] md:max-h-[calc(100dvh-9.5rem)] overflow-y-auto scrollbar-none pr-0.5">
             <ThreatAnalyticsPanel
               riskPercent={currentRiskPercent}
               severity={currentRiskPercent != null ? (currentRiskPercent >= 75 ? "SEVERE THREAT" : currentRiskPercent >= 25 ? "ELEVATED RISK" : "NORMAL") : "OFFLINE"}

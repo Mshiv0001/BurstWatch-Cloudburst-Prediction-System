@@ -580,9 +580,9 @@ function applyMapLayersAndHeatmap(
 
   // 1.5 Dynamic 3-Mode Basemap Switching:
   // - Satellite ON: Google Hybrid satellite raster
-  // - Weather overlay active ('temp', 'wind', 'precip', 'aqi'): Clean whitish OSM map
-  // - Else ('convective' or 'none'): Dark-green VersaTiles Colorful vector map
-  const isWeatherOverlay = activeLayer === 'temp' || activeLayer === 'wind' || activeLayer === 'precip' || activeLayer === 'aqi';
+  // - Weather overlay active ('temp', 'aqi'): Clean whitish OSM map
+  // - Else ('convective', 'precip', 'wind', or 'none'): Dark-green VersaTiles Colorful vector map
+  const isWeatherOverlay = activeLayer === 'temp' || activeLayer === 'aqi';
   const isGreenVectorMap = !isSatellite && !isWeatherOverlay;
   map.__bwUseGreenVector = isGreenVectorMap;
 
@@ -4124,11 +4124,11 @@ export default function CloudburstMap({
 
       {/* 2.4 PluviaAtelier™ Floating Radar Playback Dock (Centered Above Legend Bar) */}
       {selectedWeatherLayer === 'precip' && (
-        <div className={`absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom,0px))+6.25rem)] md:bottom-[78px] z-20 flex flex-col items-center gap-2 transition-all duration-300 pointer-events-none left-[62px] right-2.5 ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
+        <div className={`absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom,0px))+6.25rem)] md:bottom-[78px] z-20 flex flex-col items-center gap-2 transition-all duration-300 pointer-events-none left-[70px] right-2.5 ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
           } ${hasRightDrawerOpen ? 'md:right-[176px] lg:right-[372px]' : 'md:right-[176px]'
           }`}>
           {/* Main Floating Glass Dock Bar */}
-          <div className="flex items-center gap-2 apple-liquid-glass px-3 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none overflow-x-auto scrollbar-none max-w-full">
+          <div className="flex items-center gap-1.5 sm:gap-2 apple-liquid-glass px-2.5 sm:px-3 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none w-full sm:w-auto max-w-full">
             {/* Play / Pause Toggle Button with Animated Progress Indicator */}
             <button
               type="button"
@@ -4161,7 +4161,7 @@ export default function CloudburstMap({
             </button>
 
             {/* Frame Scrubber Slider */}
-            <div className="flex items-center gap-1.5 min-w-[90px] sm:min-w-[120px]">
+            <div className="flex items-center flex-1 min-w-[44px] sm:min-w-[120px]">
               <input
                 type="range"
                 min={0}
@@ -4172,7 +4172,7 @@ export default function CloudburstMap({
                   setRadarFrameIndex(Number(e.target.value));
                 }}
                 title="Scrub Doppler Radar Timeline"
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                className="w-full min-w-0 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               />
             </div>
 
@@ -4191,12 +4191,12 @@ export default function CloudburstMap({
             </button>
 
             {/* Timestamp & Live Badge */}
-            <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10 shrink-0">
-              <span className="text-[11px] font-mono tabular-nums font-bold text-white tracking-tight">
+            <div className="flex items-center gap-1 sm:gap-1.5 pl-1 sm:pl-1.5 border-l border-white/10 shrink-0">
+              <span className="text-[10px] sm:text-[11px] font-mono tabular-nums font-bold text-white tracking-tight whitespace-nowrap">
                 {radarTimestampTime || 'Scanning...'}
               </span>
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono tabular-nums font-bold border flex items-center gap-1 ${isLatestRadarFrame
+                className={`px-1.5 py-0.5 rounded-full text-[8.5px] sm:text-[9px] font-mono tabular-nums font-bold border flex items-center gap-1 whitespace-nowrap ${isLatestRadarFrame
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                   : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   }`}
@@ -4211,7 +4211,7 @@ export default function CloudburstMap({
               type="button"
               onClick={() => setShowRadarRings(!showRadarRings)}
               title={showRadarRings ? "IMD DWR 450km Range Rings & Astrolabes Visible" : "DWR Range Rings Hidden"}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9.5px] font-mono transition-all cursor-pointer shrink-0 ${showRadarRings
+              className={`flex items-center gap-1 p-1 sm:px-2 sm:py-0.5 rounded-full border text-[9.5px] font-mono transition-all cursor-pointer shrink-0 ${showRadarRings
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.25)]'
                 : 'bg-white/5 text-slate-400 hover:text-white border-white/10'
                 }`}

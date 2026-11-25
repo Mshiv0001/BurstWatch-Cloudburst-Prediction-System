@@ -213,7 +213,7 @@ export default function AreaRiskRankingsPanel({
       {/* ===================================================================
           MASTER CONTAINER: GlassAura™ Translucent Liquid Glass Console
           =================================================================== */}
-      <div className="glass-panel-translucent rounded-3xl p-4 border border-white/12 shadow-[0_24px_64px_rgba(0,0,0,0.55)] flex flex-col gap-3 relative overflow-hidden max-h-[calc(100dvh-11.5rem)] md:max-h-[calc(100dvh-9.5rem)]">
+      <div className="glass-panel-translucent rounded-3xl p-4 border border-white/12 shadow-[0_24px_64px_rgba(0,0,0,0.55)] flex flex-col gap-3 relative overflow-hidden max-h-[calc(100dvh-14.25rem)] sm:max-h-[calc(100dvh-11.5rem)] md:max-h-[calc(100dvh-9.5rem)]">
         
         {/* Subtle Ambient Radial Glow */}
         <div

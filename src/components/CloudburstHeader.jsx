@@ -27,7 +27,14 @@ export default function CloudburstHeader({
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [onlineResults, setOnlineResults] = useState([]);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
+  const [isPhone, setIsPhone] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false));
   const searchContainerRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsPhone(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const currentQuery = searchQuery !== undefined ? searchQuery : internalQuery;
 
@@ -160,9 +167,9 @@ export default function CloudburstHeader({
   };
 
   return (
-    <header className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-2.5 right-2.5 sm:left-4 sm:right-4 z-40 flex items-center justify-between gap-2 sm:gap-3 pointer-events-none select-none">
+    <header className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-2.5 right-2.5 sm:left-4 sm:right-4 z-40 flex flex-col items-stretch sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pointer-events-none select-none">
       {/* 1. Left: Combined BurstWatch Brand + Search Box Pill */}
-      <div ref={searchContainerRef} className="relative pointer-events-auto flex items-center gap-0 min-w-0 flex-1 max-w-[440px]">
+      <div ref={searchContainerRef} className="relative pointer-events-auto flex items-center gap-0 min-w-0 w-full sm:flex-1 sm:max-w-[440px]">
         <div className="apple-liquid-glass-pill flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 h-10 rounded-full focus-within:border-cyan-400/80 focus-within:ring-2 focus-within:ring-cyan-500/25 transition-all w-full min-w-0">
           {/* Brand Logo & Name (Clickable to Replay Cinematic Intro) */}
           <button
@@ -171,15 +178,15 @@ export default function CloudburstHeader({
             title="Click to Replay Cinematic Launch Animation"
             className="flex items-center gap-1.5 sm:gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all shrink-0"
           >
-            <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-tr from-[#f05542] to-[#ff6b57] text-white shadow-md shadow-[#f05542]/30 border border-white/20 shrink-0">
-              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="relative flex items-center justify-center w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-gradient-to-tr from-[#f05542] to-[#ff6b57] text-white shadow-md shadow-[#f05542]/30 border border-white/20 shrink-0">
+              <svg className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
                 <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
                 <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
               </svg>
             </div>
 
-            <span className="burstwatch-logo-orbitron hidden xs:inline-flex text-[12px] sm:text-[13px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-white select-none shrink-0 pr-2 border-r border-white/15 mr-0.5 sm:mr-1 items-center font-black">
+            <span className="burstwatch-logo-orbitron inline-flex text-[13px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-white select-none shrink-0 pr-2 border-r border-white/15 mr-0.5 sm:mr-1 items-center font-black">
               Burst<span className="text-cyan-400">Watch</span>
             </span>
           </button>
@@ -188,7 +195,7 @@ export default function CloudburstHeader({
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
-            placeholder="Search city or station..."
+            placeholder={isPhone ? 'Search city' : 'Search city or station...'}
             value={currentQuery}
             onChange={(e) => handleQueryChange(e.target.value)}
             onFocus={() => setShowSearchDropdown(true)}
@@ -432,8 +439,8 @@ export default function CloudburstHeader({
         </AnimatePresence>
       </div>
 
-      {/* Right: Wind Particle Dropdown */}
-      <div className="pointer-events-auto flex items-center gap-2 sm:gap-2.5 ml-auto">
+      {/* Right: Wind Particle Dropdown (below search bar on phone, right-aligned) */}
+      <div className="pointer-events-auto flex items-center gap-2 sm:gap-2.5 self-end sm:self-auto sm:ml-auto">
         <WindParticleDropdown
           mode={windParticleMode}
           onChangeMode={onWindParticleModeChange}

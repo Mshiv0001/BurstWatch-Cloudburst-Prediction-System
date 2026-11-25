@@ -85,7 +85,7 @@ export default function FpsCounter({ className = "", variant = "header" }) {
           whileTap={{ scale: 0.94 }}
           onClick={() => setIsOpen(!isOpen)}
           title={`Hardware Telemetry & GPU Monitor: ${fps} FPS (${isOptimal ? 'Optimal' : isAcceptable ? 'Acceptable' : 'Under Load'})`}
-          className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex flex-col items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
+          className={`relative group w-10 h-10 sm:w-9 sm:h-9 flex flex-col items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
             isOpen
               ? 'ring-2 ring-emerald-400/50 border-emerald-400/60 bg-emerald-500/20 shadow-emerald-950/40'
               : 'apple-liquid-glass hover:bg-white/15 border-white/20'
