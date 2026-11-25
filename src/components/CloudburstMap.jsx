@@ -1991,6 +1991,7 @@ export default function CloudburstMap({
 
   // Muted Thunder Synthesizer state
   const [isThunderMuted, setIsThunderMuted] = useState(() => thunderSynth.isMuted());
+  const [mapBearing, setMapBearing] = useState(0);
 
   // RainViewer live Doppler radar state & playback
   const [radarFrames, setRadarFrames] = useState([]);
@@ -2320,6 +2321,7 @@ export default function CloudburstMap({
 
     mapRef.current = map;
     window.map = map;
+    map.on('rotate', () => setMapBearing(map.getBearing()));
 
     const handleMapError = (event) => {
       if (event.sourceId === 'basemap') {
@@ -3774,6 +3776,9 @@ export default function CloudburstMap({
 
   const handleZoomIn = () => mapRef.current?.zoomIn();
   const handleZoomOut = () => mapRef.current?.zoomOut();
+  const handleResetNorth = () => {
+    mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 });
+  };
   const handleResetCamera = () => {
     mapRef.current?.flyTo({
       center: [78.96, 22.50],
@@ -4292,6 +4297,28 @@ export default function CloudburstMap({
       {/* 5. Clean Basic Map Navigation Controls (Horizontal Bottom-Right Pill) */}
       <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 right-2.5 sm:right-4 z-25 flex flex-row items-center gap-0.5 sm:gap-1 glass-panel-translucent p-1 sm:p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300">
         <button
+          type="button"
+          onClick={handleResetNorth}
+          title={Math.abs(mapBearing) > 1 ? `Reset North (${Math.round(mapBearing)}°)` : 'Map Orientation (North Up)'}
+          aria-label="Reset map orientation to North"
+          className={`p-1.5 xs:p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+            Math.abs(mapBearing) > 1
+              ? 'bg-cyan-500/20 text-white hover:bg-cyan-500/30 border border-cyan-400/40'
+              : 'text-slate-300 hover:text-white hover:bg-white/15 border border-transparent'
+          }`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-3.5 h-3.5 xs:w-4 xs:h-4 transition-transform duration-75"
+            style={{ transform: `rotate(${-mapBearing}deg)` }}
+            aria-hidden="true"
+          >
+            <polygon points="12,2 15.5,12 12,10.5 8.5,12" fill="#ef4444" />
+            <polygon points="12,22 15.5,12 12,13.5 8.5,12" fill="#cbd5e1" />
+          </svg>
+        </button>
+
+        <button
           onClick={handleZoomIn}
           title="Zoom In"
           className="p-1.5 xs:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
@@ -4342,7 +4369,7 @@ export default function CloudburstMap({
       </div>
 
       {/* 2.5 Unified Lower Command Bar: Scale (Left) + Legend (Center) */}
-      <div className={`absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 z-20 flex flex-col-reverse md:grid md:grid-cols-[auto_minmax(0,1fr)] items-start md:items-center gap-2.5 md:gap-3 pointer-events-none select-none transition-all duration-300 left-[62px] right-2.5 md:right-[200px] ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
+      <div className={`absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 z-20 flex flex-col-reverse md:grid md:grid-cols-[auto_minmax(0,1fr)] items-start md:items-center gap-2.5 md:gap-3 pointer-events-none select-none transition-all duration-300 left-[62px] right-2.5 md:right-[236px] ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
         }`}>
         {/* 1. Left: Dynamic Map Scale Indicator */}
         <div className="pointer-events-auto justify-self-start shrink-0 h-10 md:h-auto flex items-center">
