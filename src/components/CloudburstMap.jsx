@@ -3003,14 +3003,17 @@ export default function CloudburstMap({
       let strokeMid = styleColors?.mid || 'rgba(248, 252, 255, 0.88)';
       let strokeStrong = styleColors?.strong || 'rgba(255, 255, 255, 1.0)';
 
-      // Active Wind Speed layer overrides for high-contrast velocity representation
+      // Active Wind Speed layer & main Silk layer: Windy-style airy density scaled by viewport area
       const isWindLayer = selectedWeatherLayer === 'wind';
       const isTempLayer = selectedWeatherLayer === 'temp';
       const isAqiLayer = selectedWeatherLayer === 'aqi';
+      const isMainSilk = styleConfig.geometry === 'silk';
+      const windyCount = Math.min(2000, Math.max(850, Math.floor((canvas.width * canvas.height) / 950)));
+
       if (isWindLayer) {
-        activeCount = Math.min(count, 5500);
-        speedMult = 0.20;
-        fadeRate = 0.08;
+        activeCount = Math.min(count, windyCount);
+        speedMult = 0.15;
+        fadeRate = 0.16;
         blendMode = 'source-over';
       } else if (isTempLayer) {
         activeCount = Math.min(count, 5200);
@@ -3021,6 +3024,8 @@ export default function CloudburstMap({
         speedMult = 0.16;
         fadeRate = 0.09;
         blendMode = 'source-over';
+      } else if (isMainSilk) {
+        activeCount = Math.min(count, windyCount);
       }
 
       // AeroSilk™ Exponential Ghost Trail Persistence
@@ -3107,8 +3112,9 @@ export default function CloudburstMap({
         finalMidX += -stepY * curlPerturb;
         finalMidY += stepX * curlPerturb;
 
-        if (stepDist < 1.15) {
-          const scale = 1.15 / Math.max(0.001, stepDist);
+        const minStepDist = (isWindLayer || isMainSilk) ? 0.75 : 1.15;
+        if (stepDist < minStepDist) {
+          const scale = minStepDist / Math.max(0.001, stepDist);
           finalNextX = currX + stepX * scale;
           finalNextY = currY + stepY * scale;
           finalMidX = currX + (stepX * scale) * 0.5;
@@ -3213,19 +3219,20 @@ export default function CloudburstMap({
           p.age[i] = 0;
           p.maxAge[i] = (styleConfig.geometry === 'grand')
             ? (160 + Math.floor(Math.random() * 120))
-            : (70 + Math.floor(Math.random() * 80));
+            : (isWindLayer || isMainSilk)
+              ? (45 + Math.floor(Math.random() * 45))
+              : (70 + Math.floor(Math.random() * 80));
           p.speed[i] = 0.85 + Math.random() * 0.30;
         }
       }
 
       if (isWindLayer) {
-        // --- Single Canonical Wind Speed Streamlines ---
-        // Calibrated against Oklab velocity field: Oceanic Cyan -> Living Jade -> Starry Amber -> Flame Coral
+        // --- Windy-Style Delicate White Streamlines over Oklab Velocity Heatmap ---
         const tiers = [
-          { data: tierCalm, color: 'rgba(6, 182, 212, 0.85)', w: 0.75 },
-          { data: tierModerate, color: 'rgba(16, 185, 129, 0.90)', w: 0.95 },
-          { data: tierBrisk, color: 'rgba(245, 158, 11, 0.95)', w: 1.25 },
-          { data: tierStorm, color: 'rgba(244, 63, 94, 1.0)', w: 1.65 }
+          { data: tierCalm, color: 'rgba(255, 255, 255, 0.30)', w: 0.45 },
+          { data: tierModerate, color: 'rgba(255, 255, 255, 0.52)', w: 0.60 },
+          { data: tierBrisk, color: 'rgba(255, 255, 255, 0.76)', w: 0.80 },
+          { data: tierStorm, color: 'rgba(255, 255, 255, 0.94)', w: 1.00 }
         ];
 
         tiers.forEach(({ data, color, w }) => {
