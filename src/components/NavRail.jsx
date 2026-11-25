@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Home,
   LayoutGrid,
@@ -50,25 +50,17 @@ export default function NavRail({
   mlError = null
 }) {
   const wrapperRef = useRef(null);
-  const touchTimerRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
 
-  useEffect(() => () => clearTimeout(touchTimerRef.current), []);
-
-  const showTooltip = (e, label, isTouch = false) => {
+  const showTooltip = (e, label) => {
     const wrapperRect = wrapperRef.current?.getBoundingClientRect();
     const btnRect = e.currentTarget.getBoundingClientRect();
     if (!wrapperRect) return;
     const top = btnRect.top - wrapperRect.top + btnRect.height / 2;
     setTooltip({ label, top });
-    clearTimeout(touchTimerRef.current);
-    if (isTouch) {
-      touchTimerRef.current = setTimeout(() => setTooltip(null), 1600);
-    }
   };
 
   const hideTooltip = () => {
-    clearTimeout(touchTimerRef.current);
     setTooltip(null);
   };
 
@@ -119,13 +111,11 @@ export default function NavRail({
                 whileTap={{ scale: 0.92 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 24 }}
                 onClick={() => {
+                  hideTooltip();
                   if (onSelectNav) onSelectNav(item.id);
                 }}
-                onPointerEnter={(e) => showTooltip(e, item.label, e.pointerType === 'touch')}
-                onPointerLeave={hideTooltip}
-                onFocus={(e) => showTooltip(e, item.label)}
-                onBlur={hideTooltip}
-                onTouchStart={(e) => showTooltip(e, item.label, true)}
+                onMouseEnter={(e) => showTooltip(e, item.label)}
+                onMouseLeave={hideTooltip}
                 title={item.label}
                 aria-label={item.label}
                 className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer select-none ${isActive
@@ -157,15 +147,13 @@ export default function NavRail({
                 whileTap={{ scale: 0.92 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 24 }}
                 onClick={() => {
+                  hideTooltip();
                   if (onChangeActiveLayer) {
                     onChangeActiveLayer(isActive ? 'none' : layer.id);
                   }
                 }}
-                onPointerEnter={(e) => showTooltip(e, layer.label, e.pointerType === 'touch')}
-                onPointerLeave={hideTooltip}
-                onFocus={(e) => showTooltip(e, layer.label)}
-                onBlur={hideTooltip}
-                onTouchStart={(e) => showTooltip(e, layer.label, true)}
+                onMouseEnter={(e) => showTooltip(e, layer.label)}
+                onMouseLeave={hideTooltip}
                 title={layer.label}
                 aria-label={layer.label}
                 className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer select-none ${isActive
@@ -204,12 +192,12 @@ export default function NavRail({
           <motion.button
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
-            onClick={onToggleSatellite}
-            onPointerEnter={(e) => showTooltip(e, isSatellite ? 'Satellite Imagery: ON' : 'Satellite Imagery: OFF', e.pointerType === 'touch')}
-            onPointerLeave={hideTooltip}
-            onFocus={(e) => showTooltip(e, isSatellite ? 'Satellite Imagery: ON' : 'Satellite Imagery: OFF')}
-            onBlur={hideTooltip}
-            onTouchStart={(e) => showTooltip(e, isSatellite ? 'Satellite Imagery: ON' : 'Satellite Imagery: OFF', true)}
+            onClick={() => {
+              hideTooltip();
+              onToggleSatellite?.();
+            }}
+            onMouseEnter={(e) => showTooltip(e, isSatellite ? 'Satellite Imagery: ON' : 'Satellite Imagery: OFF')}
+            onMouseLeave={hideTooltip}
             title={isSatellite ? "Satellite View Active (Click to switch to Default Map)" : "Switch to High-Resolution Satellite Imagery"}
             aria-label="Toggle Satellite Imagery"
             className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${isSatellite
@@ -229,12 +217,12 @@ export default function NavRail({
           <motion.button
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
-            onClick={onOpenEmailModal}
-            onPointerEnter={(e) => showTooltip(e, isEmailSubscribed ? 'Weather Alerts Active' : 'Subscribe to Alerts', e.pointerType === 'touch')}
-            onPointerLeave={hideTooltip}
-            onFocus={(e) => showTooltip(e, isEmailSubscribed ? 'Weather Alerts Active' : 'Subscribe to Alerts')}
-            onBlur={hideTooltip}
-            onTouchStart={(e) => showTooltip(e, isEmailSubscribed ? 'Weather Alerts Active' : 'Subscribe to Alerts', true)}
+            onClick={() => {
+              hideTooltip();
+              onOpenEmailModal?.();
+            }}
+            onMouseEnter={(e) => showTooltip(e, isEmailSubscribed ? 'Weather Alerts Active' : 'Subscribe to Alerts')}
+            onMouseLeave={hideTooltip}
             title={isEmailSubscribed ? `Email Weather Alerts Active (${userProfile?.email || 'Verified'})` : "Subscribe to Real-Time Weather Alerts"}
             aria-label="Weather Alerts Subscription"
             className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer select-none ${
@@ -274,13 +262,13 @@ export default function NavRail({
           <motion.button
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
-            onClick={onRefreshMlStatus}
+            onClick={() => {
+              hideTooltip();
+              onRefreshMlStatus?.();
+            }}
             disabled={isMlRetrying}
-            onPointerEnter={(e) => showTooltip(e, mlTooltipLabel, e.pointerType === 'touch')}
-            onPointerLeave={hideTooltip}
-            onFocus={(e) => showTooltip(e, mlTooltipLabel)}
-            onBlur={hideTooltip}
-            onTouchStart={(e) => showTooltip(e, mlTooltipLabel, true)}
+            onMouseEnter={(e) => showTooltip(e, mlTooltipLabel)}
+            onMouseLeave={hideTooltip}
             title={
               isMlLive && !isMlStale
                 ? 'Physics-Informed Dual-Engine ML Model: LIVE (Click to refresh status)'
