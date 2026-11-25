@@ -4344,19 +4344,28 @@ export default function CloudburstMap({
             style={{ transform: `rotate(${-mapBearing}deg)` }}
             aria-hidden="true"
           >
-            <text
-              x="12"
-              y="7.2"
-              textAnchor="middle"
-              fontSize="6.5"
-              fontWeight="800"
-              fontFamily="system-ui, sans-serif"
-              fill={isNorthLocked ? '#67e8f9' : '#f87171'}
-            >
-              N
-            </text>
-            <polygon points="12,8.2 15.2,15 12,13.6 8.8,15" fill="#ef4444" />
-            <polygon points="12,22.2 15.2,15 12,16.4 8.8,15" fill="#cbd5e1" />
+            {isNorthLocked ? (
+              <>
+                <text
+                  x="12"
+                  y="7.2"
+                  textAnchor="middle"
+                  fontSize="6.5"
+                  fontWeight="800"
+                  fontFamily="system-ui, sans-serif"
+                  fill="#67e8f9"
+                >
+                  N
+                </text>
+                <polygon points="12,8.2 15.2,15 12,13.6 8.8,15" fill="#ef4444" />
+                <polygon points="12,22.2 15.2,15 12,16.4 8.8,15" fill="#cbd5e1" />
+              </>
+            ) : (
+              <>
+                <polygon points="12,2 15.5,12 12,10.5 8.5,12" fill="#ef4444" />
+                <polygon points="12,22 15.5,12 12,13.5 8.5,12" fill="#cbd5e1" />
+              </>
+            )}
           </svg>
         </button>
 
