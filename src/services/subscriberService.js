@@ -28,7 +28,7 @@ function getCandidateBases() {
       return ['/api', 'http://localhost:8000', 'http://localhost:8001'];
     }
   }
-  return ['/api', 'https://burstwatch-ml-backend.onrender.com'];
+  return ['https://burstwatch-ml-backend.onrender.com'];
 }
 
 function getAuthHeader() {
@@ -46,7 +46,8 @@ async function request(endpoint, options = {}) {
   const bases = getCandidateBases();
   let lastError = 'Network error connecting to alert service';
 
-  for (const base of bases) {
+  for (let i = 0; i < bases.length; i++) {
+    const base = bases[i];
     const url = `${base}${endpoint}`;
     try {
       const res = await fetch(url, {
@@ -60,6 +61,10 @@ async function request(endpoint, options = {}) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const errorMsg = data.detail || data.message || `Request failed with status ${res.status}`;
+        if ((res.status === 404 || res.status === 405) && i < bases.length - 1) {
+          lastError = errorMsg;
+          continue;
+        }
         return { ok: false, error: errorMsg, status: res.status };
       }
       return { ok: true, data };
