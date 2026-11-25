@@ -53,6 +53,7 @@ VERSION
 adapters/
 model_capabilities.yaml
 scripts/
+docs/
 
 
 
