@@ -108,6 +108,70 @@ export const SATELLITE_TILES = [
   'https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
 ];
 
+const LIBERTY_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const LIBERTY_LAYER_PREFIX = 'liberty-';
+let libertyStyleCache = null;
+let libertyStylePromise = null;
+
+function fetchLibertyVectorStyle() {
+  if (libertyStyleCache) return Promise.resolve(libertyStyleCache);
+  if (!libertyStylePromise) {
+    libertyStylePromise = fetch(LIBERTY_STYLE_URL)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.sources && Array.isArray(data?.layers)) {
+          libertyStyleCache = {
+            sources: data.sources,
+            layers: data.layers.filter((l) => l.type !== 'symbol'),
+          };
+        }
+        return libertyStyleCache;
+      })
+      .catch(() => null);
+  }
+  return libertyStylePromise;
+}
+
+function syncLibertyVectorBasemap(map, isVisible) {
+  if (!map || !map.getStyle() || !libertyStyleCache) return false;
+  const { sources, layers } = libertyStyleCache;
+
+  for (const [sourceId, sourceDef] of Object.entries(sources)) {
+    if (!map.getSource(sourceId)) {
+      try {
+        map.addSource(sourceId, sourceDef);
+      } catch (e) { }
+    }
+  }
+
+  const anchorId = map.getLayer('basemap') ? 'basemap' : undefined;
+  const vis = isVisible ? 'visible' : 'none';
+
+  for (const layer of layers) {
+    const id = `${LIBERTY_LAYER_PREFIX}${layer.id}`;
+    if (!map.getLayer(id)) {
+      try {
+        map.addLayer(
+          {
+            ...layer,
+            id,
+            layout: {
+              ...(layer.layout || {}),
+              visibility: vis,
+            },
+          },
+          anchorId
+        );
+      } catch (e) { }
+    } else {
+      try {
+        map.setLayoutProperty(id, 'visibility', vis);
+      } catch (e) { }
+    }
+  }
+  return true;
+}
+
 const BASEMAP_STYLE = {
   version: 8,
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
@@ -487,16 +551,43 @@ function applyMapLayersAndHeatmap(
   );
   const beforeId = firstLabelLayer ? firstLabelLayer.id : undefined;
 
-  // 1.5 Dynamic Dark Graphite Canvas Mode for Meteorological Overlays
-  // Modulates the white OSM street raster into a high-contrast dark graphite canvas
+  // 1.5 Dynamic Basemap Switching:
+  // - Cloudburst layer ('convective', non-satellite): colorful OpenFreeMap Liberty vector map
+  // - Other weather overlays: Dark Graphite Canvas over OSM
+  // - Satellite: base-satellite raster
+  const isConvectiveVector = !isSatellite && activeLayer === 'convective';
+  let libertyReady = false;
+  if (isConvectiveVector || libertyStyleCache) {
+    if (libertyStyleCache) {
+      libertyReady = syncLibertyVectorBasemap(map, isConvectiveVector);
+    } else if (isConvectiveVector) {
+      fetchLibertyVectorStyle().then((loaded) => {
+        if (!loaded || !map.getStyle()) return;
+        const stillConvective = map.getLayer('base-satellite')
+          && map.getLayoutProperty('base-satellite', 'visibility') === 'none'
+          && map.getLayer(HEATMAP_LAYER_ID)
+          && map.getLayoutProperty(HEATMAP_LAYER_ID, 'visibility') === 'visible';
+        syncLibertyVectorBasemap(map, stillConvective);
+        if (stillConvective && map.getLayer('basemap')) {
+          try {
+            map.setLayoutProperty('basemap', 'visibility', 'none');
+            map.setPaintProperty('basemap', 'raster-opacity', 0.0);
+          } catch (e) { }
+        }
+      });
+    }
+  }
+
   if (map.getLayer('basemap')) {
     const isDarkCanvas = !isSatellite && (activeLayer === 'temp' || activeLayer === 'wind' || activeLayer === 'precip' || activeLayer === 'aqi');
+    const hideOsmBasemap = isSatellite || (isConvectiveVector && libertyReady);
     try {
+      map.setLayoutProperty('basemap', 'visibility', hideOsmBasemap ? 'none' : 'visible');
       map.setPaintProperty('basemap', 'raster-brightness-min', isDarkCanvas ? 0.03 : 0.0);
       map.setPaintProperty('basemap', 'raster-brightness-max', isDarkCanvas ? 0.28 : 1.0);
       map.setPaintProperty('basemap', 'raster-contrast', isDarkCanvas ? 0.26 : 0.0);
       map.setPaintProperty('basemap', 'raster-saturation', isDarkCanvas ? -0.92 : 0.0);
-      map.setPaintProperty('basemap', 'raster-opacity', isSatellite ? 0.0 : 1.0);
+      map.setPaintProperty('basemap', 'raster-opacity', hideOsmBasemap ? 0.0 : 1.0);
     } catch (e) { }
   }
 
