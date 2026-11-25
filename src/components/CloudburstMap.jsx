@@ -108,7 +108,7 @@ export const SATELLITE_TILES = [
   'https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
 ];
 
-const LIBERTY_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const LIBERTY_STYLE_URL = 'https://tiles.openfreemap.org/styles/bright';
 const LIBERTY_LAYER_PREFIX = 'liberty-';
 let libertyStyleCache = null;
 let libertyStylePromise = null;
