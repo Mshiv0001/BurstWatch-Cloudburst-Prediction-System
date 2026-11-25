@@ -5,11 +5,13 @@ Run with:  uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
 NOTE: do not add `from __future__ import annotations` here. FastAPI must resolve the
 locally-built FeatureInput request model from the real (non-string) annotation.
 """
+import collections
 import datetime as dt
 import hmac
 import logging
 import re
 import secrets
+import threading
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -17,11 +19,12 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
 import jwt
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from .bootstrap import build_service
+from .cache import SystemCache, system_cache
 from .config import Settings
 from .email_service import EmailService
 from .model_service import InsufficientDataError
@@ -55,10 +58,47 @@ def create_session_token(email: str, name: str = "", picture: str = "",
 
 def decode_session_token(token: str, secret: str) -> Optional[Dict[str, Any]]:
     """Verify and decode an HS256 session JWT token."""
+    if not secret:
+        return None
     try:
-        return jwt.decode(token, secret, algorithms=["HS256"])
+        return jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            options={"require": ["exp", "sub"]},
+        )
     except Exception:
         return None
+
+
+class RateLimiter:
+    """Thread-safe in-memory sliding-window rate limiter."""
+
+    def __init__(self) -> None:
+        self._hits: Dict[tuple[str, str], collections.deque[float]] = collections.defaultdict(collections.deque)
+        self._lock = threading.Lock()
+
+    def check(self, route_group: str, client_ip: str, limit: int, window_seconds: int = 60) -> None:
+        now = time.monotonic()
+        cutoff = now - window_seconds
+        key = (route_group, client_ip)
+        with self._lock:
+            q = self._hits[key]
+            while q and q[0] <= cutoff:
+                q.popleft()
+            if len(q) >= limit:
+                raise HTTPException(429, "Too many requests. Please try again shortly.")
+            q.append(now)
+
+
+def _parse_gdacs_rss(raw: bytes) -> ET.Element:
+    """Safely parse GDACS RSS XML with size and DTD/entity guards."""
+    if len(raw) > 2_097_152:
+        raise ValueError("GDACS RSS feed exceeds 2MB size limit.")
+    lowered = raw.lower()
+    if b"<!doctype" in lowered or b"<!entity" in lowered:
+        raise ValueError("GDACS RSS feed contains disallowed XML DTD/entity declaration.")
+    return ET.fromstring(raw)
 
 
 def create_app(settings: Optional[Settings] = None,
@@ -88,8 +128,32 @@ def create_app(settings: Optional[Settings] = None,
         lifespan=lifespan,
     )
     if settings.cors_origins:
-        app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
-                           allow_methods=["GET", "POST", "PUT"], allow_headers=["*"])
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_origins),
+            allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+        )
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
+        return response
+
+    rate_limiter = RateLimiter()
+    app_cache = SystemCache(max_entries=1024, default_ttl_seconds=1800.0)
+    app.state.cache = app_cache
+
+    def rate_limit(route_group: str, limit: int, window_seconds: int = 60):
+        def _dep(request: Request) -> None:
+            client_ip = request.client.host if request.client else "unknown"
+            rate_limiter.check(route_group, client_ip, limit, window_seconds)
+        return Depends(_dep)
 
     def require_admin(x_api_key: Optional[str] = Header(default=None)) -> None:
         if not settings.admin_api_key:
@@ -111,7 +175,7 @@ def create_app(settings: Optional[Settings] = None,
             raise HTTPException(400, str(exc))
         except WeatherError as exc:
             logger.error("Weather provider error: %s", exc)
-            raise HTTPException(502, f"Weather data unavailable: {exc}")
+            raise HTTPException(502, "Weather data unavailable.")
 
     # ------------------------------------------------------------- public
     @app.get("/health", tags=["system"])
@@ -125,6 +189,24 @@ def create_app(settings: Optional[Settings] = None,
             "last_run": svc.store.last_run(),
             "latest_prediction": ({"target_date": latest["target_date"], **age_info(latest)} if latest else None),
         }
+
+    @app.get("/cache/stats", tags=["system"])
+    def cache_stats():
+        """Return system-wide cache statistics across API and terrain tiers."""
+        return {
+            "api_cache": app_cache.stats(),
+            "shared_cache": system_cache.stats(),
+        }
+
+    @app.post("/admin/cache/invalidate", tags=["admin"], dependencies=[Depends(require_admin)])
+    def invalidate_cache(namespace: Optional[str] = Query(default=None)):
+        """Invalidate a specific cache namespace or clear all caches."""
+        if namespace:
+            removed = app_cache.invalidate(namespace) + system_cache.invalidate(namespace)
+            return {"status": "ok", "namespace": namespace, "removed": removed}
+        app_cache.clear()
+        system_cache.clear()
+        return {"status": "ok", "namespace": "all"}
 
     @app.get("/model-info", tags=["system"])
     def model_info():
@@ -160,34 +242,38 @@ def create_app(settings: Optional[Settings] = None,
         except ValueError as exc:
             raise HTTPException(400, str(exc))
 
-    @app.post("/predict/location", tags=["predictions"])
+    @app.post("/predict/location", tags=["predictions"], dependencies=[rate_limit("predict_location", 20, 60)])
     def predict_location(payload: LocationPredictionRequest):
         """Fetch weather for coordinates, prepare model features, and score next-day rainfall risk."""
+        cache_key = f"{payload.latitude:.3f}:{payload.longitude:.3f}:{payload.feature_date}:{payload.source}"
+        cached = app_cache.get("predict_location", cache_key)
+        if cached is not None:
+            return cached
         try:
-            return svc.predict_location(
+            result = svc.predict_location(
                 payload.latitude, payload.longitude, payload.feature_date, payload.source
             )
+            app_cache.set("predict_location", cache_key, result, ttl_seconds=600.0)
+            return result
         except InsufficientDataError as exc:
             raise HTTPException(422, str(exc))
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except WeatherError as exc:
             logger.error("Weather provider error for requested coordinates: %s", exc)
-            raise HTTPException(502, f"Weather data unavailable: {exc}")
+            raise HTTPException(502, "Weather data unavailable.")
 
     @app.get("/metrics/live", tags=["evaluation"])
     def live_metrics():
         """Precision/recall of past predictions against outcomes recorded via PUT /outcomes."""
         return svc.store.live_metrics()
 
-    cyclone_cache = {"timestamp": 0, "data": []}
-
     @app.get("/cyclones", tags=["weather"])
     def active_cyclones():
         """Returns live active global tropical cyclones from UN GDACS / NOAA feeds."""
-        now = time.time()
-        if cyclone_cache["data"] and (now - cyclone_cache["timestamp"]) < 600:
-            return cyclone_cache["data"]
+        cached = app_cache.get("cyclones", "active")
+        if cached is not None:
+            return cached
 
         try:
             req = urllib.request.Request(
@@ -195,7 +281,8 @@ def create_app(settings: Optional[Settings] = None,
                 headers={"User-Agent": "BurstWatch/1.0"}
             )
             with urllib.request.urlopen(req, timeout=6) as resp:
-                tree = ET.fromstring(resp.read())
+                raw = resp.read(2_097_153)
+                tree = _parse_gdacs_rss(raw)
                 items = tree.findall(".//item")
                 cyclones = []
                 seen = set()
@@ -243,13 +330,12 @@ def create_app(settings: Optional[Settings] = None,
                             "country": country
                         })
                 if cyclones:
-                    cyclone_cache["timestamp"] = now
-                    cyclone_cache["data"] = cyclones
+                    app_cache.set("cyclones", "active", cyclones, ttl_seconds=600.0)
                     return cyclones
         except Exception as exc:
             logger.warning("Could not fetch live cyclones from GDACS: %s", exc)
 
-        return cyclone_cache["data"] or []
+        return []
 
     # -------------------------------------------------------------- admin
     @app.post("/predictions/run", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -266,7 +352,8 @@ def create_app(settings: Optional[Settings] = None,
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except WeatherError as exc:
-            raise HTTPException(502, f"Weather data unavailable: {exc}")
+            logger.error("Weather provider error during feature preview: %s", exc)
+            raise HTTPException(502, "Weather data unavailable.")
 
     @app.put("/outcomes/{target_date}", tags=["evaluation"], dependencies=[Depends(require_admin)])
     def record_outcome(target_date: dt.date, body: OutcomeRequest):
@@ -275,25 +362,27 @@ def create_app(settings: Optional[Settings] = None,
                                         settings.extreme_threshold_mm, body.source)
 
     # ------------------------------------------------------------- subscribers
-    @app.post("/subscribers/register", tags=["subscribers"])
+    @app.post("/subscribers/register", tags=["subscribers"], dependencies=[rate_limit("subscribers_register", 5, 60)])
     def register_subscriber(payload: SubscriberRegisterRequest):
-        """Register a new email subscriber. Generates and dispatches a 6-digit OTP."""
+        """Register a new or returning email subscriber. Generates and dispatches a 6-digit OTP."""
         code = f"{secrets.randbelow(900000) + 100000:06d}"
         expires_at = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).replace(microsecond=0).isoformat()
         unsub_token = secrets.token_hex(16)
 
-        sub = svc.store.upsert_subscriber(payload.email, code, expires_at, unsub_token, payload.location_pref or "ALL")
-        if sub.get("status") == "verified":
-            return {
-                "status": "verified",
-                "email": sub["email"],
-                "message": "Email is already verified and actively subscribed.",
-                "verified": True,
-            }
-
+        try:
+            sub = svc.store.upsert_subscriber(
+                payload.email,
+                code,
+                expires_at,
+                unsub_token,
+                payload.location_pref or "ALL",
+                min_threshold_mm=payload.min_threshold_mm,
+            )
+        except ValueError as exc:
+            raise HTTPException(429, str(exc))
         email_res = email_svc.send_verification_email(sub["email"], code, 15)
         if not email_res.get("success"):
-            raise HTTPException(502, detail=email_res.get("message", "SMTP delivery failed"))
+            raise HTTPException(502, detail="Email delivery temporarily unavailable.")
 
         return {
             "status": "pending",
@@ -303,7 +392,7 @@ def create_app(settings: Optional[Settings] = None,
             "dev_mode": email_res.get("dev_mode", False),
         }
 
-    @app.post("/subscribers/google-auth", tags=["subscribers"])
+    @app.post("/subscribers/google-auth", tags=["subscribers"], dependencies=[rate_limit("subscribers_google_auth", 10, 60)])
     def authenticate_google_subscriber(payload: SubscriberGoogleAuthRequest):
         """Verify Google ID token, confirm email_verified, upsert verified subscriber with ZERO OTP, and issue session JWT."""
         token = payload.credential.strip()
@@ -312,32 +401,76 @@ def create_app(settings: Optional[Settings] = None,
         picture = ""
         email_verified = False
 
-        # 1. Official Google ID Token cryptographic verification via google-auth
-        try:
-            from google.oauth2 import id_token
-            from google.auth.transport import requests as google_requests
-            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
-            email = idinfo.get("email")
-            email_verified = bool(idinfo.get("email_verified", False))
-            name = idinfo.get("name", "")
-            picture = idinfo.get("picture", "")
-        except Exception as exc:
-            logger.info("google-auth verification bypassed for dev/mock token: %s", exc)
+        # 1. Official Google verification: OIDC ID Token (JWT) or OAuth2 Access Token
+        verify_exc = None
+        if not settings.google_client_id:
+            if not settings.allow_dev_google_auth:
+                raise HTTPException(503, "Google Sign-In is not configured on the server.")
+        elif token.count(".") == 2:
+            try:
+                from google.oauth2 import id_token
+                from google.auth.transport import requests as google_requests
+                idinfo = id_token.verify_oauth2_token(
+                    token,
+                    google_requests.Request(),
+                    audience=settings.google_client_id,
+                )
+                email = idinfo.get("email")
+                email_verified = bool(idinfo.get("email_verified", False))
+                name = idinfo.get("name", "")
+                picture = idinfo.get("picture", "")
+            except Exception as exc:
+                verify_exc = exc
+        else:
+            try:
+                import requests as http_requests
+                tokeninfo_resp = http_requests.get(
+                    "https://oauth2.googleapis.com/tokeninfo",
+                    params={"access_token": token},
+                    timeout=5.0,
+                )
+                if tokeninfo_resp.status_code != 200:
+                    raise ValueError(f"tokeninfo returned {tokeninfo_resp.status_code}")
+                tokeninfo = tokeninfo_resp.json()
+                aud = tokeninfo.get("aud") or tokeninfo.get("azp")
+                if aud != settings.google_client_id:
+                    raise ValueError("Google access_token client ID mismatch")
 
-        # 2. Inspect unverified JWT claims if standard verify failed (for dev / testing)
-        if not email:
+                userinfo_resp = http_requests.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=5.0,
+                )
+                if userinfo_resp.status_code != 200:
+                    raise ValueError(f"userinfo returned {userinfo_resp.status_code}")
+                userinfo = userinfo_resp.json()
+                email = userinfo.get("email")
+                email_verified = bool(userinfo.get("email_verified", False))
+                name = userinfo.get("name", "")
+                picture = userinfo.get("picture", "")
+            except Exception as exc:
+                verify_exc = exc
+
+        if verify_exc is not None and not email:
+            if not settings.allow_dev_google_auth:
+                logger.warning("Google token verification failed: %s", verify_exc)
+                raise HTTPException(401, "Invalid or unverified Google credential.") from verify_exc
+            logger.info("google-auth verification bypassed for dev/mock token: %s", verify_exc)
+
+        # 2. Inspect unverified JWT claims if standard verify failed (dev-mode only)
+        if not email and settings.allow_dev_google_auth:
             try:
                 unverified = jwt.decode(token, options={"verify_signature": False})
                 if unverified and isinstance(unverified, dict) and "email" in unverified:
                     email = unverified["email"]
-                    email_verified = unverified.get("email_verified", True)
+                    email_verified = bool(unverified.get("email_verified", False))
                     name = unverified.get("name", "")
                     picture = unverified.get("picture", "")
             except Exception:
                 pass
 
-        # 3. Simulated dev Google login fallback (raw email input)
-        if not email and "@" in token:
+        # 3. Simulated dev Google login fallback (raw email input, dev-mode only)
+        if not email and settings.allow_dev_google_auth and "@" in token:
             email = token
             email_verified = True
             name = token.split("@")[0].replace(".", " ").title()
@@ -349,7 +482,8 @@ def create_app(settings: Optional[Settings] = None,
             email=email,
             name=name,
             picture=picture,
-            location_pref=payload.location_pref or "ALL"
+            location_pref=payload.location_pref or "ALL",
+            min_threshold_mm=payload.min_threshold_mm,
         )
 
         session_token = create_session_token(
@@ -374,7 +508,7 @@ def create_app(settings: Optional[Settings] = None,
             "message": "Subscribed and authenticated successfully with Google (Zero OTP).",
         }
 
-    @app.post("/subscribers/verify", tags=["subscribers"])
+    @app.post("/subscribers/verify", tags=["subscribers"], dependencies=[rate_limit("subscribers_verify", 10, 60)])
     def verify_subscriber_otp(payload: SubscriberVerifyRequest):
         """Verify the 6-digit OTP with brute-force limiting and return signed session JWT."""
         ok, msg = svc.store.verify_subscriber(payload.email, payload.code)
@@ -408,18 +542,18 @@ def create_app(settings: Optional[Settings] = None,
             "min_threshold_mm": sub.get("min_threshold_mm", 50.0) if sub else 50.0,
         }
 
-    @app.post("/subscribers/resend", tags=["subscribers"])
+    @app.post("/subscribers/resend", tags=["subscribers"], dependencies=[rate_limit("subscribers_resend", 3, 60)])
     def resend_verification_otp(payload: SubscriberResendRequest):
-        """Resend a new 6-digit OTP code to a pending subscriber."""
+        """Resend a new 6-digit OTP code to an email subscriber."""
         sub = svc.store.get_subscriber(payload.email)
         if not sub:
             raise HTTPException(404, "Subscriber record not found. Please register first.")
-        if sub["status"] == "verified":
-            return {"status": "verified", "email": sub["email"], "message": "Email is already verified."}
 
         new_code = f"{secrets.randbelow(900000) + 100000:06d}"
         new_expires_at = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).replace(microsecond=0).isoformat()
-        svc.store.resend_verification_code(payload.email, new_code, new_expires_at)
+        ok, msg = svc.store.resend_verification_code(payload.email, new_code, new_expires_at)
+        if not ok:
+            raise HTTPException(429, msg)
         email_res = email_svc.send_verification_email(payload.email, new_code, 15)
         return {
             "status": "sent",
@@ -429,36 +563,44 @@ def create_app(settings: Optional[Settings] = None,
         }
 
     @app.get("/subscribers/status", tags=["subscribers"])
-    def get_subscriber_status(email: str = Query(..., description="Subscriber email address")):
+    def get_subscriber_status(
+        email: str = Query(..., description="Subscriber email address"),
+        authorization: Optional[str] = Header(None),
+    ):
         """Query verification and subscription status for an email address."""
         sub = svc.store.get_subscriber(email)
         if not sub:
             return {"email": email, "status": "none", "verified": False}
-        return {
+
+        base = {
             "email": sub["email"],
             "status": sub["status"],
             "verified": sub["status"] == "verified",
-            "created_at": sub["created_at"],
-            "verified_at": sub.get("verified_at"),
-            "last_login_at": sub.get("last_login_at"),
-            "location_pref": sub.get("location_pref", "ALL"),
-            "auth_provider": sub.get("auth_provider", "email"),
-            "name": sub.get("name", ""),
-            "picture": sub.get("picture", ""),
-            "min_threshold_mm": sub.get("min_threshold_mm", 50.0),
         }
+        if authorization and authorization.lower().startswith("bearer "):
+            raw_token = authorization.split(" ", 1)[1].strip()
+            claims = decode_session_token(raw_token, settings.jwt_secret)
+            if claims and claims.get("sub", "").strip().lower() == sub["email"].strip().lower():
+                base.update({
+                    "created_at": sub["created_at"],
+                    "verified_at": sub.get("verified_at"),
+                    "last_login_at": sub.get("last_login_at"),
+                    "location_pref": sub.get("location_pref", "ALL"),
+                    "auth_provider": sub.get("auth_provider", "email"),
+                    "name": sub.get("name", ""),
+                    "picture": sub.get("picture", ""),
+                    "min_threshold_mm": sub.get("min_threshold_mm", 50.0),
+                })
+        return base
 
     @app.get("/subscribers/me", tags=["subscribers"])
     def get_authenticated_subscriber_profile(
         authorization: Optional[str] = Header(None),
-        token: Optional[str] = Query(None)
     ):
         """Retrieve authenticated subscriber profile and preferences via session JWT."""
         raw_token = None
         if authorization and authorization.lower().startswith("bearer "):
             raw_token = authorization.split(" ", 1)[1].strip()
-        elif token:
-            raw_token = token.strip()
 
         if not raw_token:
             raise HTTPException(401, "Missing authentication session token.")
@@ -468,8 +610,8 @@ def create_app(settings: Optional[Settings] = None,
             raise HTTPException(401, "Invalid or expired session token.")
 
         sub = svc.store.get_subscriber(claims["sub"])
-        if not sub:
-            raise HTTPException(404, "Subscriber account not found.")
+        if not sub or sub.get("status") != "verified":
+            raise HTTPException(401, "Subscriber session is no longer active.")
 
         return {
             "email": sub["email"],
@@ -491,18 +633,23 @@ def create_app(settings: Optional[Settings] = None,
         authorization: Optional[str] = Header(None)
     ):
         """Update notification preferences (monitoring valley and rain threshold)."""
-        email = payload.email
-        if not email and authorization and authorization.lower().startswith("bearer "):
+        raw_token = None
+        if authorization and authorization.lower().startswith("bearer "):
             raw_token = authorization.split(" ", 1)[1].strip()
-            claims = decode_session_token(raw_token, settings.jwt_secret)
-            if claims:
-                email = claims.get("sub")
 
-        if not email:
-            raise HTTPException(400, "Email address or Bearer authentication required.")
+        if not raw_token:
+            raise HTTPException(401, "Bearer authentication required.")
+
+        claims = decode_session_token(raw_token, settings.jwt_secret)
+        if not claims or "sub" not in claims:
+            raise HTTPException(401, "Invalid or expired session token.")
+
+        auth_email = claims["sub"].strip().lower()
+        if payload.email and payload.email.strip().lower() != auth_email:
+            raise HTTPException(403, "Cannot modify preferences for another subscriber.")
 
         updated = svc.store.update_subscriber_preferences(
-            email=email,
+            email=auth_email,
             location_pref=payload.location_pref,
             min_threshold_mm=payload.min_threshold_mm
         )
@@ -521,22 +668,48 @@ def create_app(settings: Optional[Settings] = None,
     def unsubscribe_subscriber_post(
         payload: Optional[SubscriberUnsubscribeRequest] = None,
         token: Optional[str] = Query(None),
-        email: Optional[str] = Query(None)
+        email: Optional[str] = Query(None),
+        authorization: Optional[str] = Header(None),
     ):
-        """Unsubscribe via JSON payload (email or token) or query params (supporting RFC 8058 One-Click)."""
-        identifier = (payload.token if payload else None) or (payload.email if payload else None) or token or email
-        if not identifier:
-            raise HTTPException(400, "Must provide either email or token to unsubscribe.")
-        ok = svc.store.unsubscribe(identifier)
+        """Unsubscribe via unsubscribe_token or authenticated Bearer JWT."""
+        unsub_token = ((payload.token if payload else None) or token or "").strip()
+        requested_email = ((payload.email if payload else None) or email or "").strip().lower()
+
+        if unsub_token and "@" not in unsub_token:
+            sub = svc.store.get_subscriber_by_token(unsub_token)
+            if not sub:
+                raise HTTPException(404, "Subscriber not found or already unsubscribed.")
+            ok = svc.store.unsubscribe(unsub_token)
+            if not ok:
+                raise HTTPException(404, "Subscriber not found or already unsubscribed.")
+            return {"status": "unsubscribed", "message": "You have been successfully unsubscribed."}
+
+        raw_token = None
+        if authorization and authorization.lower().startswith("bearer "):
+            raw_token = authorization.split(" ", 1)[1].strip()
+
+        if not raw_token:
+            raise HTTPException(401, "Authentication or valid unsubscribe token required.")
+
+        claims = decode_session_token(raw_token, settings.jwt_secret)
+        if not claims or "sub" not in claims:
+            raise HTTPException(401, "Invalid or expired session token.")
+
+        auth_email = claims["sub"].strip().lower()
+        if requested_email and requested_email != auth_email:
+            raise HTTPException(403, "Cannot unsubscribe another subscriber.")
+
+        ok = svc.store.unsubscribe(auth_email)
         if not ok:
             raise HTTPException(404, "Subscriber not found or already unsubscribed.")
         return {"status": "unsubscribed", "message": "You have been successfully unsubscribed."}
 
     @app.get("/subscribers/unsubscribe", tags=["subscribers"], response_class=HTMLResponse)
-    def unsubscribe_subscriber_get(token: Optional[str] = None, email: Optional[str] = None):
-        """1-click unsubscribe landing page from email links."""
-        identifier = token or email
-        success = bool(identifier and svc.store.unsubscribe(identifier))
+    def unsubscribe_subscriber_get(token: Optional[str] = None):
+        """1-click unsubscribe landing page from email links (requires unsubscribe_token)."""
+        clean_token = (token or "").strip()
+        sub = svc.store.get_subscriber_by_token(clean_token) if (clean_token and "@" not in clean_token) else None
+        success = bool(sub and svc.store.unsubscribe(clean_token))
         title = "Unsubscribed Successfully" if success else "Subscription Not Found"
         msg = ("You have been successfully unsubscribed from BurstWatch convective weather alerts."
                if success else
@@ -556,7 +729,7 @@ def create_app(settings: Optional[Settings] = None,
 </body>
 </html>"""
 
-    @app.post("/subscribers/broadcast", tags=["subscribers"])
+    @app.post("/subscribers/broadcast", tags=["subscribers"], dependencies=[Depends(require_admin)])
     def broadcast_alert_to_subscribers(payload: EmailBroadcastRequest):
         """Broadcast alert email to all active verified subscribers."""
         subs = svc.store.get_verified_subscribers(payload.location)
@@ -571,7 +744,7 @@ def create_app(settings: Optional[Settings] = None,
             "message": f"Broadcast dispatched to {res['sent']} verified subscriber(s).",
         }
 
-    @app.get("/subscribers", tags=["admin"])
+    @app.get("/subscribers", tags=["admin"], dependencies=[Depends(require_admin)])
     def list_subscribers_stats():
         """Subscriber counts by status."""
         return svc.store.list_subscribers_summary()

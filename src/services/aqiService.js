@@ -11,15 +11,23 @@
  */
 
 import { getGlobalAqiStationNetwork } from '../data/globalAqiCities.js';
+import {
+  aqiCacheManager,
+  getCachedAQI,
+  setCachedAQI,
+  invalidateAqiCache,
+  getAqiCacheMinutesRemaining
+} from '../cache/index.js';
 
-export { getGlobalAqiStationNetwork };
+export {
+  getGlobalAqiStationNetwork,
+  getCachedAQI,
+  setCachedAQI,
+  invalidateAqiCache,
+  getAqiCacheMinutesRemaining
+};
 
-const AQI_CACHE_KEY = 'burstwatch_global_aqi_v2';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
 const BATCH_CHUNK_SIZE = 28; // Safe coordinate batch limit per Open-Meteo GET request
-
-// Tier 1 in-memory runtime cache for instantaneous sub-millisecond retrieval
-let inMemoryAqiCache = null;
 
 /**
  * Air Quality Standard Categorization & Visual Encoding
@@ -120,81 +128,6 @@ export function getAqiCategory(aqiValue) {
 }
 
 /**
- * Helper to fetch and validate cached AQI telemetry.
- * Enforces strict stale eviction: if expired, purges memory & storage immediately.
- */
-export function getCachedAQI() {
-  const now = Date.now();
-
-  // 1. Check in-memory store first (Tier 1)
-  if (inMemoryAqiCache && inMemoryAqiCache.expiresAt && now < inMemoryAqiCache.expiresAt) {
-    return inMemoryAqiCache;
-  }
-
-  // 2. Check localStorage (Tier 2)
-  try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(AQI_CACHE_KEY) : null;
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.expiresAt && now < parsed.expiresAt && parsed.data) {
-        inMemoryAqiCache = parsed;
-        return parsed;
-      }
-      // Stale data detected: evict immediately
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(AQI_CACHE_KEY);
-      }
-    }
-  } catch (err) {
-    console.warn('[AQI] Error accessing cache, resetting:', err);
-    try {
-      if (typeof window !== 'undefined') localStorage.removeItem(AQI_CACHE_KEY);
-    } catch (_) {}
-  }
-
-  // Clear in-memory reference to allow garbage collection
-  inMemoryAqiCache = null;
-  return null;
-}
-
-/**
- * Persists fresh AQI data with a 30-minute expiration window across both tiers
- */
-export function setCachedAQI(dataMap) {
-  const now = Date.now();
-  const cachePayload = {
-    timestamp: now,
-    expiresAt: now + CACHE_TTL_MS,
-    data: dataMap,
-    count: Object.keys(dataMap).length
-  };
-
-  inMemoryAqiCache = cachePayload;
-
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(AQI_CACHE_KEY, JSON.stringify(cachePayload));
-    }
-  } catch (err) {
-    console.warn('[AQI] Failed to persist to localStorage (quota or disabled):', err);
-  }
-
-  return cachePayload;
-}
-
-/**
- * Invalidates both in-memory and persistent localStorage caches
- */
-export function invalidateAqiCache() {
-  inMemoryAqiCache = null;
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(AQI_CACHE_KEY);
-    }
-  } catch (_) {}
-}
-
-/**
  * Returns cache telemetry stats for diagnostics and UI status widgets
  */
 export function getAqiCacheStats() {
@@ -210,15 +143,6 @@ export function getAqiCacheStats() {
     expiresAt: cached.expiresAt,
     timestamp: cached.timestamp
   };
-}
-
-/**
- * Returns minutes remaining until next scheduled 30-minute synchronization
- */
-export function getAqiCacheMinutesRemaining() {
-  const cached = getCachedAQI();
-  if (!cached || !cached.expiresAt) return 0;
-  return Math.max(0, Math.round((cached.expiresAt - Date.now()) / 60000));
 }
 
 /**
@@ -297,98 +221,104 @@ export async function getLiveAirQualityNetwork(stations = null, forceRefresh = f
     }
   }
 
-  const resultsMap = {};
-  const cityList = Array.isArray(stations) && stations.length > 0 
-    ? stations 
-    : getGlobalAqiStationNetwork();
+  const dedupeKey = Array.isArray(stations) && stations.length > 0
+    ? `aqi_batch_custom_${stations.length}`
+    : 'aqi_batch_global';
 
-  // 2. Partition stations into chunked batches
-  const chunks = [];
-  for (let i = 0; i < cityList.length; i += BATCH_CHUNK_SIZE) {
-    chunks.push(cityList.slice(i, i + BATCH_CHUNK_SIZE));
-  }
+  return aqiCacheManager.deduplicator.dedupe(dedupeKey, async () => {
+    const resultsMap = {};
+    const cityList = Array.isArray(stations) && stations.length > 0
+      ? stations
+      : getGlobalAqiStationNetwork();
 
-  // 3. Process chunks with polite pacing to respect Open-Meteo rate limits
-  for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-    const chunk = chunks[chunkIdx];
-    const lats = chunk.map((c) => c.lat.toFixed(4)).join(',');
-    const lons = chunk.map((c) => c.lon.toFixed(4)).join(',');
-    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=us_aqi,european_aqi,pm10,pm2_5,nitrogen_dioxide,ozone`;
+    // 2. Partition stations into chunked batches
+    const chunks = [];
+    for (let i = 0; i < cityList.length; i += BATCH_CHUNK_SIZE) {
+      chunks.push(cityList.slice(i, i + BATCH_CHUNK_SIZE));
+    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    // 3. Process chunks with polite pacing to respect Open-Meteo rate limits
+    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+      const chunk = chunks[chunkIdx];
+      const lats = chunk.map((c) => c.lat.toFixed(4)).join(',');
+      const lons = chunk.map((c) => c.lon.toFixed(4)).join(',');
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=us_aqi,european_aqi,pm10,pm2_5,nitrogen_dioxide,ozone`;
 
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timer);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
 
-      if (!response.ok) {
-        throw new Error(`Open-Meteo AQI responded with status ${response.status}`);
-      }
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
 
-      const data = await response.json();
-      const records = Array.isArray(data) ? data : [data];
+        if (!response.ok) {
+          throw new Error(`Open-Meteo AQI responded with status ${response.status}`);
+        }
 
-      for (let i = 0; i < chunk.length; i++) {
-        const station = chunk[i];
-        const record = records[i] || {};
-        const current = record.current || {};
+        const data = await response.json();
+        const records = Array.isArray(data) ? data : [data];
 
-        const aqiRaw = current.us_aqi != null 
-          ? current.us_aqi 
-          : (current.european_aqi ? Math.round(current.european_aqi * 1.8) : null);
+        for (let i = 0; i < chunk.length; i++) {
+          const station = chunk[i];
+          const record = records[i] || {};
+          const current = record.current || {};
 
-        if (aqiRaw != null && !isNaN(aqiRaw)) {
-          const aqi = Math.max(1, Math.round(aqiRaw));
-          const cat = getAqiCategory(aqi);
-          const pm25 = current.pm2_5 != null ? parseFloat(current.pm2_5.toFixed(1)) : parseFloat((aqi * 0.45).toFixed(1));
-          const pm10 = current.pm10 != null ? parseFloat(current.pm10.toFixed(1)) : parseFloat((pm25 * 1.6).toFixed(1));
-          const no2 = current.nitrogen_dioxide != null ? parseFloat(current.nitrogen_dioxide.toFixed(1)) : 18.0;
-          const o3 = current.ozone != null ? parseFloat(current.ozone.toFixed(1)) : 42.0;
+          const aqiRaw = current.us_aqi != null
+            ? current.us_aqi
+            : (current.european_aqi ? Math.round(current.european_aqi * 1.8) : null);
 
-          resultsMap[station.id] = {
-            stationId: station.id,
-            name: station.name,
-            state: station.state || station.country || '',
-            country: station.country || 'Global',
-            continent: station.continent || 'Global',
-            region: station.region || 'metropolitan',
-            lat: station.lat,
-            lon: station.lon,
-            aqi,
-            category: cat.category,
-            color: cat.color,
-            pm2_5: pm25,
-            pm10: pm10,
-            no2: no2,
-            o3: o3,
-            dominantPollutant: pm25 > 50 ? 'PM2.5' : (pm10 > 80 ? 'PM10' : 'Ozone'),
-            healthAdvice: cat.healthAdvice,
-            maskRecommended: cat.maskRecommended,
-            time: current.time || new Date().toISOString(),
-            isEstimated: false
-          };
-        } else {
-          // Graceful baseline fallback if record missing
+          if (aqiRaw != null && !isNaN(aqiRaw)) {
+            const aqi = Math.max(1, Math.round(aqiRaw));
+            const cat = getAqiCategory(aqi);
+            const pm25 = current.pm2_5 != null ? parseFloat(current.pm2_5.toFixed(1)) : parseFloat((aqi * 0.45).toFixed(1));
+            const pm10 = current.pm10 != null ? parseFloat(current.pm10.toFixed(1)) : parseFloat((pm25 * 1.6).toFixed(1));
+            const no2 = current.nitrogen_dioxide != null ? parseFloat(current.nitrogen_dioxide.toFixed(1)) : 18.0;
+            const o3 = current.ozone != null ? parseFloat(current.ozone.toFixed(1)) : 42.0;
+
+            resultsMap[station.id] = {
+              stationId: station.id,
+              name: station.name,
+              state: station.state || station.country || '',
+              country: station.country || 'Global',
+              continent: station.continent || 'Global',
+              region: station.region || 'metropolitan',
+              lat: station.lat,
+              lon: station.lon,
+              aqi,
+              category: cat.category,
+              color: cat.color,
+              pm2_5: pm25,
+              pm10: pm10,
+              no2: no2,
+              o3: o3,
+              dominantPollutant: pm25 > 50 ? 'PM2.5' : (pm10 > 80 ? 'PM10' : 'Ozone'),
+              healthAdvice: cat.healthAdvice,
+              maskRecommended: cat.maskRecommended,
+              time: current.time || new Date().toISOString(),
+              isEstimated: false
+            };
+          } else {
+            // Graceful baseline fallback if record missing
+            resultsMap[station.id] = generateRealisticStationBaseline(station);
+          }
+        }
+      } catch (err) {
+        clearTimeout(timer);
+        // Seamless baseline fallback for network failures / rate limiting
+        for (const station of chunk) {
           resultsMap[station.id] = generateRealisticStationBaseline(station);
         }
       }
-    } catch (err) {
-      clearTimeout(timer);
-      // Seamless baseline fallback for network failures / rate limiting
-      for (const station of chunk) {
-        resultsMap[station.id] = generateRealisticStationBaseline(station);
+
+      // Polite 25ms delay between chunks to preserve clean network throttling
+      if (chunkIdx < chunks.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
       }
     }
 
-    // Polite 25ms delay between chunks to preserve clean network throttling
-    if (chunkIdx < chunks.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-  }
+    // 4. Save to multi-tier sliding-window cache with 30-min TTL
+    await setCachedAQI(resultsMap);
 
-  // 4. Save to multi-tier sliding-window cache with 30-min TTL
-  setCachedAQI(resultsMap);
-
-  return resultsMap;
+    return resultsMap;
+  });
 }

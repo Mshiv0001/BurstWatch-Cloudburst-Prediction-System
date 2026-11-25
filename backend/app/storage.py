@@ -6,6 +6,7 @@ class's public methods and swap the implementation.
 from __future__ import annotations
 
 import datetime as dt
+import hmac
 import json
 import sqlite3
 from contextlib import contextmanager
@@ -70,7 +71,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
     auth_provider TEXT DEFAULT 'email',
     name TEXT DEFAULT '',
     picture TEXT DEFAULT '',
-    min_threshold_mm REAL DEFAULT 50.0
+    min_threshold_mm REAL DEFAULT 50.0,
+    last_otp_sent_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers(email);
 CREATE INDEX IF NOT EXISTS idx_subscribers_status ON subscribers(status);
@@ -104,6 +106,8 @@ class Store:
                 c.execute("ALTER TABLE subscribers ADD COLUMN last_login_at TEXT")
             if "min_threshold_mm" not in cols:
                 c.execute("ALTER TABLE subscribers ADD COLUMN min_threshold_mm REAL DEFAULT 50.0")
+            if "last_otp_sent_at" not in cols:
+                c.execute("ALTER TABLE subscribers ADD COLUMN last_otp_sent_at TEXT")
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -248,46 +252,62 @@ class Store:
 
     # ------------------------------------------------------------ subscribers
     def upsert_subscriber(self, email: str, code: str, expires_at: str,
-                          unsubscribe_token: str, location_pref: str = "ALL") -> Dict[str, Any]:
+                          unsubscribe_token: str, location_pref: str = "ALL",
+                          min_threshold_mm: Optional[float] = None) -> Dict[str, Any]:
         """Register or re-register an email subscriber with a fresh verification code."""
         norm_email = email.strip().lower()
-        now = utcnow()
+        now_dt = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+        now = now_dt.isoformat()
         with self._conn() as c:
             existing = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
             if existing:
                 row_dict = dict(existing)
-                # If already verified, update location pref and last login
-                if row_dict["status"] == "verified":
-                    c.execute("""UPDATE subscribers 
-                              SET location_pref = ?, last_login_at = ? 
-                              WHERE id = ?""",
-                              (location_pref, now, row_dict["id"]))
-                    row_dict["location_pref"] = location_pref
-                    row_dict["last_login_at"] = now
-                    return row_dict
-                # If pending or unsubscribed, update code and reactivate to pending
-                c.execute(
-                    """UPDATE subscribers 
-                    SET status = 'pending', verification_code = ?, token_expires_at = ?,
-                        attempts = 0, failed_attempts = 0, location_pref = ?, auth_provider = 'email'
-                    WHERE id = ?""",
-                    (code, expires_at, location_pref, row_dict["id"])
-                )
+                last_sent_raw = row_dict.get("last_otp_sent_at")
+                if last_sent_raw:
+                    try:
+                        last_sent_dt = dt.datetime.fromisoformat(last_sent_raw)
+                        if (now_dt - last_sent_dt).total_seconds() < 60:
+                            raise ValueError("Please wait 60 seconds before requesting a new verification code.")
+                    except ValueError as exc:
+                        if "Please wait" in str(exc):
+                            raise
+
+                if row_dict.get("status") == "verified":
+                    c.execute(
+                        """UPDATE subscribers
+                        SET verification_code = ?, token_expires_at = ?,
+                            attempts = 0, failed_attempts = 0, last_otp_sent_at = ?
+                        WHERE id = ?""",
+                        (code, expires_at, now, row_dict["id"])
+                    )
+                else:
+                    loc = location_pref if (location_pref and location_pref != "ALL") else (row_dict.get("location_pref") or location_pref)
+                    thresh = float(min_threshold_mm) if min_threshold_mm is not None else float(row_dict.get("min_threshold_mm") or 50.0)
+                    c.execute(
+                        """UPDATE subscribers 
+                        SET verification_code = ?, token_expires_at = ?,
+                            attempts = 0, failed_attempts = 0, location_pref = ?, min_threshold_mm = ?,
+                            auth_provider = 'email', last_otp_sent_at = ?
+                        WHERE id = ?""",
+                        (code, expires_at, loc, thresh, now, row_dict["id"])
+                    )
                 updated = c.execute("SELECT * FROM subscribers WHERE id = ?", (row_dict["id"],)).fetchone()
                 return dict(updated)
             else:
+                thresh = float(min_threshold_mm) if min_threshold_mm is not None else 50.0
                 cur = c.execute(
                     """INSERT INTO subscribers 
                     (email, status, verification_code, token_expires_at, attempts, failed_attempts,
-                     unsubscribe_token, created_at, location_pref, auth_provider, name, picture, min_threshold_mm)
-                    VALUES (?, 'pending', ?, ?, 0, 0, ?, ?, ?, 'email', '', '', 50.0)""",
-                    (norm_email, code, expires_at, unsubscribe_token, now, location_pref)
+                     unsubscribe_token, created_at, location_pref, auth_provider, name, picture, min_threshold_mm, last_otp_sent_at)
+                    VALUES (?, 'pending', ?, ?, 0, 0, ?, ?, ?, 'email', '', '', ?, ?)""",
+                    (norm_email, code, expires_at, unsubscribe_token, now, location_pref, thresh, now)
                 )
                 inserted = c.execute("SELECT * FROM subscribers WHERE id = ?", (cur.lastrowid,)).fetchone()
                 return dict(inserted)
 
     def upsert_verified_google_subscriber(self, email: str, name: str = "", picture: str = "",
-                                          location_pref: str = "ALL") -> Dict[str, Any]:
+                                          location_pref: str = "ALL",
+                                          min_threshold_mm: Optional[float] = None) -> Dict[str, Any]:
         """Register or update an email subscriber as pre-verified via Google OAuth (Zero OTP)."""
         import secrets
         norm_email = email.strip().lower()
@@ -298,25 +318,29 @@ class Store:
                 row_dict = dict(existing)
                 display_name = name or row_dict.get("name") or ""
                 picture_url = picture or row_dict.get("picture") or ""
+                loc = location_pref if (location_pref and location_pref != "ALL") else (row_dict.get("location_pref") or location_pref)
+                thresh = float(min_threshold_mm) if min_threshold_mm is not None else float(row_dict.get("min_threshold_mm") or 50.0)
+                verified_at = row_dict.get("verified_at") or now
                 c.execute(
                     """UPDATE subscribers 
                     SET status = 'verified', verified_at = ?, last_login_at = ?, verification_code = NULL,
-                        attempts = 0, failed_attempts = 0, location_pref = ?, auth_provider = 'google',
-                        name = ?, picture = ?
+                        token_expires_at = NULL, attempts = 0, failed_attempts = 0, location_pref = ?,
+                        min_threshold_mm = ?, auth_provider = 'google', name = ?, picture = ?
                     WHERE id = ?""",
-                    (now, now, location_pref, display_name, picture_url, row_dict["id"])
+                    (verified_at, now, loc, thresh, display_name, picture_url, row_dict["id"])
                 )
                 updated = c.execute("SELECT * FROM subscribers WHERE id = ?", (row_dict["id"],)).fetchone()
                 return dict(updated)
             else:
                 unsub_token = secrets.token_hex(16)
+                thresh = float(min_threshold_mm) if min_threshold_mm is not None else 50.0
                 cur = c.execute(
                     """INSERT INTO subscribers 
                     (email, status, verification_code, token_expires_at, attempts, failed_attempts,
                      unsubscribe_token, created_at, verified_at, last_login_at, location_pref,
                      auth_provider, name, picture, min_threshold_mm)
-                    VALUES (?, 'verified', NULL, NULL, 0, 0, ?, ?, ?, ?, ?, 'google', ?, ?, 50.0)""",
-                    (norm_email, unsub_token, now, now, now, location_pref, name, picture)
+                    VALUES (?, 'verified', NULL, NULL, 0, 0, ?, ?, ?, ?, ?, 'google', ?, ?, ?)""",
+                    (norm_email, unsub_token, now, now, now, location_pref, name, picture, thresh)
                 )
                 inserted = c.execute("SELECT * FROM subscribers WHERE id = ?", (cur.lastrowid,)).fetchone()
                 return dict(inserted)
@@ -330,10 +354,8 @@ class Store:
             if not row:
                 return False, "Email address not found. Please register first."
             sub = dict(row)
-            if sub["status"] == "verified":
-                return True, "Email is already verified."
-            if sub["status"] == "unsubscribed":
-                return False, "This email was unsubscribed. Please register again to re-activate."
+            if not sub.get("verification_code"):
+                return False, "No verification code active. Please request a new verification code."
             current_attempts = max(sub.get("attempts", 0) or 0, sub.get("failed_attempts", 0) or 0)
             if current_attempts >= 5:
                 return False, "Too many failed attempts. Please request a new verification code."
@@ -341,7 +363,7 @@ class Store:
                 return False, "Verification code has expired. Please request a new one."
             
             clean_code = str(code).strip()
-            if clean_code != str(sub["verification_code"]).strip():
+            if not hmac.compare_digest(clean_code, str(sub["verification_code"]).strip()):
                 new_attempts = current_attempts + 1
                 c.execute("UPDATE subscribers SET attempts = ?, failed_attempts = ? WHERE id = ?",
                           (new_attempts, new_attempts, sub["id"]))
@@ -349,12 +371,13 @@ class Store:
                 return False, f"Invalid verification code. {remaining} attempt(s) remaining."
 
             # Code matches! Mark as verified
+            verified_at = sub.get("verified_at") or now
             c.execute(
                 """UPDATE subscribers 
                 SET status = 'verified', verified_at = ?, last_login_at = ?, verification_code = NULL,
-                    attempts = 0, failed_attempts = 0 
+                    token_expires_at = NULL, attempts = 0, failed_attempts = 0 
                 WHERE id = ?""",
-                (now, now, sub["id"])
+                (verified_at, now, sub["id"])
             )
             return True, "Email verified successfully."
 
@@ -393,18 +416,26 @@ class Store:
 
     def resend_verification_code(self, email: str, new_code: str, new_expires_at: str) -> tuple[bool, str]:
         norm_email = email.strip().lower()
+        now_dt = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+        now = now_dt.isoformat()
         with self._conn() as c:
             row = c.execute("SELECT * FROM subscribers WHERE email = ?", (norm_email,)).fetchone()
             if not row:
                 return False, "Email not found. Please register first."
             sub = dict(row)
-            if sub["status"] == "verified":
-                return False, "Email is already verified."
+            last_sent_raw = sub.get("last_otp_sent_at")
+            if last_sent_raw:
+                try:
+                    last_sent_dt = dt.datetime.fromisoformat(last_sent_raw)
+                    if (now_dt - last_sent_dt).total_seconds() < 60:
+                        return False, "Please wait 60 seconds before requesting a new verification code."
+                except ValueError:
+                    pass
             c.execute(
                 """UPDATE subscribers 
-                SET verification_code = ?, token_expires_at = ?, attempts = 0, failed_attempts = 0, status = 'pending'
+                SET verification_code = ?, token_expires_at = ?, attempts = 0, failed_attempts = 0, last_otp_sent_at = ?
                 WHERE id = ?""",
-                (new_code, new_expires_at, sub["id"])
+                (new_code, new_expires_at, now, sub["id"])
             )
             return True, "Verification code refreshed."
 
@@ -416,7 +447,7 @@ class Store:
                 (identifier, email_or_token.strip())
             ).fetchone()
             if row:
-                c.execute("UPDATE subscribers SET status = 'unsubscribed', verification_code = NULL WHERE id = ?",
+                c.execute("UPDATE subscribers SET status = 'unsubscribed', verification_code = NULL, token_expires_at = NULL WHERE id = ?",
                           (row["id"],))
                 return True
         return False

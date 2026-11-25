@@ -6,10 +6,12 @@ allowing instant local development without requiring external mail server creden
 """
 from __future__ import annotations
 
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid, parseaddr
 from typing import Any, Dict, List, Optional
 
 from .config import Settings
@@ -22,7 +24,18 @@ class EmailService:
         self.settings = settings
         self.is_dev_mode = bool(settings.email_dev_mode or not settings.smtp_host)
 
+    def _get_unsubscribe_url(self, unsubscribe_token: str) -> str:
+        """Return a public HTTPS/HTTP unsubscribe URL only when PUBLIC_BASE_URL is a non-localhost origin."""
+        base = (self.settings.public_base_url or "").strip().rstrip("/")
+        if not base or not (base.startswith("https://") or base.startswith("http://")):
+            return ""
+        lowered = base.lower()
+        if "localhost" in lowered or "127.0.0.1" in lowered:
+            return ""
+        return f"{base}/subscribers/unsubscribe?token={unsubscribe_token}"
+
     def _render_verification_html(self, code: str, expires_minutes: int) -> str:
+        safe_code = html.escape(str(code))
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -30,51 +43,41 @@ class EmailService:
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BurstWatch Verification Code</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #070b14; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #070b14; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 32px 16px;">
     <tr>
       <td align="center">
-        <table width="100%" max-width="560" style="max-width: 560px; background: rgba(14, 20, 36, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 24px; padding: 36px 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);">
-          <!-- Header -->
+        <table width="100%" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 24px;">
           <tr>
-            <td align="center" style="padding-bottom: 24px;">
-              <div style="display: inline-block; padding: 8px 18px; border-radius: 9999px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35);">
-                <span style="font-size: 13px; font-weight: 700; color: #38bdf8; letter-spacing: 0.1em; text-transform: uppercase;">BurstWatch Radar &amp; Early Warning</span>
+            <td style="padding-bottom: 12px; font-size: 13px; font-weight: 700; color: #0284c7;">
+              BurstWatch Weather Alerts
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 12px;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">Confirm your email address</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 20px; font-size: 14px; line-height: 1.6; color: #334155;">
+              Enter this 6-digit verification code in BurstWatch to complete your alert setup:
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 20px;">
+              <div style="display: inline-block; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 24px;">
+                <span style="font-family: ui-monospace, 'Courier New', monospace; font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #0f172a;">{safe_code}</span>
               </div>
             </td>
           </tr>
-          <!-- Title -->
           <tr>
-            <td align="center" style="padding-bottom: 16px;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em;">Verify Your Email Address</h1>
+            <td style="padding-bottom: 16px; font-size: 13px; line-height: 1.5; color: #475569;">
+              This code expires in {expires_minutes} minutes. If you did not request it, you can ignore this message.
             </td>
           </tr>
-          <!-- Body Text -->
           <tr>
-            <td style="padding-bottom: 28px; font-size: 14px; line-height: 1.6; color: #94a3b8; text-align: center;">
-              Thank you for subscribing to BurstWatch convective cloudburst and extreme weather early warnings. Use the 6-digit verification code below to confirm your subscription:
-            </td>
-          </tr>
-          <!-- OTP Box -->
-          <tr>
-            <td align="center" style="padding-bottom: 28px;">
-              <div style="display: inline-block; background: rgba(6, 182, 212, 0.1); border: 2px solid #06b6d4; border-radius: 16px; padding: 18px 36px; box-shadow: 0 0 24px rgba(6, 182, 212, 0.2);">
-                <span style="font-family: ui-monospace, 'Courier New', monospace; font-size: 38px; font-weight: 900; letter-spacing: 12px; color: #38bdf8; margin-right: -12px;">{code}</span>
-              </div>
-            </td>
-          </tr>
-          <!-- Expiration Notice -->
-          <tr>
-            <td style="padding-bottom: 28px; font-size: 12px; color: #64748b; text-align: center;">
-              This code will expire in <strong style="color: #cbd5e1;">{expires_minutes} minutes</strong>. If you did not request this verification, please safely ignore this email.
-            </td>
-          </tr>
-          <!-- Divider -->
-          <tr>
-            <td style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px;">
-              <p style="margin: 0; font-size: 11px; color: #475569; text-align: center;">
-                Pan-India Physics-Informed Convective Cloudburst &amp; Flash Flood Warning System
-              </p>
+            <td style="border-top: 1px solid #e2e8f0; padding-top: 14px; font-size: 12px; color: #64748b;">
+              BurstWatch Convective Monitoring
             </td>
           </tr>
         </table>
@@ -85,69 +88,68 @@ class EmailService:
 </html>"""
 
     def _render_alert_html(self, alert_data: Dict[str, Any], unsubscribe_token: str) -> str:
-        loc = alert_data.get("location", "Monitored Region")
+        loc = html.escape(str(alert_data.get("location", "Monitored Region")))
         prob = float(alert_data.get("predicted_probability", 0.0))
-        target_date = alert_data.get("target_date", "Upcoming Day")
+        target_date = html.escape(str(alert_data.get("target_date", "Upcoming Day")))
         thresh = float(alert_data.get("threshold", 0.50))
-        severity = "EXTREME CONVECTIVE ALERT" if prob >= 0.70 else "ELEVATED RAINFALL WARNING"
-        header_color = "#f43f5e" if prob >= 0.70 else "#f59e0b"
+        severity = html.escape("High Convective Risk" if prob >= 0.70 else "Elevated Rainfall Advisory")
+        accent = "#dc2626" if prob >= 0.70 else "#d97706"
+        unsub_url = self._get_unsubscribe_url(unsubscribe_token)
+        safe_unsub_url = html.escape(unsub_url, quote=True)
+        unsub_footer = (
+            f'<a href="{safe_unsub_url}" style="color: #475569; text-decoration: underline;">Unsubscribe from alerts</a>'
+            if unsub_url
+            else "You can update or pause alerts anytime in the BurstWatch Alerts panel."
+        )
 
         return f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>BurstWatch Weather Alert</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BurstWatch Weather Advisory</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #070b14; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #f1f5f9;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #070b14; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #0f172a;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 32px 16px;">
     <tr>
       <td align="center">
-        <table width="100%" max-width="580" style="max-width: 580px; background: rgba(18, 12, 16, 0.95); border: 1px solid {header_color}55; border-radius: 24px; padding: 36px 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);">
-          <!-- Header Badge -->
+        <table width="100%" style="max-width: 540px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 24px;">
           <tr>
-            <td align="center" style="padding-bottom: 20px;">
-              <div style="display: inline-block; padding: 6px 16px; border-radius: 9999px; background: {header_color}22; border: 1px solid {header_color}88;">
-                <span style="font-size: 12px; font-weight: 800; color: {header_color}; letter-spacing: 0.12em; text-transform: uppercase;">⚠️ {severity}</span>
-              </div>
+            <td style="padding-bottom: 8px; font-size: 12px; font-weight: 700; color: {accent};">
+              {severity}
             </td>
           </tr>
-          <!-- Title -->
           <tr>
-            <td align="center" style="padding-bottom: 20px;">
-              <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff;">Convective Risk for {loc}</h1>
+            <td style="padding-bottom: 16px;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">Weather Advisory for {loc}</h1>
             </td>
           </tr>
-          <!-- Main Details Table -->
           <tr>
-            <td style="padding-bottom: 24px;">
-              <table width="100%" style="background: rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding-bottom: 18px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
                 <tr>
-                  <td style="font-size: 13px; color: #94a3b8; padding: 6px 0;">Target Date:</td>
-                  <td align="right" style="font-size: 14px; font-weight: 700; color: #f8fafc; padding: 6px 0;">{target_date}</td>
+                  <td style="font-size: 13px; color: #475569; padding: 4px 0;">Target Date</td>
+                  <td align="right" style="font-size: 13px; font-weight: 600; color: #0f172a; padding: 4px 0;">{target_date}</td>
                 </tr>
                 <tr>
-                  <td style="font-size: 13px; color: #94a3b8; padding: 6px 0;">Convective Risk Probability:</td>
-                  <td align="right" style="font-size: 16px; font-weight: 800; color: {header_color}; padding: 6px 0;">{prob*100:.1f}%</td>
+                  <td style="font-size: 13px; color: #475569; padding: 4px 0;">Convective Risk Probability</td>
+                  <td align="right" style="font-size: 14px; font-weight: 700; color: {accent}; padding: 4px 0;">{prob*100:.1f}%</td>
                 </tr>
                 <tr>
-                  <td style="font-size: 13px; color: #94a3b8; padding: 6px 0;">Warning Threshold:</td>
-                  <td align="right" style="font-size: 14px; font-weight: 600; color: #cbd5e1; padding: 6px 0;">{thresh*100:.1f}%</td>
+                  <td style="font-size: 13px; color: #475569; padding: 4px 0;">Alert Threshold</td>
+                  <td align="right" style="font-size: 13px; font-weight: 600; color: #334155; padding: 4px 0;">{thresh*100:.1f}%</td>
                 </tr>
               </table>
             </td>
           </tr>
-          <!-- Precaution Advice -->
           <tr>
-            <td style="padding-bottom: 28px; font-size: 13px; line-height: 1.6; color: #cbd5e1;">
-              <strong>Precautionary Advisory:</strong> High moisture convergence and instability indices indicate elevated probability of rapid convective cell formation and heavy downpours (&gt;50 mm/day). Please avoid low-lying drainage channels and steep mountain streams.
+            <td style="padding-bottom: 20px; font-size: 14px; line-height: 1.6; color: #334155;">
+              Forecast models indicate elevated convective moisture convergence and potential heavy rainfall. Monitor local conditions and avoid low-lying drainage channels or steep mountain streams.
             </td>
           </tr>
-          <!-- Footer & Unsubscribe -->
           <tr>
-            <td style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; font-size: 11px; color: #64748b; text-align: center;">
-              You received this alert because you are a verified subscriber.
-              <br><br>
-              <a href="http://localhost:8000/subscribers/unsubscribe?token={unsubscribe_token}" style="color: #94a3b8; text-decoration: underline;">One-Click Unsubscribe</a>
+            <td style="border-top: 1px solid #e2e8f0; padding-top: 14px; font-size: 12px; color: #64748b;">
+              Sent for your configured BurstWatch region. {unsub_footer}
             </td>
           </tr>
         </table>
@@ -159,11 +161,18 @@ class EmailService:
 
     def _dispatch_smtp(self, to_email: str, subject: str, text_content: str, html_content: str,
                        headers: Optional[Dict[str, str]] = None) -> tuple[bool, str]:
-        """Send via real SMTP server with TLS/SSL."""
+        """Send via real SMTP server with TLS/SSL and full RFC 5322 headers."""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = self.settings.smtp_from
         msg["To"] = to_email
+        msg["Date"] = formatdate(localtime=True)
+
+        _, from_addr = parseaddr(self.settings.smtp_from)
+        sender_domain = from_addr.split("@", 1)[1] if "@" in from_addr else "burstwatch.local"
+        msg["Message-ID"] = make_msgid(domain=sender_domain)
+        if from_addr:
+            msg["Reply-To"] = from_addr
 
         if headers:
             for k, v in headers.items():
@@ -188,21 +197,19 @@ class EmailService:
             logger.info("Email successfully dispatched via SMTP to %s", to_email)
             return True, "Email sent successfully"
         except smtplib.SMTPAuthenticationError as exc:
-            err = f"SMTP Authentication failed: check username and password (for Gmail, use a 16-character App Password). Details: {exc}"
-            logger.error(err)
-            return False, err
+            logger.error("SMTP Authentication failed (%s:%s): %s", self.settings.smtp_host, self.settings.smtp_port, exc)
+            return False, "SMTP authentication failed."
         except Exception as exc:
-            err = f"SMTP Delivery error ({self.settings.smtp_host}:{self.settings.smtp_port}): {exc}"
-            logger.error(err)
-            return False, err
+            logger.error("SMTP Delivery error (%s:%s): %s", self.settings.smtp_host, self.settings.smtp_port, exc)
+            return False, "SMTP delivery failed."
 
     def send_verification_email(self, to_email: str, code: str, expires_minutes: int = 15) -> Dict[str, Any]:
         """Dispatch a 6-digit verification code to the recipient."""
         subject = f"BurstWatch Verification Code: {code}"
         text_content = (
-            f"Your BurstWatch email verification code is: {code}\n\n"
-            f"This code will expire in {expires_minutes} minutes.\n"
-            "If you did not request this, please ignore this email."
+            f"Your BurstWatch verification code is: {code}\n\n"
+            f"Enter this code to confirm your email address. It expires in {expires_minutes} minutes.\n"
+            "If you did not request this, you can ignore this message."
         )
         html_content = self._render_verification_html(code, expires_minutes)
 
@@ -236,24 +243,29 @@ class EmailService:
             }
 
     def send_alert_email(self, to_email: str, alert_data: Dict[str, Any], unsubscribe_token: str) -> Dict[str, Any]:
-        """Dispatch a severe convective rainfall warning to a subscriber with RFC 8058 one-click headers."""
+        """Dispatch a severe convective rainfall advisory to a verified subscriber."""
         loc = alert_data.get("location", "Monitored Region")
         prob = float(alert_data.get("predicted_probability", 0.0))
-        subject = f"⚠️ [BurstWatch Alert] Convective Rainfall Risk ({prob*100:.0f}%) - {loc}"
-        unsub_url = f"https://burstwatch.live/api/subscribers/unsubscribe?token={unsubscribe_token}"
+        subject = f"BurstWatch Weather Advisory: {loc} ({prob*100:.0f}% convective risk)"
+        unsub_url = self._get_unsubscribe_url(unsubscribe_token)
+        unsub_line = f"Unsubscribe: {unsub_url}\n" if unsub_url else "Manage alerts anytime in the BurstWatch Alerts panel.\n"
         text_content = (
-            f"BurstWatch Weather Alert for {loc}\n"
+            f"BurstWatch Weather Advisory for {loc}\n"
             f"Target Date: {alert_data.get('target_date', 'Next Day')}\n"
-            f"Predicted Risk: {prob*100:.1f}%\n"
-            f"Threshold: {float(alert_data.get('threshold', 0.5))*100:.1f}%\n\n"
-            "Precautionary Advisory: Rapid convective development anticipated. Avoid low-lying riverbeds.\n\n"
-            f"Unsubscribe: {unsub_url}\n"
+            f"Convective Risk Probability: {prob*100:.1f}%\n"
+            f"Alert Threshold: {float(alert_data.get('threshold', 0.5))*100:.1f}%\n\n"
+            "Advisory: Rapid convective development is possible. Avoid low-lying riverbeds and steep drainage channels.\n\n"
+            + unsub_line
         )
         html_content = self._render_alert_html(alert_data, unsubscribe_token)
-        rfc8058_headers = {
-            "List-Unsubscribe": f"<{unsub_url}>",
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        }
+        rfc8058_headers = (
+            {
+                "List-Unsubscribe": f"<{unsub_url}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
+            if unsub_url
+            else None
+        )
 
         if self.is_dev_mode:
             banner = (
@@ -262,9 +274,7 @@ class EmailService:
                 f" TO: {to_email}\n"
                 f" SUBJECT: {subject}\n"
                 f" LOCATION: {loc} | PROBABILITY: {prob*100:.1f}%\n"
-                f" RFC 8058 HEADERS:\n"
-                f"   List-Unsubscribe: <{unsub_url}>\n"
-                f"   List-Unsubscribe-Post: List-Unsubscribe=One-Click\n"
+                + (f" LIST-UNSUBSCRIBE: <{unsub_url}>\n" if unsub_url else "")
                 + "!" * 72 + "\n"
             )
             print(banner)
@@ -284,4 +294,3 @@ class EmailService:
             else:
                 failed += 1
         return {"sent": sent, "failed": failed, "total": len(subscribers)}
-

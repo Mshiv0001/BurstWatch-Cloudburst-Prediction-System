@@ -103,7 +103,7 @@ export default function ThreatAnalyticsPanel({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 20, scale: 0.98 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className="w-80 sm:w-[350px] select-none z-20 text-slate-100 flex flex-col gap-2.5 font-sans"
+      className="w-full sm:w-[340px] select-none z-20 text-slate-100 flex flex-col gap-2.5 font-sans"
       aria-label="Convective Grid Intelligence Panel"
     >
       {/* ===================================================================
@@ -343,14 +343,10 @@ export default function ThreatAnalyticsPanel({
         </div>
 
         {/* -----------------------------------------------------------------
-            4. CONCISE CONTEXTUAL ADVISORY & QUICK ACTION
+            4. QUICK ACTION
             ----------------------------------------------------------------- */}
-        <div className="flex flex-col gap-2 pt-1 border-t border-white/10">
-          <p className="text-[10.5px] text-slate-300/90 leading-snug bg-white/[0.04] p-2.5 rounded-2xl border border-white/10">
-            {threatConfig.advisory}
-          </p>
-
-          {onSelectIndiaHotspot && (
+        {onSelectIndiaHotspot && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={onSelectIndiaHotspot}
@@ -359,8 +355,8 @@ export default function ThreatAnalyticsPanel({
               <Navigation className="w-3.5 h-3.5 text-cyan-400" />
               <span>Fly to Active Hazard Hotspot</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
       </div>
     </motion.aside>

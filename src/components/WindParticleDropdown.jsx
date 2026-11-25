@@ -41,7 +41,7 @@ export default function WindParticleDropdown({
       {/* Dropdown Menu Popup (Opens downwards below the pill button) */}
       {isOpen && (
         <div
-          className="absolute top-full mt-2 right-0 glass-panel-translucent rounded-3xl shadow-[0_24px_60px_rgba(0,0,0,0.65)] p-1.5 min-w-[260px] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 select-none text-white"
+          className="absolute top-full mt-2 right-0 glass-panel-translucent rounded-3xl shadow-[0_24px_60px_rgba(0,0,0,0.65)] p-1.5 min-w-[240px] sm:min-w-[260px] max-w-[calc(100vw-20px)] max-h-[calc(100dvh-5.5rem)] overflow-y-auto scrollbar-none z-50 animate-in fade-in zoom-in-95 duration-150 select-none text-white"
         >
           {/* Header */}
           <div className="px-3 pt-1.5 pb-1 border-b border-white/10 mb-1 flex items-center justify-between">

@@ -117,12 +117,12 @@ export default function TemperatureLegendBar({
 
   return (
     <aside
-      className={`select-none pointer-events-auto transition-all duration-300 ${className}`}
+      className={`select-none pointer-events-auto transition-all duration-300 max-w-full md:w-full md:max-w-[360px] ${className}`}
       aria-label={`${config.label} Color Scale`}
     >
       {/* Horizontal Rounded Pill Bar matching Windy visual reference */}
       <div
-        className="relative flex items-center justify-between px-2.5 sm:px-4 w-[240px] xs:w-[280px] sm:w-[320px] md:w-[360px] h-7 sm:h-7.5 rounded-full border border-black/40 ring-1 ring-black/25 shadow-[0_4px_16px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_2px_rgba(0,0,0,0.45)] transition-all duration-300"
+        className="relative flex items-center justify-between px-2.5 sm:px-4 w-[min(360px,calc(100vw-80px))] md:w-full max-w-full h-7 sm:h-7.5 rounded-full border border-black/40 ring-1 ring-black/25 shadow-[0_4px_16px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_2px_rgba(0,0,0,0.45)] transition-all duration-300"
         style={{
           background: activeGradient
         }}

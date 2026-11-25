@@ -6,12 +6,14 @@ import CloudburstMap from './components/CloudburstMap';
 import ThreatAnalyticsPanel from './components/ThreatAnalyticsPanel';
 import IncidentModal from './components/IncidentModal';
 import PermissionPrompt from './components/PermissionPrompt';
+import SubscribeAlertPopup from './components/SubscribeAlertPopup';
 import LiveMeteoPanel from './components/LiveMeteoPanel';
 import AreaRiskRankingsPanel from './components/AreaRiskRankingsPanel';
 import RainingCitiesPanel from './components/RainingCitiesPanel';
 import CinematicIntroSplash from './components/CinematicIntroSplash';
 import EmailAlertModal from './components/EmailAlertModal';
-import { getLocalSubscription } from './services/subscriberService';
+import AlertsPanel from './components/AlertsPanel';
+import { getLocalSubscription, checkSubscriberStatus } from './services/subscriberService';
 import { getCloudburstEventData } from './services/cloudburstEventModel';
 
 import { fetchWeatherApiLiveData } from './services/weatherApiService';
@@ -91,8 +93,26 @@ export default function App() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isAlertsPanelOpen, setIsAlertsPanelOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState(() => getLocalSubscription());
   const [isEmailSubscribed, setIsEmailSubscribed] = useState(() => getLocalSubscription().isVerified);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Silent session validation and synchronization on mount
+  useEffect(() => {
+    let mounted = true;
+    const sub = getLocalSubscription();
+    if (sub.token || sub.email) {
+      checkSubscriberStatus(sub.email).then(() => {
+        if (mounted) {
+          const fresh = getLocalSubscription();
+          setUserProfile(fresh);
+          setIsEmailSubscribed(fresh.isVerified);
+        }
+      });
+    }
+    return () => { mounted = false; };
+  }, []);
 
   // Live Dual-Engine Cloudburst ML Prediction State (Zero Hardcoded Presets)
   const [cloudburstEvent, setCloudburstEvent] = useState(null);
@@ -268,6 +288,10 @@ export default function App() {
     loadLiveMeteo(stn.lat, stn.lon, stn.name || stn.stationName);
     fetchLivePrediction(stn);
     setIsMeteoPanelOpen(true);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsRankingsOpen(false);
+      setIsAnalyticsOpen(false);
+    }
 
     if (window.map) {
       window.map.flyTo({
@@ -447,26 +471,60 @@ export default function App() {
   // NavRail click handler
   const handleSelectNav = (navId) => {
     setActiveNav(navId);
+    const isNarrow = typeof window !== 'undefined' && window.innerWidth < 1024;
     if (navId === 'home') {
       setIsMeteoPanelOpen(false);
       setIsAnalyticsOpen(false);
       setIsRankingsOpen(false); // Collapsed on home tab as requested (pill view)
     } else if (navId === 'dashboard') {
       setIsRankingsOpen(false);
+      if (isNarrow) setIsMeteoPanelOpen(false);
       setIsAnalyticsOpen(true);
       setActiveLayer('convective');
       handleFocusCloudburstEpicenter(activeCloudburstEvent);
     } else if (navId === 'rankings') {
-      setIsRankingsOpen((prev) => !prev);
+      setIsRankingsOpen((prev) => {
+        const next = !prev;
+        if (next && window.innerWidth < 1280) {
+          setIsAnalyticsOpen(false);
+        }
+        if (next && isNarrow) {
+          setIsMeteoPanelOpen(false);
+        }
+        return next;
+      });
     } else if (navId === 'meteo') {
-      setIsMeteoPanelOpen((prev) => !prev);
+      setIsMeteoPanelOpen((prev) => {
+        const next = !prev;
+        if (next && isNarrow) {
+          setIsAnalyticsOpen(false);
+          setIsRankingsOpen(false);
+        }
+        return next;
+      });
       if (selectedStation) {
         loadLiveMeteo(selectedStation.lat, selectedStation.lon, selectedStation.name || selectedStation.stationName);
       }
     } else if (navId === 'radar') {
       setActiveLayer('precip');
+      if (window.innerWidth < 1536) {
+        setIsMeteoPanelOpen(false);
+      }
+      if (isNarrow) {
+        setIsAnalyticsOpen(false);
+        setIsRankingsOpen(false);
+      }
     } else if (navId === 'analytics') {
-      setIsAnalyticsOpen((prev) => !prev);
+      setIsAnalyticsOpen((prev) => {
+        const next = !prev;
+        if (next && window.innerWidth < 1280) {
+          setIsRankingsOpen(false);
+        }
+        if (next && isNarrow) {
+          setIsMeteoPanelOpen(false);
+        }
+        return next;
+      });
     }
   };
 
@@ -482,7 +540,7 @@ export default function App() {
   const isHomeView = activeNav === 'home';
 
   return (
-    <div className="relative w-screen h-screen bg-[#070e1b] overflow-hidden select-none font-sans text-slate-100">
+    <div className="relative w-dvw h-dvh bg-[#070e1b] overflow-hidden select-none font-sans text-slate-100">
       {/* 1. Main Dashboard Container: Edge-to-Edge Map + Floating Glass Overlays */}
       <div className="relative w-full h-full overflow-hidden">
         {/* Base Interactive 2D/3D & Satellite Map (Spans Full Screen) */}
@@ -506,6 +564,7 @@ export default function App() {
           mapView={mapView}
           isHomeView={isHomeView}
           isAnalyticsOpen={isAnalyticsOpen}
+          isRankingsOpen={isRankingsOpen}
           isMeteoPanelOpen={isMeteoPanelOpen}
           showParticles={!showIntro && showParticles && windParticleMode !== 'off'}
           onToggleParticles={(val) => {
@@ -564,7 +623,7 @@ export default function App() {
 
         {/* Location Feedback Toast Notification */}
         {locationToast && (
-          <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-full shadow-2xl text-xs font-semibold select-none transition-all ${locationToast.type === 'requesting'
+          <div className={`fixed bottom-[calc(6.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-24 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-20px)] flex items-center gap-3 px-4 py-2 rounded-full shadow-2xl text-xs font-semibold select-none transition-all ${locationToast.type === 'requesting'
             ? 'apple-liquid-glass-cyan text-cyan-200'
             : locationToast.type === 'success'
               ? 'apple-liquid-glass-emerald text-emerald-200'
@@ -592,13 +651,20 @@ export default function App() {
         )}
 
         {/* Floating Left Vertical Navigation Capsule Dock */}
-        <div className="absolute top-16 left-4 z-30 pointer-events-auto">
+        <div className="absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-2.5 sm:left-4 z-30 pointer-events-auto">
           <NavRail
             activeNav={activeNav}
             onSelectNav={handleSelectNav}
             activeLayer={activeLayer}
             onChangeActiveLayer={(layer) => {
               setActiveLayer(layer);
+              if (layer === 'precip' && window.innerWidth < 1536) {
+                setIsMeteoPanelOpen(false);
+              }
+              if (layer === 'precip' && window.innerWidth < 1024) {
+                setIsAnalyticsOpen(false);
+                setIsRankingsOpen(false);
+              }
               if (layer === 'wind') {
                 setShowParticles(true);
                 if (windParticleMode === 'off') {
@@ -608,8 +674,13 @@ export default function App() {
             }}
             isSatellite={mapView === 'satellite'}
             onToggleSatellite={() => setMapView((prev) => (prev === 'satellite' ? 'default' : 'satellite'))}
-            onOpenEmailModal={() => setIsEmailModalOpen(true)}
+            onOpenEmailModal={() => setIsAlertsPanelOpen(true)}
             isEmailSubscribed={isEmailSubscribed}
+            userProfile={userProfile}
+            isMlLive={activeCloudburstEvent?.isLive === true}
+            isMlRetrying={isMlRetrying}
+            onRefreshMlStatus={() => fetchLivePrediction(selectedStation)}
+            mlError={activeCloudburstEvent?.error}
           />
         </div>
 
@@ -617,7 +688,7 @@ export default function App() {
         {isRankingsOpen && (
           <div
             id="area-risk-rankings-container"
-            className={`absolute top-16 z-20 pointer-events-auto transition-all ${!isHomeView && isAnalyticsOpen ? 'right-4 sm:right-[390px]' : 'right-4'
+            className={`absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:left-auto z-20 pointer-events-auto transition-all flex justify-end ${!isHomeView && isAnalyticsOpen ? 'sm:right-4 xl:right-[372px]' : 'sm:right-4'
               }`}
           >
             <AreaRiskRankingsPanel
@@ -633,7 +704,7 @@ export default function App() {
 
         {/* Floating Left Panel: Current Weather Data */}
         {!isHomeView && isMeteoPanelOpen && (
-          <div id="live-meteo-panel-container" className="absolute top-16 left-[76px] sm:left-20 z-20 pointer-events-auto transition-all">
+          <div id="live-meteo-panel-container" className="absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:right-auto sm:left-20 z-25 pointer-events-auto transition-all">
             <LiveMeteoPanel
               liveData={liveMeteoData}
               station={selectedStation}
@@ -651,10 +722,9 @@ export default function App() {
 
         {/* Floating Real-Time Raining Cities Ranked Panel (Rain Radar Layer) */}
         {!isHomeView && (
-          <div className={`absolute z-30 transition-all duration-300 ${activeLayer === 'precip'
-            ? 'opacity-100 visible pointer-events-auto'
-            : 'opacity-0 invisible pointer-events-none'
-            } ${isMeteoPanelOpen ? 'top-16 left-[450px]' : 'top-16 left-[76px] sm:left-20'
+          <div className={`absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-20 transition-all duration-300 max-w-[calc(100vw-72px)] ${activeLayer === 'precip'
+            ? (isMeteoPanelOpen ? 'opacity-100 visible pointer-events-auto hidden 2xl:block 2xl:left-[432px]' : 'opacity-100 visible pointer-events-auto left-[62px] right-2.5 sm:right-auto sm:left-20')
+            : 'opacity-0 invisible pointer-events-none left-[62px] right-2.5 sm:right-auto sm:left-20'
             }`}>
             <RainingCitiesPanel
               isActive={activeLayer === 'precip'}
@@ -675,7 +745,7 @@ export default function App() {
 
         {/* Floating Right Column: Convective Grid Panel */}
         {!isHomeView && isAnalyticsOpen && (
-          <div id="threat-analytics-panel-container" className="absolute top-28 right-4 z-20 pointer-events-auto max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-none pr-0.5">
+          <div id="threat-analytics-panel-container" className="absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] left-[62px] right-2.5 sm:left-auto sm:right-4 z-20 pointer-events-auto flex justify-end max-h-[calc(100dvh-11.5rem)] md:max-h-[calc(100dvh-9.5rem)] overflow-y-auto scrollbar-none pr-0.5">
             <ThreatAnalyticsPanel
               riskPercent={currentRiskPercent}
               severity={currentRiskPercent != null ? (currentRiskPercent >= 75 ? "SEVERE THREAT" : currentRiskPercent >= 25 ? "ELEVATED RISK" : "NORMAL") : "OFFLINE"}
@@ -712,16 +782,38 @@ export default function App() {
       {/* 4. Native Browser Location & Notification Permission Prompt */}
       <PermissionPrompt onLocationAcquired={(coords) => setUserLocation(coords)} />
 
+      {/* 4b. Notification Service Subscription Popup */}
+      <SubscribeAlertPopup
+        isSubscribed={isEmailSubscribed}
+        isModalOpen={isAlertsPanelOpen || isEmailModalOpen || showIntro}
+        hasLeftDrawerOpen={!isHomeView && (isMeteoPanelOpen || activeLayer === 'precip')}
+        onSubscribeClick={() => setIsAlertsPanelOpen(true)}
+      />
+
       {/* 5. 120 FPS Cinematic Launch Intro Splash Animation */}
       {showIntro && (
         <CinematicIntroSplash onComplete={() => setShowIntro(false)} />
       )}
 
-      {/* 6. Convective Weather Email Alerts Subscription Modal */}
+      {/* 6. Convective Weather Alerts Control Panel */}
+      <AlertsPanel
+        isOpen={isAlertsPanelOpen}
+        onClose={() => setIsAlertsPanelOpen(false)}
+        onOpenModal={() => setIsEmailModalOpen(true)}
+        onSubscribedChange={(status) => {
+          setIsEmailSubscribed(status);
+          setUserProfile(getLocalSubscription());
+        }}
+      />
+
+      {/* 7. Convective Weather Email Alerts Subscription Modal */}
       <EmailAlertModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        onSubscribedChange={(status) => setIsEmailSubscribed(status)}
+        onSubscribedChange={(status) => {
+          setIsEmailSubscribed(status);
+          setUserProfile(getLocalSubscription());
+        }}
       />
 
     </div>

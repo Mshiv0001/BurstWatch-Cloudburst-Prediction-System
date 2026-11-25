@@ -1,8 +1,10 @@
 """Runtime configuration, read from environment variables (see .env.example)."""
 from __future__ import annotations
 
+import logging
 import os
-from dataclasses import dataclass
+import secrets
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple
 
@@ -75,7 +77,11 @@ class Settings:
     smtp_tls: bool
     smtp_ssl: bool
     email_dev_mode: bool
-    jwt_secret: str = "burstwatch-session-secret-key-2026"
+    jwt_secret: str = field(default_factory=lambda: secrets.token_urlsafe(32))
+    enable_weather_fallback: bool = False
+    google_client_id: str = ""
+    allow_dev_google_auth: bool = False
+    public_base_url: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -103,7 +109,7 @@ class Settings:
             run_on_startup=_bool("RUN_ON_STARTUP", True),
             stale_after_hours=float(os.getenv("STALE_AFTER_HOURS", "12")),
             admin_api_key=os.getenv("ADMIN_API_KEY", ""),
-            cors_origins=_csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,*"),
+            cors_origins=_csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             alert_webhook_url=os.getenv("ALERT_WEBHOOK_URL", ""),
             extreme_threshold_mm=float(os.getenv("EXTREME_THRESHOLD_MM", "50")),
@@ -115,5 +121,9 @@ class Settings:
             smtp_tls=_bool("SMTP_TLS", True),
             smtp_ssl=_bool("SMTP_SSL", False),
             email_dev_mode=_bool("EMAIL_DEV_MODE", not bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER"))),
-            jwt_secret=os.getenv("JWT_SECRET", "burstwatch-session-secret-key-2026"),
+            jwt_secret=os.getenv("JWT_SECRET", "").strip() or secrets.token_urlsafe(32),
+            enable_weather_fallback=_bool("ENABLE_WEATHER_FALLBACK", False),
+            google_client_id=os.getenv("GOOGLE_CLIENT_ID", "").strip(),
+            allow_dev_google_auth=_bool("ALLOW_DEV_GOOGLE_AUTH", False),
+            public_base_url=os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/"),
         )

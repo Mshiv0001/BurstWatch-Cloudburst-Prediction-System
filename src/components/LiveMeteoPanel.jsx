@@ -139,7 +139,7 @@ export default function LiveMeteoPanel({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: -20, scale: 0.98 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className="w-80 sm:w-[350px] select-none z-20 text-slate-100 flex flex-col gap-2.5 font-sans"
+      className="w-full sm:w-[340px] max-h-[calc(100dvh-11.5rem)] md:max-h-[calc(100dvh-9.5rem)] overflow-y-auto scrollbar-none select-none z-20 text-slate-100 flex flex-col gap-2.5 font-sans"
       aria-label="Station Telemetry Intelligence Panel"
     >
       {/* ===================================================================

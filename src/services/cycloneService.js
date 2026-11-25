@@ -7,6 +7,8 @@
  * 3. Reactive subscription for real-time wind particle simulation and UI markers
  */
 
+import { getOrFetchCyclones } from '../cache/index.js';
+
 // Shortest spherical delta longitude [-180, +180]
 export function deltaLon(lon1, lon2) {
   return ((((lon1 - lon2 + 180) % 360) + 360) % 360) - 180;
@@ -39,7 +41,7 @@ export function getSurfaceFrictionMultiplier(lon, lat) {
     }
   } else if (lat >= -55.0 && lat <= 60.0 && nLon >= -68.0 && nLon <= -12.0) {
     if (!(lat >= -56.0 && lat <= 12.0 && nLon >= -80.0 && nLon <= -34.0) &&
-        !(lat >= 15.0 && lat <= 60.0 && nLon >= -68.0 && nLon <= -52.0)) {
+      !(lat >= 15.0 && lat <= 60.0 && nLon >= -68.0 && nLon <= -52.0)) {
       isWater = true; // Atlantic Ocean
     }
   } else if (lat >= 30.0 && lat <= 46.0 && nLon >= -5.0 && nLon <= 36.0) {
@@ -209,31 +211,34 @@ export function computeCyclonePressureDrop(lon, lat, cyclone) {
 }
 
 /**
- * Fetches live global tropical cyclones from API / GDACS feed with automatic fallback
+ * Fetches live global tropical cyclones from API / GDACS feed with multi-tier caching & fallback
+ * @param {boolean} forceRefresh Bypass cache and force network fetch
  */
-export async function fetchLiveCyclones() {
+export async function fetchLiveCyclones(forceRefresh = false) {
   try {
-    // 1. Try backend aggregator endpoint
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const backendUrl = (
-      import.meta.env.VITE_BACKEND_URL || 
-      (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
-    ).replace(/\/$/, '');
-    const endpoint = backendUrl ? `${backendUrl}/cyclones` : '/api/cyclones';
-    const res = await fetch(endpoint, { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setActiveCyclones(data);
-        return data;
+    const data = await getOrFetchCyclones(async () => {
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const backendUrl = (
+        import.meta.env.VITE_BACKEND_URL ||
+        (isLocalhost ? '' : 'https://burstwatch-ml-backend.onrender.com')
+      ).replace(/\/$/, '');
+      const endpoint = backendUrl ? `${backendUrl}/cyclones` : '/api/cyclones';
+      const res = await fetch(endpoint, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`Cyclone endpoint HTTP ${res.status}`);
       }
+      const payload = await res.json();
+      return Array.isArray(payload) ? payload : [];
+    }, forceRefresh);
+
+    if (Array.isArray(data) && data.length > 0) {
+      setActiveCyclones(data);
+      return data;
     }
   } catch (err) {
-    // Backend endpoint not active, fallback to direct GDACS GeoRSS parsing or default set
+    // Backend endpoint not active or unreachable; fall back to calibrated dataset
   }
 
-  // 2. In browser environments without a backend aggregator, direct GDACS fetch is blocked by CORS.
-  // Return calibrated active cyclone tracker dataset immediately without console noise.
   return activeCyclones;
 }
 

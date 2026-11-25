@@ -11,7 +11,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://burstwatch.live,https://www.burstwatch.live,http://localhost:5173"
       - key: ENABLE_SCHEDULER
         value: "true"
       - key: RUN_ON_STARTUP

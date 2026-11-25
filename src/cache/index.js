@@ -59,8 +59,18 @@ export {
 export {
   radarMetaCacheManager,
   getCachedRadarMetadata,
-  setCachedRadarMetadata
+  setCachedRadarMetadata,
+  getOrFetchRadarMetadata,
+  invalidateRadarMetadataCache
 } from './layers/radarMetaCache.js';
+
+export {
+  cycloneCacheManager,
+  getCachedCyclones,
+  setCachedCyclones,
+  getOrFetchCyclones,
+  invalidateCycloneCache
+} from './layers/cycloneCache.js';
 
 export {
   terrainElevationCacheManager,

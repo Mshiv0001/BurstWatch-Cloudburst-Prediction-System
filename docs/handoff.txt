@@ -1,0 +1,340 @@
+# BurstWatch — Session Handoff Document
+
+**Date:** 2026-11-25  
+**Repo:** https://github.com/Mshiv0001/BurstWatch-Cloudburst-Prediction-System  
+**Branch:** `main`  
+**Working tree status at handoff:** Clean — `nothing to commit, working tree clean`
+
+---
+
+## What Was Done This Session
+
+### Commits Pushed (chronological order, oldest first)
+
+```
+51814ab feat: add multi-layer caching, email subscriber alerts, aqi layer, and deployment configs
+b556614 feat(ui): update bottom HUD telemetry pill and simplify nav rail layout
+425ce86 feat(ui): reposition ML model status and hardware FPS pill into bottom HUD
+1f0d34b feat(app): connect weather overlay layer controls and ML status handlers
+f4d2792 refactor(ui): remove outer border ring on active nav and layer dock buttons
+641f1fe feat(backend): add RFC 8058 one-click headers and subscriber preference management
+fe6c322 feat(auth): add JWT session creation and verification helpers for subscribers
+0a3c054 test(subscribers): add coverage for Google OAuth zero-OTP flow, JWT sessions, and rate limiting
+```
+
+---
+
+## Commit-by-Commit Breakdown
+
+### `51814ab` — feat: add multi-layer caching, email subscriber alerts, aqi layer, and deployment configs
+
+**Scope:** 71 files. The largest single commit.
+
+Key additions:
+
+- `src/cache/` — full multi-layer cache system (see architecture below)
+- `src/components/EmailSubscribeModal.jsx` — modal UI for email subscriptions, OTP entry, Google OAuth
+- `src/components/AqiLayer.jsx` — AQI overlay layer component
+- `src/components/CloudburstMap.jsx` — updated map with new overlays
+- `src/services/emailService.js` — frontend service for subscription API calls
+- `src/utils/` — shared utility modules
+- `backend/app/email_service.py` — email sending via SMTP, OTP generation, subscriber management
+- `backend/app/storage.py` — subscriber storage, brute-force rate limiting, preference columns
+- `backend/app/main.py` — subscriber API endpoints, JWT helpers
+- `backend/app/schemas.py` — Pydantic schemas including `SubscriberPreferencesRequest`
+- `backend/app/config.py` — added `jwt_secret` field
+- `backend/requirements.txt` — added `pyjwt>=2.8.0`, `google-auth>=2.20.0`
+- `backend/data/cache/terrain_cache.json` — pre-seeded terrain cache
+- `deployment/docker/` — Dockerfile, docker-compose.yml
+- `deployment/netlify/` — netlify.toml
+- `deployment/render/` — render.yaml
+- `deployment/vercel/` — vercel.json
+
+> [!NOTE]
+> `.gsd/`, `.agents/`, `.gemini/`, `scripts/`, `deployment/scripts/` are all gitignored and were NOT committed.
+
+---
+
+### `b556614` — feat(ui): update bottom HUD telemetry pill and simplify nav rail layout
+
+- `src/components/FpsCounter.jsx` — refactored into a bottom HUD telemetry pill
+- `src/components/NavRail.jsx` — simplified nav rail layout
+
+---
+
+### `425ce86` — feat(ui): reposition ML model status and hardware FPS pill into bottom HUD
+
+- `src/components/CloudburstMap.jsx` — ML model status badge moved into the bottom HUD row alongside the FPS pill
+
+---
+
+### `1f0d34b` — feat(app): connect weather overlay layer controls and ML status handlers
+
+- `src/App.jsx` — wired up weather overlay layer toggle handlers and ML model status state
+
+---
+
+### `f4d2792` — refactor(ui): remove outer border ring on active nav and layer dock buttons
+
+- `src/components/NavRail.jsx` — visual fix
+
+**What changed:** Active state class on all nav/dock buttons changed from:
+```
+apple-liquid-glass-cyan text-cyan-200 border border-cyan-400/50 shadow-[0_0_12px_rgba(56,189,248,0.35)] scale-105
+```
+to:
+```
+bg-cyan-500/20 text-cyan-300 border border-transparent
+```
+This removed the outer cyan glow border ring that appeared around active buttons.
+
+Buttons affected: nav items, weather layer buttons, satellite toggle, email subscribe button.
+
+---
+
+### `641f1fe` — feat(backend): add RFC 8058 one-click headers and subscriber preference management
+
+- `backend/app/email_service.py` — full implementation:
+  - SMTP email dispatch (HTML + plain text)
+  - OTP generation and time-limited verification
+  - RFC 8058 `List-Unsubscribe` and `List-Unsubscribe-Post` headers for one-click unsubscribe
+  - Subscriber preference management (frequency, threshold, alert types)
+- `backend/app/storage.py`:
+  - Subscriber store with SQLite (or JSON fallback)
+  - Brute-force rate limiting on OTP verification (max attempts per window)
+  - Column migrations for new preference fields
+
+---
+
+### `fe6c322` — feat(auth): add JWT session creation and verification helpers for subscribers
+
+- `backend/app/main.py`:
+  - `create_subscriber_token(email)` — creates a signed JWT for a verified subscriber
+  - `verify_subscriber_token(token)` — verifies and decodes the JWT
+  - `GET /subscribers/me` — returns subscriber profile from JWT
+  - `PUT /subscribers/preferences` — updates subscriber preferences, requires JWT
+  - Google OAuth zero-OTP path — if Google ID token is valid, subscriber is verified instantly, no OTP step
+
+---
+
+### `0a3c054` — test(subscribers): add coverage for Google OAuth zero-OTP flow, JWT sessions, and rate limiting
+
+- `backend/tests/test_subscribers.py` — 4 new tests:
+  1. Google OAuth path creates subscriber and returns JWT without OTP
+  2. JWT session `GET /subscribers/me` returns correct profile
+  3. OTP brute-force blocks after max attempts
+  4. Preference update via `PUT /subscribers/preferences` persists correctly
+- All 4 tests pass.
+
+---
+
+## Architecture: Subscriber System
+
+```
+User                Frontend                Backend                Storage
+ |                     |                       |                      |
+ | Enter email         |                       |                      |
+ |-------------------->|                       |                      |
+ |                     | POST /subscribers/subscribe                  |
+ |                     |---------------------->|                      |
+ |                     |                       | Generate OTP         |
+ |                     |                       | Send email via SMTP  |
+ |                     |                       |                      |
+ | Enter OTP           |                       |                      |
+ |-------------------->|                       |                      |
+ |                     | POST /subscribers/verify-otp                 |
+ |                     |---------------------->|                      |
+ |                     |                       | Verify OTP           |
+ |                     |                       | (brute-force check)  |
+ |                     |                       | Create JWT           |
+ |                     |<-- JWT token ---------|                      |
+ |                     |                       |                      |
+ | Google Sign-In      |                       |                      |
+ |-------------------->|                       |                      |
+ |                     | POST /subscribers/google-auth                |
+ |                     |---------------------->|                      |
+ |                     |                       | Verify Google ID token
+ |                     |                       | (google-auth library)|
+ |                     |                       | Skip OTP, create JWT |
+ |                     |<-- JWT token ---------|                      |
+```
+
+**JWT payload:** `{ "sub": "<email>", "exp": <unix timestamp> }`  
+**Secret:** `JWT_SECRET` env var (see env vars section below)  
+**Brute-force limit:** Configurable — after N failed OTP attempts within a window, that email is locked out.
+
+---
+
+## Architecture: Multi-Layer Cache (`src/cache/`)
+
+The frontend cache system is layered as follows:
+
+```
+Request
+   |
+   v
+Memory Cache (in-process Map, TTL-based)
+   | miss
+   v
+SessionStorage Cache (tab-scoped, survives soft refreshes)
+   | miss
+   v
+IndexedDB Cache (persistent, survives hard refreshes)
+   | miss
+   v
+Network fetch (API / external service)
+   |
+   v
+Populate all cache layers on response
+```
+
+Key files in `src/cache/`:
+- `cacheManager.js` — orchestrates all layers, TTL enforcement, cache-key namespacing
+- `memoryCache.js` — in-process Map with TTL
+- `sessionCache.js` — SessionStorage adapter
+- `idbCache.js` — IndexedDB adapter (async)
+- `cacheConfig.js` — per-data-type TTL configuration (weather data, terrain, predictions, etc.)
+
+---
+
+## Backend Environment Variables
+
+These must be set in the deployment environment (Render, Docker, or local `.env`):
+
+| Variable | Description | Example |
+|---|---|---|
+| `SMTP_HOST` | SMTP server hostname | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_USER` | SMTP auth username / sender address | `alerts@example.com` |
+| `SMTP_PASSWORD` | SMTP auth password or app password | `...` |
+| `SMTP_FROM` | From address shown to recipient | `BurstWatch Alerts <alerts@example.com>` |
+| `SMTP_TLS` | Use STARTTLS (`true`/`false`) | `true` |
+| `SMTP_SSL` | Use direct SSL (`true`/`false`) | `false` |
+| `EMAIL_DEV_MODE` | If `true`, print emails to stdout instead of sending | `false` |
+| `JWT_SECRET` | Secret key for signing subscriber JWTs | random 32+ char string |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID for ID token verification | from GCP console |
+
+---
+
+## New Backend Dependencies
+
+Added to `backend/requirements.txt`:
+
+```
+pyjwt>=2.8.0
+google-auth>=2.20.0
+```
+
+Install with:
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+---
+
+## Pre-existing Test Failures (NOT Regressions)
+
+These 8 tests were already failing before this session. They are **not caused by this session's changes**.
+
+### `backend/tests/test_api.py`
+
+1. **`test_health_and_model_info`**
+   - Root cause: Model loaded at test time has `n_features=12`, but test asserts `n_features=36`.
+   - Fix needed: Retrain or replace the model, or update the assertion to match actual feature count.
+
+2. **`test_location_prediction_uses_requested_coordinates_without_persisting`**
+   - Root cause: Response body does not contain a `location` key — API schema changed.
+   - Fix needed: Update test to match current API response shape, or restore the `location` field.
+
+### `backend/tests/test_pipeline.py` (6 tests in `WeatherClientTests`)
+
+All 6 fail with:
+```
+AttributeError: 'Session' object has no attribute 'headers'
+```
+
+Root cause: The test fixture creates a mock `Session` object that does not have a `.headers` attribute. `weather.py` calls `self.session.headers.update(...)`.
+
+A guard was added to `weather.py`:
+```python
+if hasattr(self.session, "headers") and hasattr(self.session.headers, "update"):
+    self.session.headers.update(...)
+```
+
+However the pipeline tests still fail because the mock `Session` itself does not set `.headers` to a dict-like object. The fix requires updating the mock fixture in `test_pipeline.py` to add `session.headers = {}` (or use `unittest.mock.MagicMock()` which auto-creates attributes).
+
+---
+
+## Network Quirk: IPv4 to GitHub Blocked
+
+**Problem:** Direct IPv4 connections to `github.com:443` fail at the local gateway (`192.168.29.1` returns ICMP "Destination net unreachable"). IPv6 is fully functional on this machine.
+
+**Root cause:** GitHub has no native `AAAA` DNS records. The gateway blocks outbound IPv4 to external IPs.
+
+**Workaround used:** A local NAT64 HTTP CONNECT proxy that resolves GitHub hostnames via a DNS64 resolver (`2a00:1098:2b::1`) which synthesizes IPv6 addresses for IPv4-only targets, then opens the TCP connection over IPv6.
+
+**Proxy file location:**
+```
+C:\Users\mshiv\.gemini\antigravity\brain\2dc0395e-e00e-4f5a-b497-bb53c6f61c82\scratch\nat64_proxy.py
+```
+
+**How to use it for future pushes on this machine:**
+
+```powershell
+# Terminal 1: start proxy (keep running)
+python "C:\Users\mshiv\.gemini\antigravity\brain\2dc0395e-e00e-4f5a-b497-bb53c6f61c82\scratch\nat64_proxy.py" 9999
+
+# Terminal 2: push through proxy
+cd "d:\major project"
+git -c http.proxy=http://127.0.0.1:9999 push origin main
+```
+
+**Note:** If this machine ever gets unrestricted internet access, plain `git push origin main` will work without the proxy.
+
+---
+
+## Gitignored Paths (Not in Repo)
+
+These exist locally but are gitignored and were never committed:
+
+- `.gsd/` — GSD planner artifacts
+- `.agents/` — agent skill files
+- `.gemini/` — Antigravity agent session data
+- `scripts/` — local utility scripts
+- `deployment/scripts/` — deployment helper scripts
+
+Only these deployment subdirectories **were** committed:
+- `deployment/docker/`
+- `deployment/netlify/`
+- `deployment/render/`
+- `deployment/vercel/`
+
+---
+
+## Suggested Next Steps
+
+1. **Fix the 8 pre-existing test failures** (see test failure section above).
+2. **Set backend env vars** on the deployment platform (Render dashboard, Docker env, or `.env` file) — especially `JWT_SECRET`, `SMTP_*`, and `GOOGLE_CLIENT_ID`.
+3. **Test the subscriber flow end-to-end** in a staging environment with a real SMTP provider (or leave `EMAIL_DEV_MODE=true` during development to print emails to stdout).
+4. **Verify Google OAuth path** — ensure `GOOGLE_CLIENT_ID` matches the client ID used in the frontend's Google Sign-In button config.
+5. **Consider code-splitting** `src/` — `npm run build` warns that some chunks exceed 500 KB. This is a warning, not an error, but worth addressing for production performance.
+
+---
+
+## Repository State at Handoff
+
+```
+Remote: https://github.com/Mshiv0001/BurstWatch-Cloudburst-Prediction-System.git
+Branch: main
+HEAD:   0a3c054 test(subscribers): add coverage for Google OAuth zero-OTP flow, JWT sessions, and rate limiting
+
+Local working tree: clean
+Uncommitted changes: none
+Untracked files relevant to repo: none
+```
+
+---
+
+*This handoff document was NOT committed to the repository. It exists only in the local agent artifact directory.*

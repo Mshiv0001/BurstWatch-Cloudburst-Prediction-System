@@ -1083,5 +1083,20 @@
     "elevation_m": 0.0,
     "slope_deg": 0.0,
     "aspect_deg": 270.0
+  },
+  "23.3303_77.7811": {
+    "elevation_m": 448.0,
+    "slope_deg": 1.36,
+    "aspect_deg": 124.6
+  },
+  "10.4191_90.7048": {
+    "elevation_m": 0.0,
+    "slope_deg": 0.0,
+    "aspect_deg": 270.0
+  },
+  "33.7410_49.7319": {
+    "elevation_m": 2621.0,
+    "slope_deg": 37.79,
+    "aspect_deg": 342.1
   }
 }

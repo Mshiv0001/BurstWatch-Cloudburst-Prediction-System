@@ -309,7 +309,7 @@ export default function RainingCitiesPanel({
   }
 
   return (
-    <div className={`select-none pointer-events-auto glass-panel-translucent rounded-3xl shadow-2xl border border-cyan-400/30 text-white flex flex-col w-[350px] sm:w-[390px] max-w-[calc(100vw-32px)] max-h-[440px] overflow-hidden animate-in fade-in duration-200 ${className}`}>
+    <div className={`select-none pointer-events-auto glass-panel-translucent rounded-3xl shadow-2xl border border-cyan-400/30 text-white flex flex-col w-full sm:w-[340px] max-h-[calc(100dvh-14.25rem)] md:max-h-[calc(100dvh-11.5rem)] lg:max-h-[calc(100dvh-9.5rem)] overflow-hidden animate-in fade-in duration-200 ${className}`}>
       {/* Header: Title, Real-Time Radar Scanner Pulse & Controls */}
       <div className="p-3 pb-2 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">

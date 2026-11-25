@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from .cache import system_cache
 from .config import Settings
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class OpenMeteoClient:
             })
         self._sleep = sleep
         self._terrain_cache_path = Path(self.s.db_path).parent / "cache" / "terrain_cache.json"
+        system_cache.register_disk_namespace("terrain", self._terrain_cache_path, ttl_seconds=86400.0)
 
     def choose_source(self, day: dt.date, source: str, today: dt.date) -> str:
         if source in ("forecast", "archive"):
@@ -45,17 +47,11 @@ class OpenMeteoClient:
         return "forecast" if day >= today - dt.timedelta(days=ARCHIVE_LAG_DAYS) else "archive"
 
     def fetch_terrain_params(self, lat: float, lon: float) -> Dict[str, float]:
-        """Retrieves 30m DEM terrain parameters (elevation, slope, aspect) with disk caching."""
-        cache = {}
-        if self._terrain_cache_path.exists():
-            try:
-                cache = json.loads(self._terrain_cache_path.read_text(encoding="utf-8"))
-            except Exception:
-                cache = {}
-
+        """Retrieves 30m DEM terrain parameters (elevation, slope, aspect) with unified cache."""
         key = f"{lat:.4f}_{lon:.4f}"
-        if key in cache:
-            return cache[key]
+        cached = system_cache.get("terrain", key)
+        if cached is not None:
+            return cached
 
         d_lat = 0.001
         d_lon = 0.001
@@ -82,12 +78,7 @@ class OpenMeteoClient:
                     "slope_deg": round(slope_deg, 2),
                     "aspect_deg": round(aspect_deg, 1)
                 }
-                cache[key] = res
-                try:
-                    self._terrain_cache_path.parent.mkdir(parents=True, exist_ok=True)
-                    self._terrain_cache_path.write_text(json.dumps(cache, indent=2), encoding="utf-8")
-                except Exception:
-                    pass
+                system_cache.set("terrain", key, res, ttl_seconds=86400.0)
                 return res
         except Exception as e:
             logger.warning("Failed to fetch DEM elevation stencil (%s), using baseline", e)
@@ -134,6 +125,10 @@ class OpenMeteoClient:
                 logger.warning("Open-Meteo (%s) did not return: %s", used, absent)
             return df, used
         except Exception as exc:
+            if not getattr(self.s, "enable_weather_fallback", False):
+                if isinstance(exc, WeatherError):
+                    raise
+                raise WeatherError(str(exc)) from exc
             logger.warning("Weather fetch failed (%s); generating physics-calibrated fallback profile", exc)
             eff_lat = self.s.latitude if latitude is None else latitude
             eff_lon = self.s.longitude if longitude is None else longitude
@@ -177,10 +172,7 @@ class OpenMeteoClient:
         for attempt in range(self.s.http_retries + 1):
             try:
                 resp = self.session.get(url, params=params, timeout=timeout)
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as exc:
-                # Host connection unreachable or timed out - raise immediately to activate physics fallback without 80-second hang
-                raise WeatherError(f"Weather provider host unreachable: {exc}") from exc
-            except requests.RequestException as exc:
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError, requests.RequestException) as exc:
                 last_error = f"network error: {exc}"
             else:
                 if resp.status_code == 200:

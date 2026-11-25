@@ -94,13 +94,21 @@ class ForecastService:
 
             feats, used, terrain = self._features_for(day, source, lat=latitude, lon=longitude)
             result = self.model.predict(feats)
+            warns = list(result.get("warnings", []))
+            if (latitude, longitude) != (self.settings.latitude, self.settings.longitude):
+                warns.append(
+                    f"Model was calibrated for {self.settings.location_name} (Dehradun region). "
+                    f"Validity at requested coordinates ({latitude}, {longitude}) is experimental."
+                )
             return {
                 **result,
                 "coordinates": [latitude, longitude],
+                "location": {"latitude": latitude, "longitude": longitude},
                 "terrain": terrain,
                 "feature_date": day.isoformat(),
                 "target_date": (day + dt.timedelta(days=1)).isoformat(),
                 "data_source": used,
+                "warnings": warns,
             }
 
     def run_job(self) -> None:

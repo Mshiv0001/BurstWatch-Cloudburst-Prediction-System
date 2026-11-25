@@ -160,16 +160,16 @@ export default function CloudburstHeader({
   };
 
   return (
-    <header className="absolute top-3 left-4 right-4 z-40 flex items-center gap-3 pointer-events-none select-none">
+    <header className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-2.5 right-2.5 sm:left-4 sm:right-4 z-40 flex items-center justify-between gap-2 sm:gap-3 pointer-events-none select-none">
       {/* 1. Left: Combined BurstWatch Brand + Search Box Pill */}
-      <div ref={searchContainerRef} className="relative pointer-events-auto flex items-center gap-0">
-        <div className="apple-liquid-glass-pill flex items-center gap-2 px-3.5 py-2 h-10 rounded-full focus-within:border-cyan-400/80 focus-within:ring-2 focus-within:ring-cyan-500/25 transition-all w-auto min-w-0">
+      <div ref={searchContainerRef} className="relative pointer-events-auto flex items-center gap-0 min-w-0 flex-1 max-w-[440px]">
+        <div className="apple-liquid-glass-pill flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 h-10 rounded-full focus-within:border-cyan-400/80 focus-within:ring-2 focus-within:ring-cyan-500/25 transition-all w-full min-w-0">
           {/* Brand Logo & Name (Clickable to Replay Cinematic Intro) */}
           <button
             type="button"
             onClick={onReplayIntro}
             title="Click to Replay Cinematic Launch Animation"
-            className="flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all shrink-0"
+            className="flex items-center gap-1.5 sm:gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all shrink-0"
           >
             <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-tr from-[#f05542] to-[#ff6b57] text-white shadow-md shadow-[#f05542]/30 border border-white/20 shrink-0">
               <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -179,7 +179,7 @@ export default function CloudburstHeader({
               </svg>
             </div>
 
-            <span className="burstwatch-logo-orbitron text-[13px] uppercase tracking-[0.14em] text-white select-none shrink-0 pr-2 border-r border-white/15 mr-1 inline-flex items-center font-black">
+            <span className="burstwatch-logo-orbitron hidden xs:inline-flex text-[12px] sm:text-[13px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-white select-none shrink-0 pr-2 border-r border-white/15 mr-0.5 sm:mr-1 items-center font-black">
               Burst<span className="text-cyan-400">Watch</span>
             </span>
           </button>
@@ -193,7 +193,7 @@ export default function CloudburstHeader({
             onChange={(e) => handleQueryChange(e.target.value)}
             onFocus={() => setShowSearchDropdown(true)}
             onKeyDown={handleKeyDown}
-            className="w-40 sm:w-52 md:w-60 bg-transparent border-none outline-none text-xs text-white placeholder:text-slate-400 font-normal"
+            className="min-w-0 flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-slate-400 font-normal"
           />
           {isSearchingOnline && (
             <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin shrink-0" />
@@ -238,7 +238,7 @@ export default function CloudburstHeader({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
               transition={{ duration: 0.15 }}
-              className="absolute left-0 top-12 w-80 sm:w-96 md:w-[400px] glass-panel-translucent rounded-3xl shadow-2xl overflow-hidden p-2 z-[100] divide-y divide-white/5 max-h-[440px] overflow-y-auto no-scrollbar"
+              className="absolute left-0 top-12 w-[calc(100vw-20px)] sm:w-96 md:w-[400px] glass-panel-translucent rounded-3xl shadow-2xl overflow-hidden p-2 z-[100] divide-y divide-white/5 max-h-[min(440px,calc(100dvh-5.5rem))] overflow-y-auto scrollbar-none"
             >
               {/* Option 1: Go to My Location */}
               <div className="pb-1.5">

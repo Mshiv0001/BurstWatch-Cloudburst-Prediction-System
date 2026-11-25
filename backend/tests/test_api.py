@@ -32,7 +32,7 @@ class ApiTests(unittest.TestCase):
 
     def test_health_and_model_info(self):
         self.assertEqual(self.client.get("/health").json()["status"], "ok")
-        self.assertEqual(self.client.get("/model-info").json()["n_features"], 36)
+        self.assertEqual(self.client.get("/model-info").json()["n_features"], len(FEATURES))
 
     def test_latest_404_then_available_after_run(self):
         self.assertEqual(self.client.get("/predictions/latest").status_code, 404)

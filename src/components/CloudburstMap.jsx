@@ -24,9 +24,9 @@ import {
   Cpu,
   RefreshCw
 } from 'lucide-react';
-import FpsCounter from './FpsCounter';
 import { STATIONS_NETWORK } from '../data/cloudburstData';
 import { getCachedMLRisk } from '../services/mlPredictionService';
+import { getOrFetchRadarMetadata } from '../cache/index.js';
 import { isIndiaSector } from '../utils/geoUtils';
 import {
   celsiusToFahrenheit,
@@ -1402,15 +1402,43 @@ function applyMapLayersAndHeatmap(
 
   // 6.5 Progressive Multi-Tier Windy Vector Hierarchy
   const isOverlayVisible = isSatellite || activeLayer === 'temp' || activeLayer === 'precip' || activeLayer === 'aqi' || isHeatmapVisible;
-  // Universal national border & coastline outline across all layers and maps, except satellite map
+  const isDarkOrWeather = isOverlayVisible || activeLayer === 'wind';
+  // Universal national border & coastline outline across all layers and maps
   const isUniversalOutlineVisible = !isSatellite;
 
-  // A. Razor-Sharp Vector National Borders & Coastlines (Visible across all zooms)
+  // A. Razor-Sharp Dual-Stroke Vector National Borders & Coastlines (Visible across ALL layers & zooms)
   if (!map.getSource('world-countries-source')) {
     map.addSource('world-countries-source', {
       type: 'geojson',
       data: WORLD_COUNTRIES_DATA
     });
+  }
+
+  if (!map.getLayer('windy-country-borders-casing')) {
+    map.addLayer({
+      id: 'windy-country-borders-casing',
+      type: 'line',
+      source: 'world-countries-source',
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+        visibility: 'visible'
+      },
+      paint: {
+        'line-color': '#090d16',
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          1, 1.75,
+          2, 2.05,
+          5, 2.55,
+          8, 3.25
+        ],
+        'line-opacity': isDarkOrWeather ? 0.65 : 0.0
+      }
+    });
+  } else {
+    map.setLayoutProperty('windy-country-borders-casing', 'visibility', 'visible');
+    map.setPaintProperty('windy-country-borders-casing', 'line-opacity', isDarkOrWeather ? 0.65 : 0.0);
   }
 
   if (!map.getLayer('windy-country-borders')) {
@@ -1421,22 +1449,24 @@ function applyMapLayersAndHeatmap(
       layout: {
         'line-cap': 'round',
         'line-join': 'round',
-        visibility: isUniversalOutlineVisible ? 'visible' : 'none'
+        visibility: 'visible'
       },
       paint: {
-        'line-color': '#111827',
+        'line-color': isDarkOrWeather ? '#e2e8f0' : '#1e293b',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          1, 0.70,
-          2, 0.85,
-          5, 1.25,
-          8, 1.85
+          1, 0.75,
+          2, 0.95,
+          5, 1.35,
+          8, 1.95
         ],
-        'line-opacity': 0.78
+        'line-opacity': isDarkOrWeather ? 0.82 : 0.72
       }
     });
   } else {
-    map.setLayoutProperty('windy-country-borders', 'visibility', isUniversalOutlineVisible ? 'visible' : 'none');
+    map.setLayoutProperty('windy-country-borders', 'visibility', 'visible');
+    map.setPaintProperty('windy-country-borders', 'line-color', isDarkOrWeather ? '#e2e8f0' : '#1e293b');
+    map.setPaintProperty('windy-country-borders', 'line-opacity', isDarkOrWeather ? 0.82 : 0.72);
   }
 
   // B. Sleek Continental & Country Overview Labels (Only at global zoom 1.0 - 5.0)
@@ -1654,6 +1684,17 @@ function applyMapLayersAndHeatmap(
     } catch (e) { }
   }
 
+  // Lock country boundary Z-order above all weather rasters/heatmaps and below place labels
+  try {
+    const labelAnchor = map.getLayer('windy-overview-labels') ? 'windy-overview-labels' : undefined;
+    if (map.getLayer('windy-country-borders-casing')) {
+      map.moveLayer('windy-country-borders-casing', labelAnchor);
+    }
+    if (map.getLayer('windy-country-borders')) {
+      map.moveLayer('windy-country-borders', labelAnchor);
+    }
+  } catch (e) { }
+
   // 7. Refresh place label typography
   applyMapLabelsTheme(map, isSatellite);
 }
@@ -1674,6 +1715,7 @@ export default function CloudburstMap({
   mapView = 'liberty',
   isHomeView = false,
   isAnalyticsOpen = false,
+  isRankingsOpen = false,
   isMeteoPanelOpen = false,
   showParticles = true,
   onToggleParticles,
@@ -1696,6 +1738,8 @@ export default function CloudburstMap({
   onHoverTemp = null
 }) {
   const isMlLive = cloudburstEvent?.isLive === true;
+  const hasRightDrawerOpen = !isHomeView && (isAnalyticsOpen || isRankingsOpen);
+  const hasLeftDrawerOpen = !isHomeView && (isMeteoPanelOpen || activeLayer === 'precip');
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -1898,20 +1942,25 @@ export default function CloudburstMap({
   useEffect(() => {
     let isMounted = true;
     const fetchRadarTimestamp = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
-          signal: controller.signal
+        const past = await getOrFetchRadarMetadata(async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          try {
+            const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
+              signal: controller.signal
+            });
+            if (!response.ok) {
+              throw new Error(`RainViewer returned HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            return Array.isArray(data?.radar?.past) ? data.radar.past : [];
+          } finally {
+            clearTimeout(timeoutId);
+          }
         });
-        if (!response.ok) {
-          throw new Error(`RainViewer returned HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
         if (!isMounted) return;
 
-        const past = data?.radar?.past;
         if (Array.isArray(past) && past.length > 0) {
           setRadarFrames(past);
           setRadarStatus('ready');
@@ -1924,8 +1973,6 @@ export default function CloudburstMap({
         console.warn('[RainViewer] Unable to load radar frames:', error);
         setRadarFrames([]);
         setRadarStatus('unavailable');
-      } finally {
-        clearTimeout(timeoutId);
       }
     };
 
@@ -2101,11 +2148,12 @@ export default function CloudburstMap({
     if (userLocation?.lng && userLocation?.lat) {
       const userEl = document.createElement('div');
       userEl.className = 'custom-user-marker relative flex items-center justify-center cursor-pointer select-none';
-      userEl.innerHTML = `
-        <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-white shadow-lg flex items-center justify-center">
-          <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
-        </div>
-      `;
+      const outerDot = document.createElement('div');
+      outerDot.className = 'w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-white shadow-lg flex items-center justify-center';
+      const innerDot = document.createElement('div');
+      innerDot.className = 'w-1.5 h-1.5 rounded-full bg-white';
+      outerDot.appendChild(innerDot);
+      userEl.appendChild(outerDot);
 
       userEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -2144,7 +2192,7 @@ export default function CloudburstMap({
       pitch: 0,
       antialias: true,
       renderWorldCopies: true,
-      attributionControl: true,
+      attributionControl: false,
       preserveDrawingBuffer: false,
       fadeDuration: 0
     });
@@ -2276,17 +2324,33 @@ export default function CloudburstMap({
       // Create glowing flash element with shockwave ripple
       const el = document.createElement('div');
       el.className = 'lightning-flash-marker pointer-events-none select-none -translate-x-1/2 -translate-y-1/2';
-      el.innerHTML = `
-        <div class="relative flex items-center justify-center">
-          <span class="absolute w-14 h-14 rounded-full border border-white/95 animate-lightning-shockwave"></span>
-          <span class="absolute w-8 h-8 rounded-full bg-cyan-300/40 blur-xs animate-ping"></span>
-          <div class="relative w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-[0_0_18px_#ffffff,0_0_30px_#38bdf8] animate-lightning-flash">
-            <svg class="w-3.5 h-3.5 text-cyan-500 fill-cyan-400" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-          </div>
-        </div>
-      `;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'relative flex items-center justify-center';
+
+      const shockwave = document.createElement('span');
+      shockwave.className = 'absolute w-14 h-14 rounded-full border border-white/95 animate-lightning-shockwave';
+
+      const ping = document.createElement('span');
+      ping.className = 'absolute w-8 h-8 rounded-full bg-cyan-300/40 blur-xs animate-ping';
+
+      const badge = document.createElement('div');
+      badge.className = 'relative w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-[0_0_18px_#ffffff,0_0_30px_#38bdf8] animate-lightning-flash';
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const boltSvg = document.createElementNS(svgNS, 'svg');
+      boltSvg.setAttribute('class', 'w-3.5 h-3.5 text-cyan-500 fill-cyan-400');
+      boltSvg.setAttribute('viewBox', '0 0 24 24');
+      boltSvg.setAttribute('fill', 'currentColor');
+
+      const boltPoly = document.createElementNS(svgNS, 'polygon');
+      boltPoly.setAttribute('points', '13 2 3 14 12 14 11 22 21 10 12 10 13 2');
+      boltSvg.appendChild(boltPoly);
+
+      badge.appendChild(boltSvg);
+      wrapper.appendChild(shockwave);
+      wrapper.appendChild(ping);
+      wrapper.appendChild(badge);
+      el.appendChild(wrapper);
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([strike.lon, strike.lat])
@@ -3382,16 +3446,38 @@ export default function CloudburstMap({
         const el = document.createElement('div');
         el.className = 'custom-cyclone-marker flex items-center gap-1.5 apple-liquid-glass px-2.5 py-1 rounded-full shadow-2xl cursor-pointer select-none transition-transform hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto';
         el.title = `${cyclone.name} (${cyclone.status || cyclone.category}) — Wind: ${cyclone.windKmh} km/h, Pressure: ${cyclone.pressureHpa} hPa`;
-        el.innerHTML = `
-          <span class="w-4 h-4 flex items-center justify-center animate-spin text-rose-400" style="animation-duration: 3.5s;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-3.5 h-3.5 text-rose-400">
-              <path d="M12 2a10 10 0 0 1 7.07 17.07l-2.12-2.12A7 7 0 0 0 12 5v-3z"/>
-              <path d="M12 22a10 10 0 0 1-7.07-17.07l2.12 2.12A7 7 0 0 0 12 19v3z"/>
-            </svg>
-          </span>
-          <span class="text-[11px] font-bold text-white tracking-wide">${cyclone.name}</span>
-          <span class="text-[9px] font-mono px-1 rounded bg-rose-500/30 text-rose-300 font-semibold">${cyclone.windKmh}k</span>
-        `;
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'w-4 h-4 flex items-center justify-center animate-spin text-rose-400';
+        iconSpan.style.animationDuration = '3.5s';
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const cycloneSvg = document.createElementNS(svgNS, 'svg');
+        cycloneSvg.setAttribute('viewBox', '0 0 24 24');
+        cycloneSvg.setAttribute('fill', 'none');
+        cycloneSvg.setAttribute('stroke', 'currentColor');
+        cycloneSvg.setAttribute('stroke-width', '2.5');
+        cycloneSvg.setAttribute('class', 'w-3.5 h-3.5 text-rose-400');
+
+        const p1 = document.createElementNS(svgNS, 'path');
+        p1.setAttribute('d', 'M12 2a10 10 0 0 1 7.07 17.07l-2.12-2.12A7 7 0 0 0 12 5v-3z');
+        const p2 = document.createElementNS(svgNS, 'path');
+        p2.setAttribute('d', 'M12 22a10 10 0 0 1-7.07-17.07l2.12 2.12A7 7 0 0 0 12 19v3z');
+        cycloneSvg.appendChild(p1);
+        cycloneSvg.appendChild(p2);
+        iconSpan.appendChild(cycloneSvg);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'text-[11px] font-bold text-white tracking-wide';
+        nameSpan.textContent = cyclone.name ?? '';
+
+        const windSpan = document.createElement('span');
+        windSpan.className = 'text-[9px] font-mono px-1 rounded bg-rose-500/30 text-rose-300 font-semibold';
+        windSpan.textContent = `${cyclone.windKmh ?? ''}k`;
+
+        el.appendChild(iconSpan);
+        el.appendChild(nameSpan);
+        el.appendChild(windSpan);
 
         el.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -3881,11 +3967,13 @@ export default function CloudburstMap({
         </div>
       )}
 
-      {/* 2.4 PluviaAtelier™ Floating Radar Playback Dock */}
+      {/* 2.4 PluviaAtelier™ Floating Radar Playback Dock (Centered Above Legend Bar) */}
       {selectedWeatherLayer === 'precip' && (
-        <div className={`absolute bottom-32 z-20 flex flex-col items-end gap-2 transition-all duration-300 max-w-[calc(100vw-32px)] ${isAnalyticsOpen ? 'right-[420px]' : 'right-16'}`}>
+        <div className={`absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom,0px))+6.25rem)] md:bottom-[78px] z-20 flex flex-col items-center gap-2 transition-all duration-300 pointer-events-none left-[62px] right-2.5 ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
+          } ${hasRightDrawerOpen ? 'md:right-[176px] lg:right-[372px]' : 'md:right-[176px]'
+          }`}>
           {/* Main Floating Glass Dock Bar */}
-          <div className="flex items-center gap-2 apple-liquid-glass px-3 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 apple-liquid-glass px-3 py-1.5 rounded-full shadow-2xl pointer-events-auto border border-white/20 select-none overflow-x-auto scrollbar-none max-w-full">
             {/* Play / Pause Toggle Button with Animated Progress Indicator */}
             <button
               type="button"
@@ -3976,30 +4064,14 @@ export default function CloudburstMap({
               <Compass className="w-3 h-3 text-cyan-400" />
               <span className="hidden sm:inline">Rings</span>
             </button>
-
-            {/* Ambient Rain Soundscape Toggle Button */}
-            <button
-              type="button"
-              onClick={() => {
-                const nextMuted = !isThunderMuted;
-                thunderSynth.setMuted(nextMuted);
-                setIsThunderMuted(nextMuted);
-              }}
-              title={isThunderMuted ? "Enable Ambient Rain Soundscape (Binaural Pink Noise & Droplet Clicks)" : "Mute Rain Soundscape"}
-              className={`p-1.5 rounded-full border transition-all cursor-pointer shrink-0 ${!isThunderMuted
-                ? 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.3)]'
-                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                }`}
-            >
-              {!isThunderMuted ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-            </button>
           </div>
         </div>
       )}
 
       {/* 2.47 AetherAura™ Liquid Glass AQI Station Telemetry Modal */}
       {selectedWeatherLayer === 'aqi' && selectedAqiStation && (
-        <div className="absolute top-20 right-4 z-30 pointer-events-auto glass-panel-translucent p-4 rounded-3xl shadow-2xl border border-white/15 text-white max-w-[320px] w-full animate-fade-in select-none">
+        <div className={`absolute top-[calc(3.75rem+env(safe-area-inset-top,0px))] z-30 pointer-events-auto glass-panel-translucent p-4 rounded-3xl shadow-2xl border border-white/15 text-white left-[62px] right-2.5 sm:w-[320px] max-h-[calc(100dvh-10.5rem)] sm:max-h-[calc(100dvh-11rem)] overflow-y-auto scrollbar-none animate-fade-in select-none transition-all duration-300 ${hasRightDrawerOpen ? 'sm:left-auto sm:right-[372px]' : 'sm:left-auto sm:right-4'
+          }`}>
           {/* Header */}
           <div className="flex items-start justify-between gap-2 mb-2 pb-2 border-b border-white/10">
             <div>
@@ -4089,21 +4161,21 @@ export default function CloudburstMap({
         </div>
       )}
 
-      {/* 5. Clean Basic Map Navigation Controls */}
-      <div className={`absolute bottom-20 z-20 flex flex-col gap-1.5 glass-panel-translucent p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 ${isAnalyticsOpen ? 'right-[396px]' : 'right-4'}`}>
+      {/* 5. Clean Basic Map Navigation Controls (Horizontal Bottom-Right Pill) */}
+      <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 right-2.5 sm:right-4 z-25 flex flex-row items-center gap-0.5 sm:gap-1 glass-panel-translucent p-1 sm:p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300">
         <button
           onClick={handleZoomIn}
           title="Zoom In"
-          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
+          className="p-1.5 xs:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
         </button>
         <button
           onClick={handleZoomOut}
           title="Zoom Out"
-          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
+          className="p-1.5 xs:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer active:scale-95"
         >
-          <Minus className="w-4 h-4" />
+          <Minus className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
         </button>
 
         <button
@@ -4116,12 +4188,12 @@ export default function CloudburstMap({
             }
           }}
           title={isThunderMuted ? "Enable Muted Thunder Audio" : "Mute Thunder Audio (Currently Active)"}
-          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${isThunderMuted
+          className={`p-1.5 xs:p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${isThunderMuted
             ? 'text-slate-400 hover:text-white hover:bg-white/15'
             : 'text-amber-300 bg-amber-400/20 border border-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.35)]'
             }`}
         >
-          {isThunderMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          {isThunderMuted ? <VolumeX className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> : <Volume2 className="w-3.5 h-3.5 xs:w-4 xs:h-4" />}
         </button>
 
         <button
@@ -4135,34 +4207,33 @@ export default function CloudburstMap({
             });
           }}
           title="Focus India / Himalayas"
-          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer flex items-center justify-center font-bold text-xs active:scale-95"
+          className="p-1.5 xs:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/15 transition-all cursor-pointer flex items-center justify-center font-bold text-xs active:scale-95"
         >
-          <span className="text-[10px] tracking-wider font-semibold">IND</span>
+          <span className="text-[9.5px] xs:text-[10px] tracking-wider font-semibold">IND</span>
         </button>
       </div>
 
-      {/* 2.5 Unified Lower Command Bar: Scale (Left) + Legend (Center) + Weather Selector (Right) */}
-      <div className={`absolute bottom-6 z-20 flex items-center justify-between gap-2 sm:gap-3 pointer-events-none select-none transition-all duration-300 ${isMeteoPanelOpen ? 'left-[400px]' : 'left-4'
-        } ${isAnalyticsOpen ? 'right-[396px]' : 'right-4'
+      {/* 2.5 Unified Lower Command Bar: Scale (Left) + Legend (Center) */}
+      <div className={`absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 z-20 flex flex-col-reverse md:grid md:grid-cols-[auto_minmax(0,1fr)] items-start md:items-center gap-2.5 md:gap-3 pointer-events-none select-none transition-all duration-300 left-[62px] right-2.5 md:right-[200px] ${hasLeftDrawerOpen ? 'md:left-20 lg:left-[428px]' : 'md:left-20'
         }`}>
         {/* 1. Left: Dynamic Map Scale Indicator */}
-        <div className="pointer-events-auto shrink-0">
+        <div className="pointer-events-auto justify-self-start shrink-0 h-10 md:h-auto flex items-center">
           <button
             type="button"
             onClick={() => setScaleUnit((u) => (u === 'metric' ? 'imperial' : 'metric'))}
             title={`Click to toggle units (${scaleUnit === 'metric' ? 'Metric: km' : 'Imperial: mi'})`}
-            className="flex items-center gap-1.5 sm:gap-2 text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-2.5 py-1.5 sm:px-3 rounded-full shadow-xl cursor-pointer hover:bg-white/20 transition-all active:scale-95 border border-white/20 shrink-0"
+            className="flex items-center gap-1.5 sm:gap-2 text-[9.5px] sm:text-[10px] font-mono text-slate-100 apple-liquid-glass-pill px-2 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-xl cursor-pointer hover:bg-white/20 transition-all active:scale-95 border border-white/20 shrink-0"
           >
             <span
               style={{ width: `${scaleInfo.widthPx}px` }}
-              className="h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
+              className="max-w-[44px] xs:max-w-none h-1 bg-white border-l-2 border-r-2 border-white shadow-[0_0_6px_#fff] transition-all duration-75"
             />
             <span className="font-semibold whitespace-nowrap">{scaleInfo.label}</span>
           </button>
         </div>
 
         {/* 2. Center: Active Weather Variable Legend Bar */}
-        <div className="pointer-events-auto shrink-0 flex items-center justify-center">
+        <div className="pointer-events-auto self-center md:justify-self-center min-w-0 w-full flex items-center justify-center max-w-full">
           {selectedWeatherLayer === 'aqi' ? (
             <AqiLegendBar
               minutesRemaining={aqiMinutesRemaining}
@@ -4190,7 +4261,7 @@ export default function CloudburstMap({
               const gradientCss = `linear-gradient(to right, ${stops.map((s, idx) => `${s.color} ${(idx / (stops.length - 1)) * 100}%`).join(', ')})`;
 
               return (
-                <div className="flex items-center gap-2 sm:gap-3 glass-panel-translucent px-3 sm:px-4 py-1.5 rounded-full shadow-2xl border border-white/20 select-none overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-2 sm:gap-3 glass-panel-translucent px-3 sm:px-4 py-1.5 rounded-full shadow-2xl border border-white/20 select-none max-w-full overflow-x-auto scrollbar-none">
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-white shrink-0">
                     <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
                     <span className="hidden sm:inline">Rain Intensity:</span>
@@ -4205,7 +4276,7 @@ export default function CloudburstMap({
                     </div>
                     <span className="text-[9.5px] font-sans font-bold text-rose-300">Torrent</span>
                   </div>
-                  <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-white/10 text-[9.5px] font-mono tabular-nums shrink-0">
+                  <div className="hidden xl:flex items-center gap-2 pl-2 border-l border-white/10 text-[9.5px] font-mono tabular-nums shrink-0">
                     {stops.map((st) => (
                       <div key={st.dbz} className="flex items-center gap-1" title={`${st.desc} (${st.label} dBZ)`}>
                         <span className="w-2.5 h-2.5 rounded-full shadow-sm ring-1 ring-white/25 shrink-0" style={{ backgroundColor: st.color }} />
@@ -4228,50 +4299,8 @@ export default function CloudburstMap({
           ) : null}
         </div>
 
-        {/* 3. Right: System Telemetry (ML Model Status & Hardware FPS Monitor) */}
-        <div className="pointer-events-auto shrink-0 flex items-center gap-2">
-          {/* Dual-Engine ML Model Status Pill Button */}
-          <button
-            type="button"
-            onClick={onRefreshMlStatus}
-            disabled={isMlRetrying}
-            title={
-              isMlLive
-                ? 'Physics-Informed Dual-Engine ML Model: LIVE (Click to refresh status)'
-                : `Dual-Engine ML Model: OFFLINE (${cloudburstEvent?.error || 'Cannot reach localhost:8001'}) - Click to retry`
-            }
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none border shadow-2xl ${
-              isMlLive
-                ? 'apple-liquid-glass-emerald text-emerald-200 border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.25)] hover:border-emerald-300'
-                : 'apple-liquid-glass-crimson text-rose-200 border-rose-500/50 shadow-[0_0_14px_rgba(244,63,94,0.25)] hover:border-rose-400'
-            }`}
-          >
-            {isMlRetrying ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-200 shrink-0" />
-            ) : (
-              <Cpu className={`w-3.5 h-3.5 shrink-0 ${isMlLive ? 'text-emerald-300' : 'text-rose-300'}`} />
-            )}
-
-            <span className="font-mono text-[11px] font-semibold tracking-tight">
-              {isMlRetrying ? 'Checking ML...' : isMlLive ? 'ML LIVE' : 'ML OFFLINE'}
-            </span>
-
-            {/* Pulsing Status Dot */}
-            <span className="relative flex h-2 w-2">
-              {isMlLive ? (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-                </>
-              ) : (
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
-              )}
-            </span>
-          </button>
-
-          {/* Real-Time Hardware FPS Monitor (Opens HUD Popover Upwards) */}
-          <FpsCounter variant="bottom" />
-        </div>
+        {/* 3. Right Spacer to keep Legend centered */}
+        <div className="hidden" aria-hidden="true" />
       </div>
     </div>
   );

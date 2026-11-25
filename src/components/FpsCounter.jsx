@@ -85,18 +85,12 @@ export default function FpsCounter({ className = "", variant = "header" }) {
           whileTap={{ scale: 0.94 }}
           onClick={() => setIsOpen(!isOpen)}
           title={`Hardware Telemetry & GPU Monitor: ${fps} FPS (${isOptimal ? 'Optimal' : isAcceptable ? 'Acceptable' : 'Under Load'})`}
-          className={`relative group w-10 h-10 flex flex-col items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
+          className={`relative group w-8 h-8 sm:w-9 sm:h-9 flex flex-col items-center justify-center rounded-full transition-all cursor-pointer select-none border shadow-md ${
             isOpen
               ? 'ring-2 ring-emerald-400/50 border-emerald-400/60 bg-emerald-500/20 shadow-emerald-950/40'
               : 'apple-liquid-glass hover:bg-white/15 border-white/20'
           } ${className}`}
         >
-          {/* Pulsing Fluidity Indicator */}
-          <span className="relative flex h-1.5 w-1.5 mb-0.5">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotColor}`} />
-            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColor}`} />
-          </span>
-
           {/* Live FPS Number */}
           <span className={`font-mono font-black text-[11px] leading-none tabular-nums ${statusColor}`}>
             {fps}
@@ -122,7 +116,7 @@ export default function FpsCounter({ className = "", variant = "header" }) {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -8, scale: 0.96 }}
               transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-full ml-3 bottom-0 w-64 glass-panel-translucent rounded-3xl p-4 shadow-2xl z-50 flex flex-col gap-3 border border-white/20 text-slate-100"
+              className="absolute left-full ml-3 bottom-0 w-[min(16rem,calc(100vw-5rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto scrollbar-none glass-panel-translucent rounded-3xl p-4 shadow-2xl z-50 flex flex-col gap-3 border border-white/20 text-slate-100"
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/10">
                 <div className="flex items-center gap-2">

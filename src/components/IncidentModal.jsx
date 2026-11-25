@@ -44,7 +44,7 @@ export default function IncidentModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 12 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
-          className="apple-liquid-glass-crimson w-full max-w-lg rounded-3xl p-6 relative flex flex-col gap-4 text-white overflow-hidden shadow-2xl"
+          className="apple-liquid-glass-crimson w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto scrollbar-none rounded-3xl p-5 sm:p-6 relative flex flex-col gap-4 text-white shadow-2xl"
         >
           {/* Modal Header */}
           <div className="flex items-start justify-between">

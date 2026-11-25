@@ -44,11 +44,11 @@ export default function AqiLegendBar({
   }
 
   return (
-    <div className={`flex flex-col items-center pointer-events-auto select-none ${className}`}>
-      <div className="flex items-center gap-2 sm:gap-3 glass-panel-translucent px-3 sm:px-5 py-1.5 rounded-full shadow-2xl border border-white/15 text-slate-200">
+    <div className={`flex flex-col items-center pointer-events-auto select-none max-w-full ${className}`}>
+      <div className="flex items-center gap-2 sm:gap-3 glass-panel-translucent px-2.5 sm:px-5 py-1.5 rounded-full shadow-2xl border border-white/15 text-slate-200 max-w-full overflow-x-auto scrollbar-none">
 
         {/* Title & Threshold Notice */}
-        <div className="flex items-center gap-2 pr-3 border-r border-white/10 shrink-0">
+        <div className="hidden xs:flex items-center gap-2 pr-2 sm:pr-3 border-r border-white/10 shrink-0">
           <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
             <Wind className="w-3.5 h-3.5 text-emerald-400" />
           </div>
@@ -56,12 +56,12 @@ export default function AqiLegendBar({
             <span className="text-[11px] font-bold tracking-tight text-white flex items-center gap-1.5">
               Air Quality
             </span>
-            <span className="text-[9px] font-mono text-amber-300/90 font-medium">&gt; 50 Harmful</span>
+            <span className="hidden sm:inline text-[9px] font-mono text-amber-300/90 font-medium">&gt; 50 Harmful</span>
           </div>
         </div>
 
         {/* Continuous Gradient Track with Numeric Scale & Synchronized Needle */}
-        <div className="flex flex-col gap-1 w-32 xs:w-44 sm:w-56 md:w-72 relative py-1">
+        <div className="flex flex-col gap-1 w-28 xs:w-32 sm:w-40 md:w-44 lg:w-48 xl:w-64 relative py-1 shrink-0">
           {/* Synchronized Needle */}
           {needlePct != null && needleCat && (
             <div

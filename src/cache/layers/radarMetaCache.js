@@ -22,3 +22,16 @@ export function getCachedRadarMetadata() {
 export function setCachedRadarMetadata(meta) {
   return radarMetaCacheManager.set(RADAR_LOOP_KEY, meta, TTL_SECONDS.RADAR_FRAME_METADATA);
 }
+
+export function getOrFetchRadarMetadata(fetcher, forceRefresh = false) {
+  return radarMetaCacheManager.getOrFetch(
+    RADAR_LOOP_KEY,
+    fetcher,
+    TTL_SECONDS.RADAR_FRAME_METADATA,
+    forceRefresh
+  );
+}
+
+export function invalidateRadarMetadataCache() {
+  return radarMetaCacheManager.invalidate(RADAR_LOOP_KEY);
+}

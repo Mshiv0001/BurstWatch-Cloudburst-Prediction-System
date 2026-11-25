@@ -9,19 +9,24 @@ import {
   RotateCcw,
   BellRing,
   AlertTriangle,
-  Send,
-  Trash2
+  Sliders,
+  Trash2,
+  LogOut,
+  MapPin,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
+import GoogleAuthButton from './GoogleAuthButton';
+import AlertPreferencesCard from './AlertPreferencesCard';
 import {
   registerSubscriber,
-  registerSubscriberGoogle,
   verifySubscriber,
   resendVerificationCode,
   unsubscribeSubscriber,
-  getLocalSubscription
+  updateSubscriberPreferences,
+  logoutSubscriber,
+  getLocalSubscription,
+  checkSubscriberStatus
 } from '../services/subscriberService';
 
 export default function EmailAlertModal({
@@ -32,12 +37,15 @@ export default function EmailAlertModal({
   const [step, setStep] = useState('input'); // 'input' | 'verify' | 'active'
   const [email, setEmail] = useState('');
   const [locationPref, setLocationPref] = useState('ALL');
+  const [minThresholdMm, setMinThresholdMm] = useState(50);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [devOtpNotice, setDevOtpNotice] = useState('');
+  const [userProfile, setUserProfile] = useState(() => getLocalSubscription());
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const otpInputsRef = useRef([]);
 
@@ -48,9 +56,21 @@ export default function EmailAlertModal({
       setSuccessMessage('');
       setDevOtpNotice('');
       const sub = getLocalSubscription();
+      setUserProfile(sub);
       if (sub.isVerified && sub.email) {
         setEmail(sub.email);
+        setLocationPref(sub.locationPref || 'ALL');
+        setMinThresholdMm(sub.minThresholdMm || 50);
         setStep('active');
+        // Validate session token asynchronously against server
+        checkSubscriberStatus(sub.email).then((res) => {
+          if (res?.status === 401) {
+            const fresh = getLocalSubscription();
+            setUserProfile(fresh);
+            setStep('input');
+            onSubscribedChange?.(false);
+          }
+        });
       } else {
         if (sub.email) setEmail(sub.email);
         setStep('input');
@@ -91,71 +111,39 @@ export default function EmailAlertModal({
 
     setIsLoading(true);
     setErrorMessage('');
-    const res = await registerSubscriber(email, locationPref);
+    const res = await registerSubscriber(email, locationPref, minThresholdMm);
     setIsLoading(false);
 
     if (res.ok) {
-      if (res.data.status === 'verified') {
-        setStep('active');
-        onSubscribedChange?.(true);
-      } else {
-        setStep('verify');
-        setResendCooldown(60);
-        setOtp(['', '', '', '', '', '']);
-        if (res.data.dev_mode) {
-          setDevOtpNotice('Development Mode: Check server console terminal for the 6-digit OTP code.');
-        }
-        setTimeout(() => otpInputsRef.current[0]?.focus(), 150);
+      setStep('verify');
+      setResendCooldown(60);
+      setOtp(['', '', '', '', '', '']);
+      if (res.data?.dev_mode) {
+        setDevOtpNotice('Development Mode: Check server console terminal for the 6-digit OTP code.');
       }
+      setTimeout(() => otpInputsRef.current[0]?.focus(), 150);
     } else {
       setErrorMessage(res.error || 'Failed to send verification code. Please try again.');
     }
   };
 
-  // Google OAuth 1-Click Handlers
-  const onGoogleSuccess = async (credentialResponse) => {
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const decoded = jwtDecode(credentialResponse.credential);
-      const userEmail = decoded.email || decoded.sub;
-      const res = await registerSubscriberGoogle(credentialResponse.credential, locationPref);
-      setIsLoading(false);
-
-      if (res.ok) {
-        setEmail(userEmail);
-        setStep('active');
-        setSuccessMessage('Successfully subscribed with Google! 1-click verification complete.');
-        onSubscribedChange?.(true);
-      } else {
-        setErrorMessage(res.error || 'Google subscription failed.');
-      }
-    } catch (err) {
-      setIsLoading(false);
-      setErrorMessage('Failed to decode Google account credential.');
-    }
+  // Google OAuth 1-Click Handlers (ZERO OTP)
+  const handleGoogleAuthSuccess = () => {
+    const current = getLocalSubscription();
+    setUserProfile(current);
+    setEmail(current.email);
+    setErrorMessage('');
+    setStep('active');
+    setSuccessMessage('Successfully subscribed with Google! Zero-OTP authentication verified.');
+    onSubscribedChange?.(true);
   };
 
-  const handleDemoGoogleSignIn = async () => {
-    const defaultEmail = email.trim() && email.includes('@') ? email.trim() : 'mshivhare0001@gmail.com';
-    setIsLoading(true);
-    setErrorMessage('');
-    const res = await registerSubscriberGoogle(defaultEmail, locationPref);
-    setIsLoading(false);
-
-    if (res.ok) {
-      setEmail(defaultEmail);
-      setStep('active');
-      setSuccessMessage('Subscribed successfully with Google (1-Click Verified)!');
-      onSubscribedChange?.(true);
-    } else {
-      setErrorMessage(res.error || 'Google subscription failed.');
-    }
+  const handleGoogleAuthError = (msg) => {
+    setErrorMessage(msg || 'Google Sign-In failed.');
   };
 
   // Step 2: Handle OTP Input
   const handleOtpChange = (index, value) => {
-    // Handle paste of full 6-digit code
     if (value.length > 1) {
       const digits = value.replace(/\D/g, '').slice(0, 6).split('');
       const newOtp = [...otp];
@@ -173,7 +161,6 @@ export default function EmailAlertModal({
     newOtp[index] = digit;
     setOtp(newOtp);
 
-    // Auto-advance cursor
     if (digit && index < 5) {
       otpInputsRef.current[index + 1]?.focus();
     }
@@ -200,11 +187,13 @@ export default function EmailAlertModal({
     setIsLoading(false);
 
     if (res.ok) {
+      const current = getLocalSubscription();
+      setUserProfile(current);
       setStep('active');
-      setSuccessMessage('Email successfully verified! You will receive high-priority alerts.');
+      setSuccessMessage('Email successfully verified! Convective early warnings activated.');
       onSubscribedChange?.(true);
     } else {
-      setErrorMessage(res.error || 'Verification code failed. Please check the code and try again.');
+      setErrorMessage(res.error || 'Verification failed. Please check the code and try again.');
     }
   };
 
@@ -227,6 +216,26 @@ export default function EmailAlertModal({
     }
   };
 
+  // Step 3: Save Preferences
+  const handleSavePreferences = async () => {
+    setIsSavingPrefs(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    const res = await updateSubscriberPreferences({
+      locationPref,
+      minThresholdMm
+    });
+    setIsSavingPrefs(false);
+
+    if (res.ok) {
+      setUserProfile(getLocalSubscription());
+      setSuccessMessage('Notification preferences saved successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      setErrorMessage(res.error || 'Failed to update preferences.');
+    }
+  };
+
   // Step 3: Unsubscribe
   const handleUnsubscribe = async () => {
     if (!window.confirm(`Are you sure you want to stop receiving weather alerts for ${email}?`)) {
@@ -238,12 +247,22 @@ export default function EmailAlertModal({
     setIsLoading(false);
 
     if (res.ok) {
+      setUserProfile(getLocalSubscription());
       setStep('input');
       onSubscribedChange?.(false);
       setSuccessMessage('You have been successfully unsubscribed.');
     } else {
       setErrorMessage(res.error || 'Failed to unsubscribe.');
     }
+  };
+
+  // Step 3: Sign Out
+  const handleSignOut = () => {
+    logoutSubscriber();
+    setUserProfile(getLocalSubscription());
+    setStep('input');
+    onSubscribedChange?.(false);
+    setSuccessMessage('Signed out successfully.');
   };
 
   return (
@@ -254,7 +273,7 @@ export default function EmailAlertModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="glass-panel-translucent apple-liquid-glass w-full max-w-md rounded-3xl p-6 sm:p-7 relative flex flex-col gap-5 text-white overflow-hidden shadow-2xl border border-white/20"
+          className="glass-panel-translucent apple-liquid-glass w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto scrollbar-none rounded-3xl p-5 sm:p-7 relative flex flex-col gap-5 text-white shadow-2xl border border-white/20"
         >
           {/* Close button */}
           <button
@@ -267,7 +286,7 @@ export default function EmailAlertModal({
           </button>
 
           {/* ========================================================================= */}
-          {/* STAGE 1: Email Registration Input                                         */}
+          {/* STAGE 1: Dual-Path Login & Registration Screen                            */}
           {/* ========================================================================= */}
           {step === 'input' && (
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
@@ -289,49 +308,37 @@ export default function EmailAlertModal({
                 Receive high-priority email alerts when convective cloudbursts, severe flash flood threats, or extreme rainfall (&gt;50 mm/day) are forecasted.
               </p>
 
-              {/* Google 1-Click Subscription */}
-              <div className="flex flex-col gap-2.5 pt-1">
-                {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
-                  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-                    <div className="w-full flex justify-center">
-                      <GoogleLogin
-                        onSuccess={onGoogleSuccess}
-                        onError={() => setErrorMessage('Google Sign-In failed or was cancelled.')}
-                        theme="filled_black"
-                        shape="pill"
-                        text="continue_with"
-                        size="large"
-                        width="100%"
-                      />
-                    </div>
-                  </GoogleOAuthProvider>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleDemoGoogleSignIn}
-                    className="w-full py-2.5 px-4 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md active:scale-98"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.34 24 12 24z"/>
-                      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.99 0 12s.45 3.85 1.24 5.42l4.04-3.15z"/>
-                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                    </svg>
-                    <span>Continue with Google</span>
-                  </button>
-                )}
+              {/* Alert Region & Rainfall Threshold */}
+              <AlertPreferencesCard
+                compact
+                region={locationPref}
+                onRegionChange={setLocationPref}
+                thresholdMm={minThresholdMm}
+                onThresholdChange={setMinThresholdMm}
+              />
 
-                {/* Aesthetic Divider */}
+              {/* Path A: Google 1-Click Login (Zero OTP) */}
+              <div className="flex flex-col gap-2.5 pt-1">
+                <GoogleAuthButton
+                  locationPref={locationPref}
+                  minThresholdMm={minThresholdMm}
+                  fallbackEmail={email}
+                  disabled={isLoading}
+                  onSuccess={handleGoogleAuthSuccess}
+                  onError={handleGoogleAuthError}
+                />
+
+                {/* Aesthetic Minimal Divider */}
                 <div className="flex items-center gap-3 my-1">
                   <div className="flex-1 h-px bg-white/10" />
                   <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium font-mono">
-                    or enter email manually
+                    or continue with email
                   </span>
                   <div className="flex-1 h-px bg-white/10" />
                 </div>
               </div>
 
-              {/* Email Input Field */}
+              {/* Path B: Email Address Input Field */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-medium text-slate-300">
                   Email Address
@@ -350,23 +357,6 @@ export default function EmailAlertModal({
                 </div>
               </div>
 
-              {/* Alert Scope Selector */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-medium text-slate-300">
-                  Monitoring Region
-                </label>
-                <select
-                  value={locationPref}
-                  onChange={(e) => setLocationPref(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-full bg-white/10 border border-white/15 text-white text-xs focus:outline-none focus:border-cyan-400 cursor-pointer"
-                >
-                  <option value="ALL" className="bg-slate-900 text-white">Pan-India Convective Network (All 419+ Stations)</option>
-                  <option value="Kedarnath Valley" className="bg-slate-900 text-white">Kedarnath Valley &amp; Garhwal Himalayas</option>
-                  <option value="Western Ghats" className="bg-slate-900 text-white">Western Ghats &amp; Coastal Belts</option>
-                  <option value="Northeast Corridors" className="bg-slate-900 text-white">Northeast Meghalaya &amp; Brahmaputra Valley</option>
-                </select>
-              </div>
-
               {/* Inline Error */}
               {errorMessage && (
                 <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
@@ -382,7 +372,7 @@ export default function EmailAlertModal({
                 </div>
               )}
 
-              {/* Submit Pill Button */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -520,52 +510,139 @@ export default function EmailAlertModal({
           )}
 
           {/* ========================================================================= */}
-          {/* STAGE 3: Active Verified Subscription Dashboard                          */}
+          {/* STAGE 3: Active Verified Subscription & Preferences Dashboard            */}
           {/* ========================================================================= */}
           {step === 'active' && (
-            <div className="flex flex-col gap-4 text-center items-center">
-              <div className="w-14 h-14 rounded-full apple-liquid-glass-emerald flex items-center justify-center shadow-lg shadow-emerald-500/25 border border-emerald-400/50 mt-1">
-                <CheckCircle2 className="w-8 h-8 text-emerald-300 animate-pulse" />
-              </div>
+            <div className="flex flex-col gap-4">
+              {/* Profile Card */}
+              <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                {userProfile.picture ? (
+                  <img
+                    src={userProfile.picture}
+                    alt={userProfile.name || 'User Avatar'}
+                    className="w-12 h-12 rounded-full border-2 border-emerald-400 shadow-md object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full apple-liquid-glass-emerald flex items-center justify-center font-bold text-emerald-300 border border-emerald-400/40 shrink-0">
+                    {userProfile.name ? userProfile.name[0].toUpperCase() : <ShieldCheck className="w-6 h-6" />}
+                  </div>
+                )}
 
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                  Subscription Active
-                </span>
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-white mt-0.5">
-                  Early Warnings Activated
-                </h2>
-                <p className="text-xs text-slate-300 mt-1">
-                  High-priority convective weather alerts are active for:
-                </p>
-                <div className="mt-2 inline-block px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-mono font-medium text-cyan-300">
-                  {email}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white truncate">
+                      {userProfile.name || 'BurstWatch Subscriber'}
+                    </h3>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {userProfile.authProvider === 'google' ? 'Google Verified' : 'Email Verified'}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-300 font-mono truncate block mt-0.5">
+                    {email}
+                  </span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Sign out of alerts"
+                  className="p-2 rounded-full text-slate-400 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Thank you note */}
-              <div className="w-full text-center bg-white/5 border border-white/10 rounded-2xl p-3.5 text-xs text-slate-300 font-medium">
-                Thank you for subscribing!
+              {/* Preferences Configuration */}
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-semibold text-white">Alert Preferences</span>
+                </div>
+
+                {/* Region selector */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-slate-400 uppercase font-semibold">Monitoring Region</label>
+                  <select
+                    value={locationPref}
+                    onChange={(e) => setLocationPref(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    <option value="ALL">Pan-India Convective Network (All Stations)</option>
+                    <option value="Kedarnath Valley">Kedarnath Valley &amp; Garhwal Himalayas</option>
+                    <option value="Western Ghats">Western Ghats &amp; Coastal Belts</option>
+                    <option value="Northeast Corridors">Northeast Meghalaya &amp; Brahmaputra Valley</option>
+                  </select>
+                </div>
+
+                {/* Rainfall threshold slider */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span className="uppercase font-semibold">Rainfall Alert Threshold</span>
+                    <span className="text-cyan-300 font-bold">&gt;= {minThresholdMm} mm/day</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="25"
+                    max="100"
+                    step="5"
+                    value={minThresholdMm}
+                    onChange={(e) => setMinThresholdMm(Number(e.target.value))}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500">
+                    <span>25 mm (Moderate)</span>
+                    <span>50 mm (Heavy)</span>
+                    <span>100 mm (Extreme)</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSavePreferences}
+                  disabled={isSavingPrefs}
+                  className="mt-1 py-2 rounded-xl apple-liquid-glass-cyan text-white text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingPrefs ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-300" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-300" />
+                  )}
+                  <span>Save Notification Preferences</span>
+                </button>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-col gap-2 w-full mt-2">
+              {/* Inline Success or Error */}
+              {successMessage && (
+                <div className="p-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+              {errorMessage && (
+                <div className="p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full py-2.5 rounded-full apple-liquid-glass-emerald text-white text-xs font-semibold tracking-wide shadow-md hover:bg-emerald-500/20 active:scale-98 transition-all cursor-pointer"
+                  className="flex-1 py-2.5 rounded-full apple-liquid-glass-emerald text-white text-xs font-semibold cursor-pointer shadow-md"
                 >
                   Done
                 </button>
-
                 <button
                   type="button"
                   onClick={handleUnsubscribe}
                   disabled={isLoading}
-                  className="w-full py-2 rounded-full text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="py-2.5 px-4 rounded-full text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Unsubscribe from alerts</span>
+                  <span>Unsubscribe</span>
                 </button>
               </div>
             </div>
@@ -575,4 +652,3 @@ export default function EmailAlertModal({
     </AnimatePresence>
   );
 }
-
