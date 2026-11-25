@@ -1992,6 +1992,7 @@ export default function CloudburstMap({
   // Muted Thunder Synthesizer state
   const [isThunderMuted, setIsThunderMuted] = useState(() => thunderSynth.isMuted());
   const [mapBearing, setMapBearing] = useState(0);
+  const [isNorthLocked, setIsNorthLocked] = useState(false);
 
   // RainViewer live Doppler radar state & playback
   const [radarFrames, setRadarFrames] = useState([]);
@@ -3776,8 +3777,29 @@ export default function CloudburstMap({
 
   const handleZoomIn = () => mapRef.current?.zoomIn();
   const handleZoomOut = () => mapRef.current?.zoomOut();
-  const handleResetNorth = () => {
-    mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 });
+  const handleToggleNorthLock = () => {
+    const map = mapRef.current;
+    setIsNorthLocked((prev) => {
+      const nextLocked = !prev;
+      if (map) {
+        if (nextLocked) {
+          map.dragRotate?.disable();
+          map.touchZoomRotate?.disableRotation();
+          map.keyboard?.disableRotation?.();
+          map.easeTo({
+            bearing: 0,
+            pitch: 0,
+            duration: 600,
+            easing: (t) => 1 - Math.pow(1 - t, 3),
+          });
+        } else {
+          map.dragRotate?.enable();
+          map.touchZoomRotate?.enableRotation();
+          map.keyboard?.enableRotation?.();
+        }
+      }
+      return nextLocked;
+    });
   };
   const handleResetCamera = () => {
     mapRef.current?.flyTo({
@@ -4298,24 +4320,36 @@ export default function CloudburstMap({
       <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:bottom-6 right-2.5 sm:right-4 z-25 flex flex-row items-center gap-0.5 sm:gap-1 glass-panel-translucent p-1 sm:p-1.5 rounded-full shadow-2xl pointer-events-auto transition-all duration-300">
         <button
           type="button"
-          onClick={handleResetNorth}
-          title={Math.abs(mapBearing) > 1 ? `Reset North (${Math.round(mapBearing)}°)` : 'Map Orientation (North Up)'}
-          aria-label="Reset map orientation to North"
-          className={`p-1.5 xs:p-2 rounded-full transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
-            Math.abs(mapBearing) > 1
-              ? 'bg-cyan-500/20 text-white hover:bg-cyan-500/30 border border-cyan-400/40'
-              : 'text-slate-300 hover:text-white hover:bg-white/15 border border-transparent'
+          onClick={handleToggleNorthLock}
+          title={
+            isNorthLocked
+              ? 'North Locked (Click to unlock free rotation)'
+              : Math.abs(mapBearing) > 1
+                ? `Free Rotation (${Math.round(mapBearing)}°) — Click to lock North`
+                : 'Free Rotation (Click to lock North)'
+          }
+          aria-label={isNorthLocked ? 'Unlock North orientation' : 'Lock map orientation to North'}
+          aria-pressed={isNorthLocked}
+          className={`relative p-1.5 xs:p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center active:scale-95 ${
+            isNorthLocked
+              ? 'bg-cyan-500/25 text-white border border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.28)]'
+              : Math.abs(mapBearing) > 1
+                ? 'bg-white/15 text-white hover:bg-white/20 border border-white/25'
+                : 'text-slate-300 hover:text-white hover:bg-white/15 border border-transparent'
           }`}
         >
           <svg
             viewBox="0 0 24 24"
-            className="w-3.5 h-3.5 xs:w-4 xs:h-4 transition-transform duration-75"
+            className="w-3.5 h-3.5 xs:w-4 xs:h-4 transition-transform duration-300 ease-out"
             style={{ transform: `rotate(${-mapBearing}deg)` }}
             aria-hidden="true"
           >
             <polygon points="12,2 15.5,12 12,10.5 8.5,12" fill="#ef4444" />
             <polygon points="12,22 15.5,12 12,13.5 8.5,12" fill="#cbd5e1" />
           </svg>
+          {isNorthLocked && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+          )}
         </button>
 
         <button
