@@ -578,24 +578,24 @@ function applyMapLayersAndHeatmap(
   );
   const beforeId = firstLabelLayer ? firstLabelLayer.id : undefined;
 
-  // 1.5 Dynamic Basemap Switching:
-  // - Cloudburst layer ('convective', non-satellite): colorful OpenFreeMap Liberty vector map
-  // - Other weather overlays: Dark Graphite Canvas over OSM
-  // - Satellite: base-satellite raster
-  const isConvectiveVector = !isSatellite && activeLayer === 'convective';
+  // 1.5 Dynamic 3-Mode Basemap Switching:
+  // - Satellite ON: Google Hybrid satellite raster
+  // - Weather overlay active ('temp', 'wind', 'precip', 'aqi'): Clean whitish OSM map
+  // - Else ('convective' or 'none'): Dark-green VersaTiles Colorful vector map
+  const isWeatherOverlay = activeLayer === 'temp' || activeLayer === 'wind' || activeLayer === 'precip' || activeLayer === 'aqi';
+  const isGreenVectorMap = !isSatellite && !isWeatherOverlay;
+  map.__bwUseGreenVector = isGreenVectorMap;
+
   let libertyReady = false;
-  if (isConvectiveVector || libertyStyleCache) {
+  if (isGreenVectorMap || libertyStyleCache) {
     if (libertyStyleCache) {
-      libertyReady = syncLibertyVectorBasemap(map, isConvectiveVector);
-    } else if (isConvectiveVector) {
+      libertyReady = syncLibertyVectorBasemap(map, isGreenVectorMap);
+    } else if (isGreenVectorMap) {
       fetchLibertyVectorStyle().then((loaded) => {
         if (!loaded || !map.getStyle()) return;
-        const stillConvective = map.getLayer('base-satellite')
-          && map.getLayoutProperty('base-satellite', 'visibility') === 'none'
-          && map.getLayer(HEATMAP_LAYER_ID)
-          && map.getLayoutProperty(HEATMAP_LAYER_ID, 'visibility') === 'visible';
-        syncLibertyVectorBasemap(map, stillConvective);
-        if (stillConvective && map.getLayer('basemap')) {
+        const stillGreen = Boolean(map.__bwUseGreenVector);
+        syncLibertyVectorBasemap(map, stillGreen);
+        if (stillGreen && map.getLayer('basemap')) {
           try {
             map.setLayoutProperty('basemap', 'visibility', 'none');
             map.setPaintProperty('basemap', 'raster-opacity', 0.0);
@@ -606,14 +606,13 @@ function applyMapLayersAndHeatmap(
   }
 
   if (map.getLayer('basemap')) {
-    const isDarkCanvas = !isSatellite && (activeLayer === 'temp' || activeLayer === 'wind' || activeLayer === 'precip' || activeLayer === 'aqi');
-    const hideOsmBasemap = isSatellite || (isConvectiveVector && libertyReady);
+    const hideOsmBasemap = isSatellite || (isGreenVectorMap && libertyReady);
     try {
       map.setLayoutProperty('basemap', 'visibility', hideOsmBasemap ? 'none' : 'visible');
-      map.setPaintProperty('basemap', 'raster-brightness-min', isDarkCanvas ? 0.03 : 0.0);
-      map.setPaintProperty('basemap', 'raster-brightness-max', isDarkCanvas ? 0.28 : 1.0);
-      map.setPaintProperty('basemap', 'raster-contrast', isDarkCanvas ? 0.26 : 0.0);
-      map.setPaintProperty('basemap', 'raster-saturation', isDarkCanvas ? -0.92 : 0.0);
+      map.setPaintProperty('basemap', 'raster-brightness-min', 0.0);
+      map.setPaintProperty('basemap', 'raster-brightness-max', 1.0);
+      map.setPaintProperty('basemap', 'raster-contrast', 0.0);
+      map.setPaintProperty('basemap', 'raster-saturation', isWeatherOverlay ? -0.35 : 0.0);
       map.setPaintProperty('basemap', 'raster-opacity', hideOsmBasemap ? 0.0 : 1.0);
     } catch (e) { }
   }
